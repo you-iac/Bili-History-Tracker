@@ -1,0 +1,3 @@
+# Local build output and Go coverage reports.
+/backend/bin/
+/backend/coverage.out
