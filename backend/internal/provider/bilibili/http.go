@@ -1,3 +1,7 @@
+// http.go 为视频和 UP 主查询提供共用的 HTTP 请求、业务码检查及 JSON 数据解析。
+// 本文件负责限制响应大小并保留取消和超时错误，字段语义由各查询实现校验。
+// 设计说明（仓库相对路径）：docs/architecture.md 的“服务端在哪里请求 B站”章节。
+
 package bilibili
 
 import (

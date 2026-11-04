@@ -1,4 +1,7 @@
-// Package httpapi exposes platform-independent metadata queries over HTTP.
+// Package httpapi 将视频和作者资料查询暴露为 HTTP API，负责路由、超时和 JSON 响应。
+// 本包通过 Querier 调用查询服务，将业务错误映射为 HTTP 状态，不依赖具体平台实现。
+//
+// 设计说明（仓库相对路径）：docs/architecture.md#module-navigation。
 package httpapi
 
 import (
@@ -12,11 +15,13 @@ import (
 	"bili-history-tracker/backend/internal/source"
 )
 
+// Querier 是 HTTP 层所需的查询能力；实现必须传递上下文的取消和超时信号。
 type Querier interface {
 	GetVideo(context.Context, string, string) (source.Video, error)
 	GetCreator(context.Context, string, string) (source.CreatorProfile, error)
 }
 
+// New 注册健康检查、视频查询和作者资料查询路由；健康检查不会访问上游。
 func New(queries Querier) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {

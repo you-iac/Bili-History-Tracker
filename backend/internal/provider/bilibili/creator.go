@@ -1,3 +1,7 @@
+// creator.go 按 UID 查询 UP 主资料，校验响应中的身份并归一化资料字段。
+// 请求处理复用 http.go；粉丝数缺失时保持未知，不触发投稿列表查询。
+// 设计说明（仓库相对路径）：docs/architecture.md 的“按 UID 查询 UP 主资料”章节。
+
 package bilibili
 
 import (
@@ -14,6 +18,7 @@ const creatorEndpoint = "https://api.bilibili.com/x/web-interface/card"
 
 var _ source.CreatorProvider = (*Provider)(nil)
 
+// GetCreator 接受规范的正十进制 UID，返回本次观测资料；无效 UID 不发起上游请求。
 func (p *Provider) GetCreator(ctx context.Context, id string) (source.CreatorProfile, error) {
 	// UID is a canonical positive decimal integer. Do not accept URLs, signs,
 	// leading zeroes or values that cannot be represented by the source's int64.

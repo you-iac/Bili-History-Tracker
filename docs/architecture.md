@@ -2,6 +2,25 @@
 
 当前实现一次性视频元数据查询和 UP 主资料查询。视频查询对应 PRD FR-005 的基础元数据获取能力。尚未实现投稿列表发现、可访问性状态机、持久化历史查询和 Agent 同步，不能视为完整实现 FR-005、FR-006 或 FR-008。
 
+<a id="module-navigation"></a>
+
+## 模块导航与维护约定
+
+下表链接均相对于本文件所在的 `docs/` 目录，可在支持本地 Markdown 链接的查看器中打开对应代码。代码文件的模块注释反向注明本文档位置，文档路径以仓库根目录为基准。
+
+| 模块或独立职责 | 功能与边界 | 实现入口与关键符号 | 相关测试 |
+|---|---|---|---|
+| 服务启动 | 组装数据源和查询服务、读取配置、管理 HTTP 服务生命周期 | [main.go](../backend/cmd/server/main.go) 的 `main` | 使用本文的启动、健康检查和查询命令验证 |
+| 通用查询层 | 定义统一数据与错误，按平台和能力分发；平台格式校验交给适配器 | [source.go](../backend/internal/source/source.go) 的 `Provider`、`CreatorProvider`、`Service` | [source_test.go](../backend/internal/source/source_test.go) |
+| HTTP API | 接收调用方请求，提取参数，设置查询超时并返回 JSON | [handler.go](../backend/internal/httpapi/handler.go) 的 `Querier`、`New` | [handler_test.go](../backend/internal/httpapi/handler_test.go) |
+| B站 Provider 与视频查询 | 初始化客户端、校验 BV、转换视频元数据和业务错误 | [bilibili.go](../backend/internal/provider/bilibili/bilibili.go) 的 `Provider`、`GetVideo` | [bilibili_test.go](../backend/internal/provider/bilibili/bilibili_test.go) |
+| B站 UP 主资料查询 | 校验 UID、查询并归一化资料；不获取投稿列表 | [creator.go](../backend/internal/provider/bilibili/creator.go) 的 `GetCreator` | [creator_test.go](../backend/internal/provider/bilibili/creator_test.go) |
+| B站共用请求处理 | 发送上游请求，检查 HTTP 和业务状态、响应大小及 JSON；字段语义交给各查询实现 | [http.go](../backend/internal/provider/bilibili/http.go) 的 `get` | 由 [视频测试](../backend/internal/provider/bilibili/bilibili_test.go) 和 [资料测试](../backend/internal/provider/bilibili/creator_test.go) 覆盖 |
+
+注释与技术文档分工：包注释和文件头说明模块职责、边界及文档位置；接口、关键方法和复杂逻辑附近解释输入约束、错误语义及设计原因；本文负责模块关系、执行链路、API、字段映射及扩展方式。普通赋值和显而易见的调用不需要逐行注释。
+
+新增或移动模块、变更接口或职责时，同步更新上述导航及相关章节。定位实现优先使用文件链接和符号名，避免固定行号随着代码调整而失效。具体要求见 [AGENTS.md](../AGENTS.md)。
+
 ## 模块边界
 
 ```text
@@ -28,7 +47,7 @@ backend/internal/provider/bilibili B站标识校验、HTTP 请求、响应解析
 
 ## 启动时如何组装服务
 
-入口为 `backend/cmd/server/main.go`。执行 `go run ./cmd/server` 或运行已编译程序时，依次完成：
+入口为 [main.go](../backend/cmd/server/main.go)。执行 `go run ./cmd/server` 或运行已编译程序时，依次完成：
 
 1. `bilibili.New()` 创建 B站 Provider，内部持有一个可复用的 `http.Client`，此时还不查询 B站。
 2. `source.NewService(bilibili.New())` 创建查询服务，按 Provider 的 `Platform()` 返回值注册为 `providers["bilibili"]`。
@@ -129,7 +148,7 @@ B站 Provider 的实现位于 `backend/internal/provider/bilibili` 包，具体�
 
 ### 本项目 API 路由如何设置
 
-路由在 `backend/internal/httpapi/handler.go` 的 `New()` 中注册：
+路由在 [handler.go](../backend/internal/httpapi/handler.go) 的 `New()` 中注册：
 
 ```go
 mux := http.NewServeMux()
@@ -199,7 +218,7 @@ B站 API 路由本身返回 HTTP 404 时映射为 `upstream_failure`；只有可
 
 ### 服务端在哪里请求 B站
 
-视频查询入口位于 `backend/internal/provider/bilibili/bilibili.go` 的 `GetVideo()` 中。B站地址由同文件的 `videoEndpoint` 常量指定，与本项目提供给 curl 的路由相互独立：
+视频查询入口位于 [bilibili.go](../backend/internal/provider/bilibili/bilibili.go) 的 `GetVideo()` 中。B站地址由同文件的 `videoEndpoint` 常量指定，与本项目提供给 curl 的路由相互独立：
 
 ```go
 const videoEndpoint = "https://api.bilibili.com/x/web-interface/view"
@@ -210,7 +229,7 @@ var data videoData
 err := p.get(ctx, endpoint, &data)
 ```
 
-视频和 UP 主资料查询共用 `backend/internal/provider/bilibili/http.go` 的 `get()`，实际网络请求在这里发送：
+视频和 UP 主资料查询共用 [http.go](../backend/internal/provider/bilibili/http.go) 的 `get()`，实际网络请求在这里发送：
 
 ```go
 req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
@@ -307,7 +326,7 @@ sequenceDiagram
     H-->>C: HTTP 状态及 JSON
 ```
 
-通用类型及能力接口位于 `backend/internal/source/source.go`：
+通用类型及能力接口位于 [source.go](../backend/internal/source/source.go)：
 
 ```go
 type CreatorProvider interface {
@@ -321,7 +340,7 @@ type CreatorProvider interface {
 
 ### B站端点、输入与字段映射
 
-实现位于 `backend/internal/provider/bilibili/creator.go`，使用固定端点 `https://api.bilibili.com/x/web-interface/card`，将 UID 放入 `mid` 查询参数。不接受任意上游 URL，不使用 Cookie，不会请求该 UID 的投稿列表。
+实现位于 [creator.go](../backend/internal/provider/bilibili/creator.go)，使用固定端点 `https://api.bilibili.com/x/web-interface/card`，将 UID 放入 `mid` 查询参数。不接受任意上游 URL，不使用 Cookie，不会请求该 UID 的投稿列表。
 
 UID 必须是规范的正十进制整数，范围为 `1` 到 `9223372036854775807`。空值、零、正负号、前导零、空格、小数、科学计数法、溢出值和个人空间链接均不接受；到达 Provider 的无效值会在发起上游请求前返回 `invalid_input`。HTTP 路径中完全缺失 ID 时，由路由器返回 404。
 

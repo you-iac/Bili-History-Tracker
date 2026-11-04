@@ -1,3 +1,7 @@
+// Command server 组装平台 Provider、查询服务和 HTTP 路由，并管理监听与关闭流程。
+// 本入口负责读取服务配置，具体平台的数据获取由 Provider 实现。
+//
+// 设计说明（仓库相对路径）：docs/architecture.md#module-navigation。
 package main
 
 import (

@@ -35,3 +35,5 @@ go build -o bin/server.exe ./cmd/server
 当前查询结果不持久化，不能查询已消失视频的历史记录。元数据查询成功也不代表视频可以播放；查询不到不代表视频已被删除。
 
 从 curl 到 B站再到 JSON 返回的执行链路、API 路由配置、`httpapi` 与 Provider 的职责及扩展方式见 [架构说明](docs/architecture.md)。
+
+阅读代码可从 [模块导航](docs/architecture.md#module-navigation) 进入，表中链接到各模块实现和相关测试；模块注释与文档的维护约定见 [AGENTS.md](AGENTS.md)。

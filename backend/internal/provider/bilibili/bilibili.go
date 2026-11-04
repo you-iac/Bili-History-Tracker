@@ -1,5 +1,8 @@
-// Package bilibili implements metadata queries against Bilibili's web endpoint.
-// This endpoint is not a guaranteed public developer API and may reject requests.
+// Package bilibili 将 B站网页端点的响应转换为 source 中的平台无关数据。
+// 本文件负责客户端初始化、BV 查询和业务错误映射；creator.go 负责 UID 资料查询，
+// http.go 负责共用的请求与响应校验。网页端点可能拒绝访问，不保证持续可用。
+//
+// 设计说明（仓库相对路径）：docs/architecture.md#module-navigation。
 package bilibili
 
 import (
@@ -23,6 +26,7 @@ var bvidPattern = regexp.MustCompile(`^BV[1-9A-HJ-NP-Za-km-z]{10}$`)
 
 var _ source.Provider = (*Provider)(nil)
 
+// Provider 持有可并发复用的 HTTP 客户端，实现视频查询和可选的作者资料查询能力。
 type Provider struct {
 	client *http.Client
 }
@@ -53,6 +57,7 @@ type videoData struct {
 	} `json:"owner"`
 }
 
+// GetVideo 校验 BV 并获取视频元数据；查询成功不代表视频当前可以播放。
 func (p *Provider) GetVideo(ctx context.Context, id string) (source.Video, error) {
 	if !bvidPattern.MatchString(id) {
 		return source.Video{}, &source.Error{Kind: source.InvalidInput, Platform: platform}

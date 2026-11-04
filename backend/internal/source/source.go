@@ -1,4 +1,7 @@
-// Package source defines the platform-independent metadata query contract.
+// Package source 定义平台无关的查询接口、数据结构和错误，并按平台注册表分发查询。
+// 本包判断数据源是否支持所需能力，具体平台的标识校验和网络请求由 Provider 实现。
+//
+// 设计说明（仓库相对路径）：docs/architecture.md#module-navigation。
 package source
 
 import (
@@ -7,6 +10,7 @@ import (
 	"time"
 )
 
+// Creator 是视频结果中的简要作者引用，独立资料查询使用 CreatorProfile。
 type Creator struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
@@ -88,6 +92,7 @@ type Service struct {
 	providers map[string]Provider
 }
 
+// NewService 创建查询服务并拒绝空平台名或重复注册；构造后不再修改注册表。
 func NewService(providers ...Provider) (*Service, error) {
 	s := &Service{providers: make(map[string]Provider, len(providers))}
 	for _, p := range providers {
@@ -103,6 +108,7 @@ func NewService(providers ...Provider) (*Service, error) {
 	return s, nil
 }
 
+// GetVideo 选择平台并透传视频 ID 与上下文，ID 的格式由具体 Provider 校验。
 func (s *Service) GetVideo(ctx context.Context, platform, id string) (Video, error) {
 	p, err := s.lookup(platform, id)
 	if err != nil {
@@ -111,6 +117,7 @@ func (s *Service) GetVideo(ctx context.Context, platform, id string) (Video, err
 	return p.GetVideo(ctx, id)
 }
 
+// GetCreator 通过可选能力查询作者资料；已注册但不支持该能力的平台返回 UnsupportedOperation。
 func (s *Service) GetCreator(ctx context.Context, platform, id string) (CreatorProfile, error) {
 	p, err := s.lookup(platform, id)
 	if err != nil {
