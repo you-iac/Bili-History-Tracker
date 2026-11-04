@@ -48,7 +48,7 @@ server := &http.Server{
 err = server.ListenAndServe()
 ```
 
-监听地址由 `main.go` 读取环境变量 `BHT_ADDR` 决定，未设置时为 `127.0.0.1:8080`。`127.0.0.1` 表示本机回环地址，`8080` 是本项目服务的端口。
+监听地址由 `main.go` 读取环境变量 `BHT_ADDR` 决定，未设置时为 `127.0.0.1:8181`。`127.0.0.1` 表示本机回环地址，`8181` 是本项目服务的端口。
 
 例如，在启动服务的 PowerShell 中设置：
 
@@ -65,7 +65,7 @@ go run ./cmd/server
 在保持服务运行的同时，另开一个终端执行：
 
 ```powershell
-curl.exe "http://127.0.0.1:8080/api/v1/platforms/bilibili/videos/BV17x411w7KC"
+curl.exe "http://127.0.0.1:8181/api/v1/platforms/bilibili/videos/BV17x411w7KC"
 ```
 
 命令中直接填写 URL，不要把 Markdown 的 `[文字](链接)` 格式复制进命令。这里没有指定请求体或其他方法，curl 默认发起 GET 请求。
@@ -91,7 +91,7 @@ sequenceDiagram
 
 成功路径的具体步骤如下：
 
-1. curl 连接本机 `8080` 端口，将请求交给运行中的 Go HTTP 服务。
+1. curl 连接本机 `8181` 端口，将请求交给运行中的 Go HTTP 服务。
 2. Go 标准库 `http.ServeMux` 匹配 GET 方法和路由模板，进入 `httpapi.New()` 中注册的处理函数。
 3. 处理函数从路径中取出 `platform="bilibili"` 和 `id="BV17x411w7KC"`，创建带 12 秒超时的请求上下文。
 4. `source.Service.GetVideo()` 用平台名查找已注册的 Provider，并把视频 ID 和上下文传给它。这个步骤不拼接 B站 URL，也不发起网络请求。

@@ -9,11 +9,11 @@ cd backend
 go run ./cmd/server
 ```
 
-默认监听 `127.0.0.1:8080`，可通过环境变量 `BHT_ADDR` 修改地址。
+默认监听 `127.0.0.1:8181`，可通过环境变量 `BHT_ADDR` 修改地址。
 
 ```powershell
-curl.exe http://127.0.0.1:8080/healthz
-curl.exe http://127.0.0.1:8080/api/v1/platforms/bilibili/videos/BV17x411w7KC
+curl.exe http://127.0.0.1:8181/healthz
+curl.exe http://127.0.0.1:8181/api/v1/platforms/bilibili/videos/BV17x411w7KC
 ```
 
 目前仅接受完整 BV 号，区分大小写，不接受视频链接或 av 号。返回标题、简介、封面地址、UP 主、发布时间、时长、来源地址和观测时间；不请求播放地址或下载媒体。

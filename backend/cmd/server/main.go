@@ -21,7 +21,7 @@ func main() {
 	}
 	addr := os.Getenv("BHT_ADDR")
 	if addr == "" {
-		addr = "127.0.0.1:8080"
+		addr = "127.0.0.1:8181"
 	}
 	server := &http.Server{
 		Addr:              addr,
