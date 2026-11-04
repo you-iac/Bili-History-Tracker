@@ -1,6 +1,6 @@
 # 服务端查询模块
 
-当前仅实现一次性视频元数据查询，对应 PRD FR-005 的基础元数据获取能力。尚未实现投稿列表发现、可访问性状态机、持久化历史查询和 Agent 同步，不能视为完整实现 FR-005、FR-006 或 FR-008。
+当前实现一次性视频元数据查询和 UP 主资料查询。视频查询对应 PRD FR-005 的基础元数据获取能力。尚未实现投稿列表发现、可访问性状态机、持久化历史查询和 Agent 同步，不能视为完整实现 FR-005、FR-006 或 FR-008。
 
 ## 模块边界
 
@@ -9,12 +9,12 @@ backend/cmd/server                 组装 Provider、查询服务和 HTTP 服务
         ↓
 backend/internal/httpapi           路由、查询超时、统一 JSON 和错误响应
         ↓
-backend/internal/source            通用 Provider 接口、Video、错误类型、查询分发
+backend/internal/source            通用 Provider 接口、Video、CreatorProfile、错误与分发
         ↑
 backend/internal/provider/bilibili B站标识校验、HTTP 请求、响应解析和字段转换
 ```
 
-依赖方向由适配器指向通用契约。HTTP 层不导入 B站实现，只有启动入口负责组装具体 Provider。查询模块不依赖用户、订阅、数据库或 HTTP 服务，可直接通过 `Service.GetVideo(ctx, platform, id)` 调用。
+依赖方向由适配器指向通用契约。HTTP 层不导入 B站实现，只有启动入口负责组装具体 Provider。查询模块不依赖用户、订阅、数据库或 HTTP 服务，可直接通过 `Service.GetVideo(ctx, platform, id)` 或 `Service.GetCreator(ctx, platform, id)` 调用。
 
 平台 ID、视频 ID 和作者 ID 均使用字符串。视频的唯一业务标识是 `(platform, id)`，不要把 B站 BV 或 UID 的格式限制放到通用类型中。
 
@@ -95,7 +95,7 @@ sequenceDiagram
 2. Go 标准库 `http.ServeMux` 匹配 GET 方法和路由模板，进入 `httpapi.New()` 中注册的处理函数。
 3. 处理函数从路径中取出 `platform="bilibili"` 和 `id="BV17x411w7KC"`，创建带 12 秒超时的请求上下文。
 4. `source.Service.GetVideo()` 用平台名查找已注册的 Provider，并把视频 ID 和上下文传给它。这个步骤不拼接 B站 URL，也不发起网络请求。
-5. `bilibili.Provider.GetVideo()` 校验 BV 格式，构造 B站查询 URL，调用 `p.client.Do(req)` 发起上游请求。
+5. `bilibili.Provider.GetVideo()` 校验 BV 格式，构造 B站查询 URL，通过公共 `get()` 方法调用 `p.client.Do(req)` 发起上游请求。
 6. Provider 检查上游 HTTP 状态、读取有大小上限的响应体，再检查 JSON 业务码 `code`。HTTP 200 和 `code=0` 是两项独立检查，不能只看 HTTP 状态就认定查询成功。
 7. Provider 解析 B站字段，转换为通用的 `source.Video`，经过查询服务返回给 `httpapi`。
 8. `httpapi` 把结果包装成 `{"data": ...}`，设置 HTTP 200、JSON 内容类型和 `Cache-Control: no-store`，通过 `json.NewEncoder(w).Encode(...)` 写回连接。
@@ -105,25 +105,27 @@ sequenceDiagram
 
 ## httpapi 与 B站 Provider 的职责
 
-`httpapi` 是本项目对调用方提供 HTTP API 的入口。它通过 `VideoQuerier` 接口调用查询服务；Go 的接口采用隐式实现，`*source.Service` 具有匹配的 `GetVideo` 方法，因此能够直接传给 `httpapi.New()`。
+`httpapi` 是本项目对调用方提供 HTTP API 的入口。它通过 `Querier` 接口调用查询服务；该接口包含 `GetVideo` 和 `GetCreator`。Go 的接口采用隐式实现，`*source.Service` 具有匹配的方法，因此能够直接传给 `httpapi.New()`。
 
 B站 Provider 的实现位于 `backend/internal/provider/bilibili` 包，具体类型为 `*bilibili.Provider`，负责适配 B站的数据获取方式。
 
 | 模块 | 输入 | 负责的工作 | 输出 |
 |---|---|---|---|
 | `httpapi` | curl 等调用方的 HTTP 请求 | 匹配路由、提取参数、设置查询超时、映射错误和编码 JSON | 本项目 HTTP 响应 |
-| `source.Service` | 平台名、视频 ID、上下文 | 根据平台名选择已注册的数据源 | 通用 `source.Video` 或错误 |
-| `bilibili.Provider` | BV 号、上下文 | 校验 BV、请求 B站、解析 B站响应、归一化字段 | 通用 `source.Video` 或错误 |
+| `source.Service` | 平台名、视频 ID 或作者 ID、上下文 | 根据平台名选择数据源，并检查所需能力 | 通用 `source.Video`、`source.CreatorProfile` 或错误 |
+| `bilibili.Provider` | BV 号或 UID、上下文 | 校验标识、请求 B站、解析响应、归一化字段 | 通用 `source.Video`、`source.CreatorProfile` 或错误 |
 
 `httpapi` 不导入 B站包，不需要知道 B站接口路径、BV 校验规则或 B站业务码。B站 Provider 不处理本项目的 `ResponseWriter`，也不决定 curl 最终收到的 HTTP 状态码。启动入口负责把这些模块连接起来。
 
-新增平台时，实现相同的 `source.Provider` 接口并在启动入口注册即可。注册表不会自动扫描目录；只创建新文件而不注册，不会使新平台生效。只要仍是“按平台和视频 ID 查询元数据”，现有 HTTP 路由就可以复用。
+新增平台时，实现相同的 `source.Provider` 接口并在启动入口注册即可。注册表不会自动扫描目录；只创建新文件而不注册，不会使新平台生效。支持作者资料查询的平台还需实现可选的 `source.CreatorProvider` 接口；仅支持视频的平台可以继续注册，作者资料请求将返回 HTTP 501 和 `unsupported_operation`。现有通用 HTTP 路由均可复用。
 
 ## HTTP 接口
 
 `GET /healthz` 仅检查进程可用，不请求上游。
 
 `GET /api/v1/platforms/{platform}/videos/{id}` 当前支持 `platform=bilibili` 和完整 BV 号。请求不接受任意上游 URL。
+
+`GET /api/v1/platforms/{platform}/creators/{id}` 当前支持 `platform=bilibili` 和 UP 主 UID。资料查询和视频查询是两条独立路由，不会自动查询投稿列表。
 
 ### 本项目 API 路由如何设置
 
@@ -182,6 +184,7 @@ Go 路由器也会将 HEAD 匹配到 GET 路由；其他未注册的方法返回
 |---|---|---|
 | 400 | invalid_input | 视频标识格式无效或上游明确拒绝参数 |
 | 404 | unsupported_platform | 没有注册对应平台 |
+| 501 | unsupported_operation | 平台已注册，但未实现当前查询能力 |
 | 404 | not_found | 上游业务响应表示未找到，不表示已确认删除 |
 | 502 | access_restricted | 上游拒绝访问或需要权限，包括 HTTP 412 |
 | 503 | rate_limited | 上游限流，当前不能完成查询 |
@@ -196,13 +199,20 @@ B站 API 路由本身返回 HTTP 404 时映射为 `upstream_failure`；只有可
 
 ### 服务端在哪里请求 B站
 
-实际网络请求位于 `backend/internal/provider/bilibili/bilibili.go` 的 `GetVideo()` 中。B站地址由同文件的 `videoEndpoint` 常量指定，与本项目提供给 curl 的路由相互独立：
+视频查询入口位于 `backend/internal/provider/bilibili/bilibili.go` 的 `GetVideo()` 中。B站地址由同文件的 `videoEndpoint` 常量指定，与本项目提供给 curl 的路由相互独立：
 
 ```go
 const videoEndpoint = "https://api.bilibili.com/x/web-interface/view"
 
 // GetVideo 内部：
 endpoint := videoEndpoint + "?" + url.Values{"bvid": {id}}.Encode()
+var data videoData
+err := p.get(ctx, endpoint, &data)
+```
+
+视频和 UP 主资料查询共用 `backend/internal/provider/bilibili/http.go` 的 `get()`，实际网络请求在这里发送：
+
+```go
 req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 // 实际代码在这里检查 err，并设置 Accept 和 User-Agent 请求头。
 resp, err := p.client.Do(req) // 真正向 B站发送请求的位置。
@@ -245,6 +255,92 @@ Provider 先从 B站返回的 `data` 中读取字段，再构造 `source.Video`�
 
 UID 投稿列表扫描暂未实现。后续可增加独立的列表查询能力契约，以不透明分页游标隔离平台差异，而不强制所有平台 Provider 都支持投稿列表。
 
+## 按 UID 查询 UP 主资料
+
+请求示例（服务默认端口为 `8181`）：
+
+```powershell
+curl.exe "http://127.0.0.1:8181/api/v1/platforms/bilibili/creators/122541"
+```
+
+也可以在 PowerShell 中格式化显示：
+
+```powershell
+Invoke-RestMethod -Uri "http://127.0.0.1:8181/api/v1/platforms/bilibili/creators/122541" | ConvertTo-Json -Depth 5
+```
+
+成功响应示例（内容为构造数据，字段名与实际实现一致）：
+
+```json
+{
+  "data": {
+    "platform": "bilibili",
+    "id": "122541",
+    "name": "示例UP",
+    "description": "个人签名",
+    "avatar_url": "https://example.com/avatar.jpg",
+    "url": "https://space.bilibili.com/122541",
+    "follower_count": 1234,
+    "observed_at": "2026-11-04T00:00:00Z",
+    "source_url": "https://api.bilibili.com/x/web-interface/card?mid=122541"
+  }
+}
+```
+
+### 查询链路与平台能力
+
+```mermaid
+sequenceDiagram
+    participant C as curl
+    participant H as httpapi
+    participant S as source.Service
+    participant P as bilibili.Provider
+    participant B as B站用户资料端点
+    C->>H: GET /api/v1/platforms/bilibili/creators/122541
+    H->>S: GetCreator(ctx, "bilibili", "122541")
+    S->>S: 查找 Provider 并检查 CreatorProvider 能力
+    S->>P: GetCreator(ctx, "122541")
+    P->>B: HTTPS GET /x/web-interface/card?mid=122541
+    B-->>P: 用户资料 JSON
+    P-->>S: source.CreatorProfile 或 error
+    S-->>H: 查询结果
+    H-->>C: HTTP 状态及 JSON
+```
+
+通用类型及能力接口位于 `backend/internal/source/source.go`：
+
+```go
+type CreatorProvider interface {
+    GetCreator(ctx context.Context, id string) (CreatorProfile, error)
+}
+```
+
+`source.Service.GetCreator()` 先验证平台和 ID 是否为空，再查找已注册的平台，使用接口断言检查资料查询能力，最后调用具体 Provider。UID 的具体格式只由 B站适配器校验，其他平台的作者 ID 可以采用其他格式。
+
+保留视频结果中原有的 `Creator{ID, Name}` 简要作者引用，单独使用 `CreatorProfile` 表示资料查询结果，避免给现有视频接口增加未知的作者资料字段。
+
+### B站端点、输入与字段映射
+
+实现位于 `backend/internal/provider/bilibili/creator.go`，使用固定端点 `https://api.bilibili.com/x/web-interface/card`，将 UID 放入 `mid` 查询参数。不接受任意上游 URL，不使用 Cookie，不会请求该 UID 的投稿列表。
+
+UID 必须是规范的正十进制整数，范围为 `1` 到 `9223372036854775807`。空值、零、正负号、前导零、空格、小数、科学计数法、溢出值和个人空间链接均不接受；到达 Provider 的无效值会在发起上游请求前返回 `invalid_input`。HTTP 路径中完全缺失 ID 时，由路由器返回 404。
+
+| 本项目字段 | 来源或处理方式 |
+|---|---|
+| `platform` | 固定为 `bilibili` |
+| `id` | 请求 UID，并校验响应 `data.card.mid` 与它相等 |
+| `name` | `data.card.name`，为空视为无效响应 |
+| `description` | `data.card.sign`（个人签名），缺失时为空字符串 |
+| `avatar_url` | `data.card.face`，缺失时为空字符串；仅返回地址 |
+| `url` | 使用 UID 拼接个人空间地址 |
+| `follower_count` | `data.follower`，缺失或为 `null` 时保持 `null`；负值视为无效响应 |
+| `observed_at` | 本服务成功解析时的 UTC 时间 |
+| `source_url` | 本次上游查询 URL |
+
+B站的 `card.mid` 可以是字符串形式，解析时使用 `json.Number` 同时兼容字符串和整数，避免经过浮点数导致大 UID 精度丢失。错误响应沿用视频查询的分类、超时和 2 MiB 响应体限制；接口返回未知资料时，不推断账号已注销。
+
+这一步只建立单个 UP 主的资料查询能力，返回的粉丝数是本次观测值，不是历史统计。后续获取全部投稿需要另行实现分页列表能力和相应调度。
+
 ## 验证
 
-运行 `cd backend` 后执行 `go test ./...`、`go vet ./...` 和 `go build -o bin/server.exe ./cmd/server`。自动化测试使用本地构造的上游响应，不依赖 B站网络可用性，覆盖字段归一化、输入校验、访问限制、限流、无效响应、响应体上限、取消和超时传播，以及多平台分发和 HTTP 错误映射。
+运行 `cd backend` 后执行 `go test ./...`、`go vet ./...` 和 `go build -o bin/server.exe ./cmd/server`。自动化测试使用本地构造的上游响应，不依赖 B站网络可用性，覆盖字段归一化、BV/UID 校验、UID 精度、未知与零粉丝数、访问限制、限流、无效响应、响应体上限、取消和超时传播，以及多平台能力分发和两类 HTTP 接口的错误映射。当前仓库没有 `package.json` 或 `.github/workflows`，Go 服务的检查由这些命令执行。

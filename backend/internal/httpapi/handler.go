@@ -12,11 +12,12 @@ import (
 	"bili-history-tracker/backend/internal/source"
 )
 
-type VideoQuerier interface {
+type Querier interface {
 	GetVideo(context.Context, string, string) (source.Video, error)
+	GetCreator(context.Context, string, string) (source.CreatorProfile, error)
 }
 
-func New(queries VideoQuerier) http.Handler {
+func New(queries Querier) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
@@ -30,6 +31,16 @@ func New(queries VideoQuerier) http.Handler {
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]source.Video{"data": video})
+	})
+	mux.HandleFunc("GET /api/v1/platforms/{platform}/creators/{id}", func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 12*time.Second)
+		defer cancel()
+		creator, err := queries.GetCreator(ctx, r.PathValue("platform"), r.PathValue("id"))
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]source.CreatorProfile{"data": creator})
 	})
 	return mux
 }
@@ -45,6 +56,8 @@ func writeError(w http.ResponseWriter, err error) {
 			status = http.StatusBadRequest
 		case source.UnsupportedPlatform, source.NotFound:
 			status = http.StatusNotFound
+		case source.UnsupportedOperation:
+			status = http.StatusNotImplemented
 		case source.RateLimited:
 			status = http.StatusServiceUnavailable
 		}

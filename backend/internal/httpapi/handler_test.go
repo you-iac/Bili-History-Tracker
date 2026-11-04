@@ -18,6 +18,20 @@ func (f queryFunc) GetVideo(ctx context.Context, platform, id string) (source.Vi
 	return f(ctx, platform, id)
 }
 
+func (queryFunc) GetCreator(context.Context, string, string) (source.CreatorProfile, error) {
+	return source.CreatorProfile{}, &source.Error{Kind: source.UnsupportedOperation}
+}
+
+type creatorQueryFunc func(context.Context, string, string) (source.CreatorProfile, error)
+
+func (f creatorQueryFunc) GetCreator(ctx context.Context, platform, id string) (source.CreatorProfile, error) {
+	return f(ctx, platform, id)
+}
+
+func (creatorQueryFunc) GetVideo(context.Context, string, string) (source.Video, error) {
+	return source.Video{}, &source.Error{Kind: source.UnsupportedOperation}
+}
+
 func TestQueryRoute(t *testing.T) {
 	handler := New(queryFunc(func(ctx context.Context, platform, id string) (source.Video, error) {
 		if platform != "another-platform" || id != "opaque-id" {
@@ -51,6 +65,7 @@ func TestErrorMapping(t *testing.T) {
 	}{
 		{"invalid ID", &source.Error{Kind: source.InvalidInput}, 400, source.InvalidInput},
 		{"unknown platform", &source.Error{Kind: source.UnsupportedPlatform}, 404, source.UnsupportedPlatform},
+		{"unsupported operation", &source.Error{Kind: source.UnsupportedOperation}, 501, source.UnsupportedOperation},
 		{"not found", &source.Error{Kind: source.NotFound}, 404, source.NotFound},
 		{"blocked upstream", &source.Error{Kind: source.AccessRestricted}, 502, source.AccessRestricted},
 		{"limited upstream", &source.Error{Kind: source.RateLimited}, 503, source.RateLimited},
@@ -60,21 +75,29 @@ func TestErrorMapping(t *testing.T) {
 		{"transport error", fmt.Errorf("private transport details"), 502, source.UpstreamFailure},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			handler := New(queryFunc(func(context.Context, string, string) (source.Video, error) {
+			var queries Querier = queryFunc(func(context.Context, string, string) (source.Video, error) {
 				return source.Video{}, tc.err
-			}))
-			w := httptest.NewRecorder()
-			handler.ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/platforms/bilibili/videos/BV17x411w7KC", nil))
-			var response struct {
-				Error struct {
-					Code source.ErrorKind `json:"code"`
-				} `json:"error"`
-			}
-			if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
-				t.Fatal(err)
-			}
-			if w.Code != tc.status || response.Error.Code != tc.code || strings.Contains(w.Body.String(), "private") {
-				t.Fatalf("unexpected error response: %d %s", w.Code, w.Body)
+			})
+			for _, resource := range []string{"videos", "creators"} {
+				if resource == "creators" {
+					queries = creatorQueryFunc(func(context.Context, string, string) (source.CreatorProfile, error) {
+						return source.CreatorProfile{}, tc.err
+					})
+				}
+				handler := New(queries)
+				w := httptest.NewRecorder()
+				handler.ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/platforms/bilibili/"+resource+"/123", nil))
+				var response struct {
+					Error struct {
+						Code source.ErrorKind `json:"code"`
+					} `json:"error"`
+				}
+				if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+					t.Fatal(err)
+				}
+				if w.Code != tc.status || response.Error.Code != tc.code || strings.Contains(w.Body.String(), "private") {
+					t.Fatalf("unexpected error response: %d %s", w.Code, w.Body)
+				}
 			}
 		})
 	}
@@ -91,6 +114,7 @@ func TestHealthAndMethodHandling(t *testing.T) {
 	}{
 		{http.MethodGet, "/healthz", 200},
 		{http.MethodPost, "/api/v1/platforms/bilibili/videos/BV17x411w7KC", 405},
+		{http.MethodPost, "/api/v1/platforms/bilibili/creators/122541", 405},
 		{http.MethodGet, "/missing", 404},
 	} {
 		w := httptest.NewRecorder()
@@ -98,5 +122,29 @@ func TestHealthAndMethodHandling(t *testing.T) {
 		if w.Code != tc.status {
 			t.Fatalf("%s %s: got %d", tc.method, tc.path, w.Code)
 		}
+	}
+}
+
+func TestCreatorQueryRoute(t *testing.T) {
+	handler := New(creatorQueryFunc(func(ctx context.Context, platform, id string) (source.CreatorProfile, error) {
+		if platform != "another-platform" || id != "opaque-creator-id" {
+			t.Fatalf("incorrect creator parameters: %q %q", platform, id)
+		}
+		if _, ok := ctx.Deadline(); !ok {
+			t.Fatal("creator query has no deadline")
+		}
+		return source.CreatorProfile{Platform: platform, ID: id, Name: "测试UP"}, nil
+	}))
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/platforms/another-platform/creators/opaque-creator-id", nil))
+	var response struct {
+		Data source.CreatorProfile `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if w.Code != 200 || response.Data.ID != "opaque-creator-id" || response.Data.Name != "测试UP" ||
+		w.Header().Get("Content-Type") != "application/json; charset=utf-8" || w.Header().Get("Cache-Control") != "no-store" {
+		t.Fatalf("unexpected creator response: %d %s", w.Code, w.Body)
 	}
 }

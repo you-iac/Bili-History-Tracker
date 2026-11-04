@@ -3,11 +3,7 @@
 package bilibili
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
-	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -62,52 +58,11 @@ func (p *Provider) GetVideo(ctx context.Context, id string) (source.Video, error
 		return source.Video{}, &source.Error{Kind: source.InvalidInput, Platform: platform}
 	}
 	endpoint := videoEndpoint + "?" + url.Values{"bvid": {id}}.Encode()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
-	if err != nil {
-		return source.Video{}, fmt.Errorf("build bilibili request: %w", err)
-	}
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", "Bili-History-Tracker/0.1")
-	resp, err := p.client.Do(req)
-	if err != nil {
-		// Preserve cancellation and timeout errors for the caller.
-		return source.Video{}, fmt.Errorf("query bilibili: %w", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		kind := source.UpstreamFailure
-		switch resp.StatusCode {
-		case http.StatusUnauthorized, http.StatusForbidden, http.StatusPreconditionFailed:
-			kind = source.AccessRestricted
-		case http.StatusTooManyRequests:
-			kind = source.RateLimited
-		}
-		// A missing API route (HTTP 404) does not mean the video is missing.
-		return source.Video{}, &source.Error{Kind: kind, Platform: platform, HTTPStatus: resp.StatusCode}
-	}
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseSize+1))
-	if err != nil {
-		return source.Video{}, fmt.Errorf("read bilibili response: %w", err)
+	var data videoData
+	if err := p.get(ctx, endpoint, &data); err != nil {
+		return source.Video{}, err
 	}
 	invalidResponse := &source.Error{Kind: source.InvalidResponse, Platform: platform}
-	if len(body) > maxResponseSize {
-		return source.Video{}, invalidResponse
-	}
-	var envelope struct {
-		Code *int            `json:"code"`
-		Data json.RawMessage `json:"data"`
-	}
-	if json.Unmarshal(body, &envelope) != nil || envelope.Code == nil {
-		return source.Video{}, invalidResponse
-	}
-	if *envelope.Code != 0 {
-		return source.Video{}, apiError(*envelope.Code)
-	}
-	var data videoData
-	if len(envelope.Data) == 0 || bytes.Equal(bytes.TrimSpace(envelope.Data), []byte("null")) ||
-		json.Unmarshal(envelope.Data, &data) != nil {
-		return source.Video{}, invalidResponse
-	}
 	if data.BVID != id || data.Title == "" || data.Owner.MID <= 0 || data.Duration < 0 || data.Pubdate < 0 {
 		return source.Video{}, invalidResponse
 	}

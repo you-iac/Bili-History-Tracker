@@ -12,6 +12,21 @@ type Creator struct {
 	Name string `json:"name"`
 }
 
+// CreatorProfile is an independently observed creator profile. Creator remains
+// the compact author reference embedded in Video, so video responses stay stable.
+// A nil FollowerCount means the source did not provide a count.
+type CreatorProfile struct {
+	Platform      string    `json:"platform"`
+	ID            string    `json:"id"`
+	Name          string    `json:"name"`
+	Description   string    `json:"description"`
+	AvatarURL     string    `json:"avatar_url"`
+	URL           string    `json:"url"`
+	FollowerCount *int64    `json:"follower_count"`
+	ObservedAt    time.Time `json:"observed_at"`
+	SourceURL     string    `json:"source_url"`
+}
+
 // Video is observed metadata, not proof that a video can currently be played.
 // A nil PublishedAt means the source did not supply a publication time.
 type Video struct {
@@ -35,16 +50,23 @@ type Provider interface {
 	GetVideo(ctx context.Context, id string) (Video, error)
 }
 
+// CreatorProvider is an optional capability of a registered Provider. Platforms
+// that only support video queries need not implement profile queries.
+type CreatorProvider interface {
+	GetCreator(ctx context.Context, id string) (CreatorProfile, error)
+}
+
 type ErrorKind string
 
 const (
-	InvalidInput        ErrorKind = "invalid_input"
-	UnsupportedPlatform ErrorKind = "unsupported_platform"
-	NotFound            ErrorKind = "not_found"
-	AccessRestricted    ErrorKind = "access_restricted"
-	RateLimited         ErrorKind = "rate_limited"
-	UpstreamFailure     ErrorKind = "upstream_failure"
-	InvalidResponse     ErrorKind = "invalid_response"
+	InvalidInput         ErrorKind = "invalid_input"
+	UnsupportedPlatform  ErrorKind = "unsupported_platform"
+	UnsupportedOperation ErrorKind = "unsupported_operation"
+	NotFound             ErrorKind = "not_found"
+	AccessRestricted     ErrorKind = "access_restricted"
+	RateLimited          ErrorKind = "rate_limited"
+	UpstreamFailure      ErrorKind = "upstream_failure"
+	InvalidResponse      ErrorKind = "invalid_response"
 )
 
 // Error preserves diagnostic codes without exposing upstream response bodies.
@@ -82,12 +104,32 @@ func NewService(providers ...Provider) (*Service, error) {
 }
 
 func (s *Service) GetVideo(ctx context.Context, platform, id string) (Video, error) {
+	p, err := s.lookup(platform, id)
+	if err != nil {
+		return Video{}, err
+	}
+	return p.GetVideo(ctx, id)
+}
+
+func (s *Service) GetCreator(ctx context.Context, platform, id string) (CreatorProfile, error) {
+	p, err := s.lookup(platform, id)
+	if err != nil {
+		return CreatorProfile{}, err
+	}
+	creatorProvider, ok := p.(CreatorProvider)
+	if !ok {
+		return CreatorProfile{}, &Error{Kind: UnsupportedOperation, Platform: platform}
+	}
+	return creatorProvider.GetCreator(ctx, id)
+}
+
+func (s *Service) lookup(platform, id string) (Provider, error) {
 	if platform == "" || id == "" {
-		return Video{}, &Error{Kind: InvalidInput, Platform: platform}
+		return nil, &Error{Kind: InvalidInput, Platform: platform}
 	}
 	p, ok := s.providers[platform]
 	if !ok {
-		return Video{}, &Error{Kind: UnsupportedPlatform, Platform: platform}
+		return nil, &Error{Kind: UnsupportedPlatform, Platform: platform}
 	}
-	return p.GetVideo(ctx, id)
+	return p, nil
 }
