@@ -102,7 +102,7 @@ go run ./cmd/server
 | 删除目标 | `POST /targets/delete` | 只停止调度，不删除已保存的历史 |
 | 入库详情 | `GET /detail/{type}/{id}` | 当前字段 + 最新版本的完整 payload |
 
-添加 UP 主后：查询 `card` 资料并写入 `creators` / `creator_versions`；随后尝试公开合集接口发现视频，把新视频加入 `tracking_targets` 并立即查询一次。B站空间投稿列表接口需要登录态和风控参数，未配置 Cookie 时通常返回 `412` 或 `-799`，因此发现结果可能不完整；此时可在后台手动添加 BV。
+添加 UP 主后：查询 `card` 资料并写入 `creators` / `creator_versions`；随后发现视频并加入 `tracking_targets`，立即查询一次。发现顺序是：配置了 `BHT_BILI_COOKIE` 时先调用空间投稿列表（按投稿时间分页，最多 120 个），失败或没有 Cookie 时回退公开合集接口。B站空间接口需要登录态和风控参数，未登录时通常返回 `412` 或 `-799`，因此没有 Cookie 时结果可能只包含合集内视频，此时可在后台手动添加 BV。
 
 调度器每 30 秒检查一次到期目标，按 `next_run_at` 顺序串行执行，每轮最多 10 个。执行完成后把 `next_run_at` 推后一个间隔（默认 3 小时）；失败也推进，避免反复重试。网络请求在事务外完成，成功后才写入数据库。
 
