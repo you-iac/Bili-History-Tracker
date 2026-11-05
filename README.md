@@ -37,3 +37,5 @@ go build -o bin/server.exe ./cmd/server
 从 curl 到 B站再到 JSON 返回的执行链路、API 路由配置、`httpapi` 与 Provider 的职责及扩展方式见 [架构说明](docs/architecture.md)。
 
 阅读代码可从 [模块导航](docs/architecture.md#module-navigation) 进入，表中链接到各模块实现和相关测试；模块注释与文档的维护约定见 [AGENTS.md](AGENTS.md)。
+
+后续持久化方案见 [数据库设计](docs/database.md)：两张当前索引表、两张保存完整上游快照的内容版本表及一张指标采样表，说明投影哈希、冷热写入路径、索引与 SQLite 容量约束，尚未接入自动入库。
