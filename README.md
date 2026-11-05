@@ -1,15 +1,53 @@
 # Bili History Tracker
 
-视频历史追踪项目。目前支持服务端按 BV 查询视频元数据、按 UID 查询 UP 主资料，不包含用户端、投稿列表扫描、订阅调度和数据库。
+视频历史追踪项目。服务端按 BV 查询视频元数据、按 UID 查询 UP 主资料，并把成功观测写入 SQLite；
+8182 端口提供本地后台，可添加 UP 主或视频作为跟踪目标、设置查询间隔（默认 3 小时）、查看查询日志与入库详情。
+当前只通过公开合集发现视频，不做完整投稿列表扫描。
 
-需要 Go 1.22 或更高版本，无第三方依赖。
+需要 Go 1.26 或更高版本。
 
 ```powershell
 cd backend
 go run ./cmd/server
 ```
 
-默认监听 `127.0.0.1:8181`，可通过环境变量 `BHT_ADDR` 修改地址。
+默认监听：
+
+- 查询 API：`127.0.0.1:8181`
+- 本地后台：`http://127.0.0.1:8182/`
+
+后台不设登录和权限，默认只监听回环地址。
+
+## 本地后台
+
+打开 `http://127.0.0.1:8182/` 可以：
+
+- 添加 UP 主 UID 或视频 BV，填写查询间隔（小时）
+- 添加后立即查询一次，之后由调度器按间隔循环执行
+- 查看最近 100 条查询日志
+- 点击目标 ID 查看数据库保存的当前字段和最新版本的完整上游 payload
+
+B站空间投稿列表接口需要登录态和风控参数，未带 Cookie 时通常返回 `412` 或 `-799`，因此“添加 UP 主”只能发现公开合集内的视频；其余视频请手动添加 BV。需要登录态时可设置 `BHT_BILI_COOKIE`。
+
+## 配置
+
+| 环境变量 | 默认值 | 说明 |
+|---|---|---|
+| `BHT_ADDR` | `127.0.0.1:8181` | 查询 API 监听地址 |
+| `BHT_ADMIN_ADDR` | `127.0.0.1:8182` | 本地后台监听地址 |
+| `BHT_DB` | `data/bht.db` | SQLite 文件路径 |
+| `BHT_QUERY_LOG` | 数据库同目录的 `query.log` | 查询日志，JSON Lines |
+| `BHT_BILI_COOKIE` | 空 | 可选，访问需要登录态的 B站接口 |
+
+数据库和日志位于 `backend/data/`，已被 `.gitignore` 忽略。
+
+## 数据模型
+
+五张内容表（`creators`、`videos`、`creator_versions`、`video_versions`、`metric_samples`）加一张调度表 `tracking_targets`。
+当前表保存列表与调度需要的字段和版本指针，版本表保存完整上游 `data` 快照，内容指纹只覆盖标题、简介、封面、分P 等稳定字段，
+播放量和粉丝数变化不会制造新版本。设计、迁移与读取路径见 [数据库设计](docs/database.md)。
+
+## 查询 API
 
 ```powershell
 curl.exe http://127.0.0.1:8181/healthz
@@ -17,9 +55,13 @@ curl.exe http://127.0.0.1:8181/api/v1/platforms/bilibili/videos/BV17x411w7KC
 curl.exe http://127.0.0.1:8181/api/v1/platforms/bilibili/creators/122541
 ```
 
-视频查询仅接受完整 BV 号，区分大小写，不接受视频链接或 av 号。返回标题、简介、封面地址、UP 主、发布时间、时长、来源地址和观测时间；不请求播放地址或下载媒体。
+视频查询仅接受完整 BV 号，区分大小写，不接受视频链接或 av 号。返回标题、简介、封面地址、UP 主、发布时间、时长、播放量、来源地址和观测时间；不请求播放地址或下载媒体。
 
 UP 主资料查询接受正整数 UID（不带前导零，最大值为 `9223372036854775807`），不接受个人空间链接。返回 UID、昵称、头像地址、个人签名（`description`）、空间地址、粉丝数、来源地址和观测时间；粉丝数未知时为 `null`。查询资料不会触发该 UP 主的投稿列表获取。
+
+B站网页端点（`/x/web-interface/view`、`/x/web-interface/card`、合集接口）属于实验性接入，不是有稳定性承诺的开放平台 API。适配器不使用登录 Cookie（除非显式配置），不做应用层自动重试或绕过访问限制。
+
+## 验证
 
 ```powershell
 cd backend
@@ -28,14 +70,6 @@ go vet ./...
 go build -o bin/server.exe ./cmd/server
 ```
 
-查询适配器使用 B站网页端点：视频信息为 `https://api.bilibili.com/x/web-interface/view`，UP 主资料为 `https://api.bilibili.com/x/web-interface/card`。它们属于实验性接入，并非具有稳定性承诺的开放平台 API。适配器不使用登录 Cookie，不做应用层自动重试或绕过访问限制；上游限制和失败会明确返回。实际接入范围与上线条件仍按 [PRD](docs/PRD.md) 确认。
+修改代码后需重启服务才能生效；查询结果已持久化，历史内容在重启后保留。元数据查询成功也不代表视频可以播放；查询不到不代表视频已被删除。
 
-修改代码后需重启服务才能使用新接口；如果使用 `bin/server.exe`，请先停止旧程序，再重新编译并运行。
-
-当前查询结果不持久化，不能查询已消失视频的历史记录。元数据查询成功也不代表视频可以播放；查询不到不代表视频已被删除。
-
-从 curl 到 B站再到 JSON 返回的执行链路、API 路由配置、`httpapi` 与 Provider 的职责及扩展方式见 [架构说明](docs/architecture.md)。
-
-阅读代码可从 [模块导航](docs/architecture.md#module-navigation) 进入，表中链接到各模块实现和相关测试；模块注释与文档的维护约定见 [AGENTS.md](AGENTS.md)。
-
-后续持久化方案见 [数据库设计](docs/database.md)：两张当前索引表、两张保存完整上游快照的内容版本表及一张指标采样表，说明投影哈希、冷热写入路径、索引与 SQLite 容量约束，尚未接入自动入库。
+执行链路、模块导航和后台调度说明见 [架构说明](docs/architecture.md)。模块注释与文档维护约定见 [AGENTS.md](AGENTS.md)。

@@ -36,7 +36,8 @@ func (p *Provider) GetCreator(ctx context.Context, id string) (source.CreatorPro
 		} `json:"card"`
 		Follower *int64 `json:"follower"`
 	}
-	if err := p.get(ctx, endpoint, &data); err != nil {
+	raw, err := p.get(ctx, endpoint, &data)
+	if err != nil {
 		return source.CreatorProfile{}, err
 	}
 	invalidResponse := &source.Error{Kind: source.InvalidResponse, Platform: platform}
@@ -60,5 +61,6 @@ func (p *Provider) GetCreator(ctx context.Context, id string) (source.CreatorPro
 		FollowerCount: data.Follower,
 		ObservedAt:    time.Now().UTC(),
 		SourceURL:     endpoint,
+		Raw:           raw,
 	}, nil
 }
