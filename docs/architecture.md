@@ -1,8 +1,8 @@
 # 服务端查询模块
 
-当前实现一次性视频元数据查询和 UP 主资料查询。视频查询对应 PRD FR-005 的基础元数据获取能力。尚未实现投稿列表发现、可访问性状态机、持久化历史查询和 Agent 同步，不能视为完整实现 FR-005、FR-006 或 FR-008。
+当前实现一次性视频元数据查询、UP 主资料查询、SQLite 持久化、8182 本地后台和循环调度。成功观测按 [数据库设计](database.md) 的五表写入当前索引与内容版本表；查询失败只记日志，不修改已有内容。尚未实现完整投稿列表发现（B站列表接口需要登录态，当前只用公开合集发现）、可访问性状态机、事件日志和 Agent 同步，不能视为完整实现 FR-005、FR-006、FR-008 或 FR-009。
 
-作者与视频当前索引、保存完整上游快照的内容版本表、指标采样表，以及写入与索引的容量优化见 [数据库设计](database.md)。该文档是待接入方案，当前查询链路尚未自动入库，也没有版本写入和采样任务。
+数据库由 0001 迁移建表，`PRAGMA user_version = 1`；调度目标单独存放在 `tracking_targets`，属于调度配置而非内容设计。
 
 <a id="module-navigation"></a>
 
@@ -17,7 +17,11 @@
 | HTTP API | 接收调用方请求，提取参数，设置查询超时并返回 JSON | [handler.go](../backend/internal/httpapi/handler.go) 的 `Querier`、`New` | [handler_test.go](../backend/internal/httpapi/handler_test.go) |
 | B站 Provider 与视频查询 | 初始化客户端、校验 BV、转换视频元数据和业务错误 | [bilibili.go](../backend/internal/provider/bilibili/bilibili.go) 的 `Provider`、`GetVideo` | [bilibili_test.go](../backend/internal/provider/bilibili/bilibili_test.go) |
 | B站 UP 主资料查询 | 校验 UID、查询并归一化资料；不获取投稿列表 | [creator.go](../backend/internal/provider/bilibili/creator.go) 的 `GetCreator` | [creator_test.go](../backend/internal/provider/bilibili/creator_test.go) |
-| B站共用请求处理 | 发送上游请求，检查 HTTP 和业务状态、响应大小及 JSON；字段语义交给各查询实现 | [http.go](../backend/internal/provider/bilibili/http.go) 的 `get` | 由 [视频测试](../backend/internal/provider/bilibili/bilibili_test.go) 和 [资料测试](../backend/internal/provider/bilibili/creator_test.go) 覆盖 |
+| B站共用请求处理 | 发送上游请求，检查 HTTP 和业务状态、响应大小及 JSON；返回原始 data 和解析结果 | [http.go](../backend/internal/provider/bilibili/http.go) 的 `get` | 由 [视频测试](../backend/internal/provider/bilibili/bilibili_test.go) 和 [资料测试](../backend/internal/provider/bilibili/creator_test.go) 覆盖 |
+| B站合集发现 | 通过公开合集接口列出可跟踪视频；不代表全部投稿 | [list.go](../backend/internal/provider/bilibili/list.go) 的 `GetCreatorVideos` | [bilibili_test.go](../backend/internal/provider/bilibili/bilibili_test.go) |
+| 持久化 | 打开 SQLite、执行迁移、计算内容指纹、读写五表和调度目标 | [db.go](../backend/internal/storage/db.go)、[fingerprint.go](../backend/internal/storage/fingerprint.go)、[repo.go](../backend/internal/storage/repo.go) | [storage_test.go](../backend/internal/storage/storage_test.go)、[creator_test.go](../backend/internal/storage/creator_test.go) |
+| 查询与调度 | 执行目标查询、合集发现、查询日志、到期目标调度 | [tracker.go](../backend/internal/tracker/tracker.go)、[scheduler.go](../backend/internal/tracker/scheduler.go)、[log.go](../backend/internal/tracker/log.go) | [tracker_test.go](../backend/internal/tracker/tracker_test.go) |
+| 本地后台 | 8182 端口的目标管理、日志和入库详情 | [server.go](../backend/internal/admin/server.go)、`templates/` | [admin_test.go](../backend/internal/admin/admin_test.go) |
 
 注释与技术文档分工：包注释和文件头说明模块职责、边界及文档位置；接口、关键方法和复杂逻辑附近解释输入约束、错误语义及设计原因；本文负责模块关系、执行链路、API、字段映射及扩展方式。普通赋值和显而易见的调用不需要逐行注释。
 
@@ -26,13 +30,18 @@
 ## 模块边界
 
 ```text
-backend/cmd/server                 组装 Provider、查询服务和 HTTP 服务
+backend/cmd/server                 组装 Provider、查询服务、数据库、后台和调度
         ↓
-backend/internal/httpapi           路由、查询超时、统一 JSON 和错误响应
+backend/internal/httpapi           对外查询 API：路由、超时、JSON 和错误响应
+backend/internal/admin             本地后台：目标管理、日志和详情（8182）
+        ↓
+backend/internal/tracker           查询用例、合集发现、循环调度、查询日志
         ↓
 backend/internal/source            通用 Provider 接口、Video、CreatorProfile、错误与分发
         ↑
 backend/internal/provider/bilibili B站标识校验、HTTP 请求、响应解析和字段转换
+        ↓
+backend/internal/storage           打开 SQLite、迁移、内容指纹、五表读写
 ```
 
 依赖方向由适配器指向通用契约。HTTP 层不导入 B站实现，只有启动入口负责组装具体 Provider。查询模块不依赖用户、订阅、数据库或 HTTP 服务，可直接通过 `Service.GetVideo(ctx, platform, id)` 或 `Service.GetCreator(ctx, platform, id)` 调用。
@@ -80,6 +89,32 @@ go run ./cmd/server
 ```
 
 之后查询地址相应改成 `http://127.0.0.1:9090/...`。环境变量需要在启动前设置，修改后需要重启服务；修改此地址不会改变 B站的上游端点。
+
+## 本地后台与循环查询
+
+后台默认监听 `127.0.0.1:8182`，不设登录和权限，访问即进入。
+
+| 页面或操作 | 路径 | 说明 |
+|---|---|---|
+| 首页 | `GET /` | 表行数、跟踪目标、最近 100 条查询日志 |
+| 添加目标 | `POST /targets` | `type=creator` 或 `video`、`id`、`interval_hours` |
+| 立即查询 | `POST /targets/run` | 异步执行一次；内容未变化时不新增版本 |
+| 删除目标 | `POST /targets/delete` | 只停止调度，不删除已保存的历史 |
+| 入库详情 | `GET /detail/{type}/{id}` | 当前字段 + 最新版本的完整 payload |
+
+添加 UP 主后：查询 `card` 资料并写入 `creators` / `creator_versions`；随后尝试公开合集接口发现视频，把新视频加入 `tracking_targets` 并立即查询一次。B站空间投稿列表接口需要登录态和风控参数，未配置 Cookie 时通常返回 `412` 或 `-799`，因此发现结果可能不完整；此时可在后台手动添加 BV。
+
+调度器每 30 秒检查一次到期目标，按 `next_run_at` 顺序串行执行，每轮最多 10 个。执行完成后把 `next_run_at` 推后一个间隔（默认 3 小时）；失败也推进，避免反复重试。网络请求在事务外完成，成功后才写入数据库。
+
+| 环境变量 | 默认值 | 作用 |
+|---|---|---|
+| `BHT_ADDR` | `127.0.0.1:8181` | 对外查询 API 监听地址 |
+| `BHT_ADMIN_ADDR` | `127.0.0.1:8182` | 本地后台监听地址 |
+| `BHT_DB` | `data/bht.db` | SQLite 文件路径 |
+| `BHT_QUERY_LOG` | 与数据库同目录的 `query.log` | 查询日志，JSON Lines |
+| `BHT_BILI_COOKIE` | 空 | 可选，访问需要登录态的接口时使用 |
+
+查询日志同时保留最近 500 条在内存中供后台展示；文件日志适合排查失败原因和将来回填状态。数据库和日志文件位于本地 `data/` 目录，已被 `.gitignore` 忽略。
 
 ## 从 curl 到响应的完整链路
 
@@ -365,3 +400,13 @@ B站的 `card.mid` 可以是字符串形式，解析时使用 `json.Number` 同�
 ## 验证
 
 运行 `cd backend` 后执行 `go test ./...`、`go vet ./...` 和 `go build -o bin/server.exe ./cmd/server`。自动化测试使用本地构造的上游响应，不依赖 B站网络可用性，覆盖字段归一化、BV/UID 校验、UID 精度、未知与零粉丝数、访问限制、限流、无效响应、响应体上限、取消和超时传播，以及多平台能力分发和两类 HTTP 接口的错误映射。当前仓库没有 `package.json` 或 `.github/workflows`，Go 服务的检查由这些命令执行。
+
+手动验证持久化：
+
+```powershell
+cd backend
+$env:BHT_DB = "data/bht.db"
+go run ./cmd/server
+```
+
+另开终端访问 `http://127.0.0.1:8182/`，添加 UP 主 `122541`，等待日志出现 `query_creator` 和 `discover`。SQLite 文件中应出现 `creators`、`videos`、`creator_versions`、`video_versions`、`metric_samples`、`tracking_targets` 六张表，`videos.current_hash` 与 `seq = current_seq` 的版本行一致。重复点击“立即查询”不应增加版本数，只更新 `last_observed_at`。

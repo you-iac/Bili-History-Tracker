@@ -9,8 +9,10 @@ import (
 	"context"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"bili-history-tracker/backend/internal/source"
@@ -27,19 +29,25 @@ var bvidPattern = regexp.MustCompile(`^BV[1-9A-HJ-NP-Za-km-z]{10}$`)
 var _ source.Provider = (*Provider)(nil)
 
 // Provider 持有可并发复用的 HTTP 客户端，实现视频查询和可选的作者资料查询能力。
+// cookie 来自 BHT_BILI_COOKIE，仅用于访问需要登录态的投稿列表接口。
 type Provider struct {
 	client *http.Client
+	cookie string
 }
 
-// New uses a dedicated HTTP client. The adapter never supplies login cookies,
-// retries requests, or follows redirects to alternative data sources.
+// New uses a dedicated HTTP client. The adapter never supplies login cookies
+// unless the operator configured BHT_BILI_COOKIE, retries requests, or follows
+// redirects to alternative data sources.
 func New() *Provider {
-	return &Provider{client: &http.Client{
-		Timeout: 10 * time.Second,
-		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
-			return http.ErrUseLastResponse
+	return &Provider{
+		client: &http.Client{
+			Timeout: 10 * time.Second,
+			CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
 		},
-	}}
+		cookie: strings.TrimSpace(os.Getenv("BHT_BILI_COOKIE")),
+	}
 }
 
 func (*Provider) Platform() string { return platform }
@@ -55,6 +63,9 @@ type videoData struct {
 		MID  int64  `json:"mid"`
 		Name string `json:"name"`
 	} `json:"owner"`
+	Stat *struct {
+		View *int64 `json:"view"`
+	} `json:"stat"`
 }
 
 // GetVideo 校验 BV 并获取视频元数据；查询成功不代表视频当前可以播放。
@@ -64,7 +75,8 @@ func (p *Provider) GetVideo(ctx context.Context, id string) (source.Video, error
 	}
 	endpoint := videoEndpoint + "?" + url.Values{"bvid": {id}}.Encode()
 	var data videoData
-	if err := p.get(ctx, endpoint, &data); err != nil {
+	raw, err := p.get(ctx, endpoint, &data)
+	if err != nil {
 		return source.Video{}, err
 	}
 	invalidResponse := &source.Error{Kind: source.InvalidResponse, Platform: platform}
@@ -76,6 +88,10 @@ func (p *Provider) GetVideo(ctx context.Context, id string) (source.Video, error
 		t := time.Unix(data.Pubdate, 0).UTC()
 		publishedAt = &t
 	}
+	var viewCount *int64
+	if data.Stat != nil && data.Stat.View != nil && *data.Stat.View >= 0 {
+		viewCount = data.Stat.View
+	}
 	return source.Video{
 		Platform:        platform,
 		ID:              data.BVID,
@@ -86,8 +102,10 @@ func (p *Provider) GetVideo(ctx context.Context, id string) (source.Video, error
 		Creator:         source.Creator{ID: strconv.FormatInt(data.Owner.MID, 10), Name: data.Owner.Name},
 		PublishedAt:     publishedAt,
 		DurationSeconds: data.Duration,
+		ViewCount:       viewCount,
 		ObservedAt:      time.Now().UTC(),
 		SourceURL:       endpoint,
+		Raw:             raw,
 	}, nil
 }
 

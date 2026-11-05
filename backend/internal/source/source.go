@@ -6,6 +6,7 @@ package source
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 )
@@ -19,6 +20,8 @@ type Creator struct {
 // CreatorProfile is an independently observed creator profile. Creator remains
 // the compact author reference embedded in Video, so video responses stay stable.
 // A nil FollowerCount means the source did not provide a count.
+// Raw keeps the unmodified upstream business object for persistence; it is never
+// serialized into API responses.
 type CreatorProfile struct {
 	Platform      string    `json:"platform"`
 	ID            string    `json:"id"`
@@ -29,10 +32,13 @@ type CreatorProfile struct {
 	FollowerCount *int64    `json:"follower_count"`
 	ObservedAt    time.Time `json:"observed_at"`
 	SourceURL     string    `json:"source_url"`
+	Raw           json.RawMessage `json:"-"`
 }
 
 // Video is observed metadata, not proof that a video can currently be played.
 // A nil PublishedAt means the source did not supply a publication time.
+// A nil ViewCount means the source did not supply a count. Raw keeps the
+// unmodified upstream business object for persistence and is not serialized.
 type Video struct {
 	Platform        string     `json:"platform"`
 	ID              string     `json:"id"`
@@ -43,8 +49,17 @@ type Video struct {
 	Creator         Creator    `json:"creator"`
 	PublishedAt     *time.Time `json:"published_at"`
 	DurationSeconds int64      `json:"duration_seconds"`
+	ViewCount       *int64     `json:"view_count"`
 	ObservedAt      time.Time  `json:"observed_at"`
 	SourceURL       string     `json:"source_url"`
+	Raw             json.RawMessage `json:"-"`
+}
+
+// CreatorVideo is a compact entry from a creator's published video list.
+type CreatorVideo struct {
+	ID          string     `json:"id"`
+	Title       string     `json:"title"`
+	PublishedAt *time.Time `json:"published_at"`
 }
 
 // Provider implementations own platform-specific identifiers, requests and parsing.
@@ -58,6 +73,12 @@ type Provider interface {
 // that only support video queries need not implement profile queries.
 type CreatorProvider interface {
 	GetCreator(ctx context.Context, id string) (CreatorProfile, error)
+}
+
+// VideoLister is an optional capability for discovering a creator's videos.
+// Sources without list access can still be tracked by adding video IDs directly.
+type VideoLister interface {
+	GetCreatorVideos(ctx context.Context, id string) ([]CreatorVideo, error)
 }
 
 type ErrorKind string
@@ -128,6 +149,19 @@ func (s *Service) GetCreator(ctx context.Context, platform, id string) (CreatorP
 		return CreatorProfile{}, &Error{Kind: UnsupportedOperation, Platform: platform}
 	}
 	return creatorProvider.GetCreator(ctx, id)
+}
+
+// ListCreatorVideos 通过可选能力列出作者投稿；平台不支持时返回 UnsupportedOperation。
+func (s *Service) ListCreatorVideos(ctx context.Context, platform, id string) ([]CreatorVideo, error) {
+	p, err := s.lookup(platform, id)
+	if err != nil {
+		return nil, err
+	}
+	lister, ok := p.(VideoLister)
+	if !ok {
+		return nil, &Error{Kind: UnsupportedOperation, Platform: platform}
+	}
+	return lister.GetCreatorVideos(ctx, id)
 }
 
 func (s *Service) lookup(platform, id string) (Provider, error) {

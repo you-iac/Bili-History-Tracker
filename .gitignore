@@ -1,3 +1,9 @@
 # Local build output and Go coverage reports.
 /backend/bin/
 /backend/coverage.out
+
+# Local SQLite database, WAL files and query logs.
+/backend/data/
+/backend/*.db
+/backend/*.db-wal
+/backend/*.db-shm
