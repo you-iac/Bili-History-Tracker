@@ -1,6 +1,22 @@
 // Package httpapi 将视频和作者资料查询暴露为 HTTP API，负责路由、超时和 JSON 响应。
 // 本包通过 Querier 调用查询服务，将业务错误映射为 HTTP 状态，不依赖具体平台实现。
 //
+// 输入：HTTP 请求（platform、id 路径参数）和 Querier 返回的查询结果。
+// 输出：JSON 响应；成功为 {"data": ...}，失败为 {"error": {"code": ...}}。
+// 它不认识：SQLite、tracker、调度器；本包只读，不写数据库，也不触发跟踪。
+//
+// 上下游关系：
+//
+//	[上游] curl / 其他程序（127.0.0.1:8181）
+//	          │ GET /api/v1/platforms/{platform}/...
+//	          ▼
+//	[当前] ┌─────────────┐
+//	       │   httpapi   │
+//	       └──────┬──────┘
+//	              │ Querier（通常是 *source.Service）
+//	              ▼
+//	[下游] source → provider/bilibili
+//
 // 设计说明（仓库相对路径）：docs/architecture.md#module-navigation。
 package httpapi
 

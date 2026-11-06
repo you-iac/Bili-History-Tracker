@@ -1,6 +1,23 @@
 // Package source 定义平台无关的查询接口、数据结构和错误，并按平台注册表分发查询。
 // 本包判断数据源是否支持所需能力，具体平台的标识校验和网络请求由 Provider 实现。
 //
+// 输入：调用方（tracker、httpapi）传入的平台名、目标 ID 和 context。
+// 输出：Video、CreatorProfile、CreatorVideo 或 *Error，原路返回给调用方；
+// 本包不落库、不编码 HTTP 响应。
+// 它不认识：SQLite、HTTP 路由、调度间隔、B站端点及其字段格式。
+//
+// 上下游关系：
+//
+//	[上游] tracker / httpapi / cmd/server
+//	          │ 平台名 + 目标 ID + context
+//	          ▼
+//	[当前] ┌─────────────┐
+//	       │   source    │
+//	       └──────┬──────┘
+//	              │ Provider 接口
+//	              ▼
+//	[下游] provider/bilibili 等适配器 → 上游 HTTP API
+//
 // 设计说明（仓库相对路径）：docs/architecture.md#module-navigation。
 package source
 

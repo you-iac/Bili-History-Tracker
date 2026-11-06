@@ -2,6 +2,23 @@
 // 本文件负责客户端初始化、BV 查询和业务错误映射；creator.go 负责 UID 资料查询，
 // http.go 负责共用的请求与响应校验。网页端点可能拒绝访问，不保证持续可用。
 //
+// 输入：source 层传来的 BV、UID 和 context，以及 B站 HTTP 响应；
+// 输出：Video、CreatorProfile、CreatorVideo 和 *source.Error；其中 Raw 保存
+// 未裁剪的 data 对象，供 storage 存档与计算指纹。
+// 它不认识：数据库、调度器、8181/8182 的 HTTP 服务；Cookie 只来自 BHT_BILI_COOKIE。
+//
+// 上下游关系：
+//
+//	[上游] source.Service（由 tracker / httpapi 调用）
+//	          │ GetVideo / GetCreator / GetCreatorVideos
+//	          ▼
+//	[当前] ┌───────────────────┐
+//	       │ provider/bilibili │
+//	       └─────────┬─────────┘
+//	                 │ HTTPS GET（固定端点）
+//	                 ▼
+//	[下游] api.bilibili.com（网页端点，可能 412 或被风控）
+//
 // 设计说明（仓库相对路径）：docs/architecture.md#module-navigation。
 package bilibili
 
