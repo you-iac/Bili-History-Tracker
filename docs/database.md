@@ -26,47 +26,27 @@
 
 ## 表关系
 
-```mermaid
-erDiagram
-    creators ||--o{ videos : "主要作者"
-    creators ||--o{ creator_versions : "完整快照"
-    videos ||--o{ video_versions : "完整快照"
+```text
+┌────────────────────────────┐                                  ┌────────────────────────────┐
+│ creators                   │   主要作者 1:N                   │ videos                     │
+│ PK: platform + creator_id  │─────────────────────────────────►│ PK: platform + video_id    │
+└────────────────────────────┘                                  └────────────────────────────┘
+               │                                                               │
+               │ 完整内容快照                                                  │ 完整内容快照
+               │                                                               │
+               ▼                                                               ▼
+┌────────────────────────────┐                                  ┌────────────────────────────┐
+│ creator_versions           │                                  │ video_versions             │
+│ PK: platform + ID + seq    │                                  │ PK: platform + ID + seq    │
+└────────────────────────────┘                                  └────────────────────────────┘
 
-    creators {
-        TEXT platform PK
-        TEXT creator_id PK
-        TEXT name
-        INTEGER follower_count
-        INTEGER first_seen_at
-        INTEGER last_referenced_at
-        INTEGER last_profile_observed_at
-        BLOB current_profile_hash
-        INTEGER current_profile_seq
-    }
-    videos {
-        TEXT platform PK
-        TEXT video_id PK
-        TEXT creator_id FK
-        TEXT title
-        INTEGER published_at
-        INTEGER duration_seconds
-        INTEGER view_count
-        INTEGER first_seen_at
-        INTEGER last_observed_at
-        BLOB current_hash
-        INTEGER current_seq
-    }
-    video_versions {
-        TEXT platform PK
-        TEXT video_id PK
-        INTEGER seq PK
-        INTEGER observed_at
-        TEXT source_url
-        BLOB content_hash
-        INTEGER hash_version
-        TEXT payload_encoding
-        TEXT payload
-    }
+
+
+
+┌────────────────────────────┐                                  ┌────────────────────────────┐
+│ metric_samples             │                                  │ tracking_targets           │
+│ 按目标和指标记录采样       │                                  │ 查询目标 / 间隔 / 到期时间 │
+└────────────────────────────┘                                  └────────────────────────────┘
 ```
 
 `creator_versions` 与 `video_versions` 结构相同，只把 `video_id` 换成 `creator_id`。`metric_samples` 用 `(platform, subject_type, subject_id)` 多态引用作者或视频，没有外键，孤立行由删除流程清理。
@@ -272,21 +252,27 @@ fingerprint = SHA256("bht-content-v1\n" + canonicalJSON(projection(payload)))[0:
 
 ### 五张表的规模
 
-```mermaid
-flowchart LR
-    subgraph CUR["当前索引 · 每目标 1 行"]
-        C["creators<br/>约 130 B"]
-        V["videos<br/>约 150 B"]
-    end
-    subgraph VER["内容版本 · 每次内容变化 1 行"]
-        CV["creator_versions<br/>约 8–12 KB"]
-        VV["video_versions<br/>约 8–12 KB"]
-    end
-    subgraph MET["指标采样 · 每窗口 1 行"]
-        M["metric_samples<br/>约 40 B"]
-    end
-    C --> CV
-    V --> VV
+```text
+┌────────────────────────────┐                                  ┌────────────────────────────┐
+│ creators                   │                                  │ videos                     │
+│ 每目标 1 行 / 约 130 B     │                                  │ 每目标 1 行 / 约 150 B     │
+└────────────────────────────┘                                  └────────────────────────────┘
+               │                                                               │
+               │                                                               │
+               │                                                               │
+               ▼                                                               ▼
+┌────────────────────────────┐                                  ┌────────────────────────────┐
+│ creator_versions           │                                  │ video_versions             │
+│ 每次内容变化 / 约 8–12 KB  │                                  │ 每次内容变化 / 约 8–12 KB  │
+└────────────────────────────┘                                  └────────────────────────────┘
+
+
+
+
+                                ┌────────────────────────────┐
+                                │ metric_samples             │
+                                │ 每窗口 1 行 / 约 40 B      │
+                                └────────────────────────────┘
 ```
 
 ### creators
@@ -584,12 +570,35 @@ PRAGMA user_version;
 
 ### 列表：按作者列视频
 
-```mermaid
-flowchart LR
-    A["列表请求<br/>platform + creator_id + limit"] --> B["索引 idx_videos_creator_published<br/>定位排序起点"]
-    B --> C["按 rowid 回表<br/>读 videos 叶页中的连续行"]
-    C --> D["每行按主键<br/>查 creators 取 name"]
-    D --> E["返回 20 条摘要"]
+```text
+┌──────────────────────────────────────────────┐
+│ 列表请求                                     │
+│ platform + creator_id + limit                │
+└──────────────────────────────────────────────┘
+                        │
+                        ▼
+┌──────────────────────────────────────────────┐
+│ idx_videos_creator_published                 │
+│ 定位排序起点                                 │
+└──────────────────────────────────────────────┘
+                        │
+                        ▼
+┌──────────────────────────────────────────────┐
+│ videos                                       │
+│ 回表读取摘要 / 计数 / 时间                   │
+└──────────────────────────────────────────────┘
+                        │
+                        ▼
+┌──────────────────────────────────────────────┐
+│ creators                                     │
+│ 按主键关联作者 name                          │
+└──────────────────────────────────────────────┘
+                        │
+                        ▼
+┌──────────────────────────────────────────────┐
+│ 返回列表                                     │
+│ 只返回摘要，不读取 payload                   │
+└──────────────────────────────────────────────┘
 ```
 
 - 排序和分页由 `(platform, creator_id, published_at DESC, video_id DESC)` 索引完成，不需要排序；
@@ -598,12 +607,35 @@ flowchart LR
 
 ### 详情：取当前内容
 
-```mermaid
-flowchart LR
-    A["详情请求<br/>platform + video_id"] --> B["videos 主键定位<br/>读 current_seq 与计数"]
-    B --> C["video_versions 主键定位<br/>platform + video_id + seq"]
-    C --> D["按 payload_encoding 解码<br/>json 直接读，zstd 先解压"]
-    D --> E["合并返回：计数 + 完整内容"]
+```text
+┌──────────────────────────────────────────────┐
+│ 详情请求                                     │
+│ platform + video_id                          │
+└──────────────────────────────────────────────┘
+                        │
+                        ▼
+┌──────────────────────────────────────────────┐
+│ videos                                       │
+│ 主键定位 current_seq 与计数                  │
+└──────────────────────────────────────────────┘
+                        │
+                        ▼
+┌──────────────────────────────────────────────┐
+│ video_versions                               │
+│ 按 platform + video_id + seq 定位            │
+└──────────────────────────────────────────────┘
+                        │
+                        ▼
+┌──────────────────────────────────────────────┐
+│ payload_encoding                             │
+│ json 直接读 / zstd 先解压                    │
+└──────────────────────────────────────────────┘
+                        │
+                        ▼
+┌──────────────────────────────────────────────┐
+│ 返回详情                                     │
+│ 合并当前计数与完整内容                       │
+└──────────────────────────────────────────────┘
 ```
 
 - 两次都是主键定位，没有扫描、没有排序、没有聚合子查询；
@@ -614,23 +646,64 @@ flowchart LR
 
 ### 历史：版本时间线
 
-```mermaid
-flowchart LR
-    A["历史请求<br/>platform + video_id"] --> B["video_versions 主键前缀<br/>范围扫描"]
-    B --> C["按 seq 升序逐行<br/>读时间、来源、指纹"]
-    C --> D["payload 按需加载<br/>默认只返回元信息"]
+```text
+┌──────────────────────────────────────────────┐
+│ 历史请求                                     │
+│ platform + video_id                          │
+└──────────────────────────────────────────────┘
+                        │
+                        ▼
+┌──────────────────────────────────────────────┐
+│ video_versions                               │
+│ 按主键前缀做范围扫描                         │
+└──────────────────────────────────────────────┘
+                        │
+                        ▼
+┌──────────────────────────────────────────────┐
+│ 按 seq 升序                                  │
+│ 读取时间 / 来源 / 指纹                       │
+└──────────────────────────────────────────────┘
+                        │
+                        ▼
+┌──────────────────────────────────────────────┐
+│ 返回版本时间线                               │
+│ payload 按需加载                             │
+└──────────────────────────────────────────────┘
 ```
 
 版本行很少（每个视频每年几次），范围扫描成本可以忽略。默认不把每条 payload 都返回，避免一次把几十 KB 拉进内存；需要某条内容时再按 `seq` 单独取。
 
 ### 指标：数值曲线
 
-```mermaid
-flowchart LR
-    A["曲线请求<br/>platform + subject + metric"] --> B["metric_samples 主键前缀<br/>范围扫描"]
-    B --> C["按 sampled_at 升序"]
-    C --> D["窗口函数计算相邻差值"]
-    D --> E["返回时间点与增量"]
+```text
+┌──────────────────────────────────────────────┐
+│ 曲线请求                                     │
+│ platform + subject + metric                  │
+└──────────────────────────────────────────────┘
+                        │
+                        ▼
+┌──────────────────────────────────────────────┐
+│ metric_samples                               │
+│ 按主键前缀做范围扫描                         │
+└──────────────────────────────────────────────┘
+                        │
+                        ▼
+┌──────────────────────────────────────────────┐
+│ 按 sampled_at 升序                           │
+│ 读取窗口内采样点                             │
+└──────────────────────────────────────────────┘
+                        │
+                        ▼
+┌──────────────────────────────────────────────┐
+│ 窗口函数                                     │
+│ 计算相邻采样值的差                           │
+└──────────────────────────────────────────────┘
+                        │
+                        ▼
+┌──────────────────────────────────────────────┐
+│ 返回指标曲线                                 │
+│ 时间点 / 数值 / 增量                         │
+└──────────────────────────────────────────────┘
 ```
 
 `WITHOUT ROWID` 让这张表按主键聚簇存放，同一目标同一指标的采样点物理相邻，顺序读几乎不产生随机 I/O。

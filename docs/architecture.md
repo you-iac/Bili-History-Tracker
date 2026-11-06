@@ -25,25 +25,41 @@
 
 注释与技术文档分工：包注释和文件头说明模块职责、边界及文档位置；接口、关键方法和复杂逻辑附近解释输入约束、错误语义及设计原因；本文负责模块关系、执行链路、API、字段映射及扩展方式。普通赋值和显而易见的调用不需要逐行注释。
 
-各模块目录下的 `README.md` 以一张子模块协作图为主，说明内部文件如何协作，以及输入、输出和边界；模块地图见 [backend/internal/README.md](../backend/internal/README.md)。
+各模块目录下的 `README.md` 以一张子模块协作图为主，说明内部文件如何协作，以及输入、输出和边界；模块地图见 [backend/internal/README.md](../backend/internal/README.md)。架构与协作图统一使用 `text` 代码块中的等宽字符框图，方框表示模块，箭头标明调用、组装或读写关系；查询结果沿调用链返回。
 
 新增或移动模块、变更接口或职责时，同步更新上述导航及相关章节。定位实现优先使用文件链接和符号名，避免固定行号随着代码调整而失效。具体要求见 [AGENTS.md](../AGENTS.md)。
 
 ## 模块边界
 
 ```text
-backend/cmd/server                 组装 Provider、查询服务、数据库、后台和调度
-        ↓
-backend/internal/httpapi           对外查询 API：路由、超时、JSON 和错误响应
-backend/internal/admin             本地后台：目标管理、日志和详情（8182）
-        ↓
-backend/internal/tracker           查询用例、合集发现、循环调度、查询日志
-        ↓
-backend/internal/source            通用 Provider 接口、Video、CreatorProfile、错误与分发
-        ↑
-backend/internal/provider/bilibili B站标识校验、HTTP 请求、响应解析和字段转换
-        ↓
-backend/internal/storage           打开 SQLite、迁移、内容指纹、五表读写
+            ┌────────────────────────────┐                    ┌────────────────────────────┐
+            │ admin  :8182               │                    │ httpapi  :8181             │
+  ┌─────────│ HTML 管理后台              │                    │ JSON 查询 API              │
+  │         └────────────────────────────┘                    └────────────────────────────┘
+  │                        │                                                 │
+  │                        │ 立即查询                                        │
+  │                        │                                                 │
+  │                        ▼                                                 │
+  │         ┌────────────────────────────┐                                   │
+  │读写库   │ tracker                    │                                   │ 只查上游
+  │         │ 查询 / 调度 / 发现         │────────┐                          │
+  │         └────────────────────────────┘        │                          │
+  │                        │                      │                          │
+  │                        │ 保存 / 采样          │                          │
+  │                        │                      │                          │
+  │                        ▼                      │平台查询                  ▼
+  │         ┌────────────────────────────┐        │           ┌────────────────────────────┐
+  │         │ storage                    │        │           │ source + provider          │
+  └────────►│ 内容 / 版本 / 指标 / 目标  │        └──────────►│ 能力分发 / 平台适配        │
+            └────────────────────────────┘                    └────────────────────────────┘
+                           │                                                 │
+                           │ SQL                                             │ HTTPS GET
+                           │                                                 │
+                           ▼                                                 ▼
+            ┌────────────────────────────┐                    ┌────────────────────────────┐
+            │ SQLite                     │                    │ api.bilibili.com           │
+            │ data/bht.db                │                    │ B站网页端点                │
+            └────────────────────────────┘                    └────────────────────────────┘
 ```
 
 依赖方向由适配器指向通用契约。HTTP 层不导入 B站实现，只有启动入口负责组装具体 Provider。查询模块不依赖用户、订阅、数据库或 HTTP 服务，可直接通过 `Service.GetVideo(ctx, platform, id)` 或 `Service.GetCreator(ctx, platform, id)` 调用。
@@ -130,21 +146,43 @@ curl.exe "http://127.0.0.1:8181/api/v1/platforms/bilibili/videos/BV17x411w7KC"
 
 本次查询涉及两段网络通信：curl 向本项目服务发送 HTTP 请求，本项目服务再作为 HTTP 客户端向 B站发送 HTTPS 请求。`httpapi` 处理第一段，B站 Provider 处理第二段。
 
-```mermaid
-sequenceDiagram
-    participant C as curl
-    participant H as httpapi
-    participant S as source.Service
-    participant P as bilibili.Provider
-    participant B as B站元数据端点
-    C->>H: GET /api/v1/platforms/bilibili/videos/BV17x411w7KC
-    H->>S: GetVideo(ctx, "bilibili", "BV17x411w7KC")
-    S->>P: GetVideo(ctx, "BV17x411w7KC")
-    P->>B: HTTPS GET /x/web-interface/view?bvid=BV17x411w7KC
-    B-->>P: HTTP 响应及 B站 JSON
-    P-->>S: source.Video 或 error
-    S-->>H: source.Video 或 error
-    H-->>C: 本项目 HTTP 状态码及 JSON
+```text
+┌────────────────────────────┐
+│ curl                       │
+│ GET videos/{id}            │
+└────────────────────────────┘
+               │
+               │ HTTP 请求
+               │
+               ▼
+┌────────────────────────────┐
+│ httpapi / handler.go       │
+│ 提取 platform 与 BV        │
+└────────────────────────────┘
+               │
+               │ GetVideo
+               │
+               ▼
+┌────────────────────────────┐                                  ┌────────────────────────────┐
+│ source.Service             │  接口分发                        │ bilibili.GetVideo          │
+│ 选择视频查询 Provider      │─────────────────────────────────►│ 校验 BV / 转换字段         │
+└────────────────────────────┘                                  └────────────────────────────┘
+                                                                               │
+                                                                               │
+                                                                               │
+                                                                               ▼
+                                                                ┌────────────────────────────┐
+                                                                │ http.go / B站              │
+               ┌────────────────────────────────────────────────│ GET view?bvid=...          │
+               │                                                └────────────────────────────┘
+               │
+               │ 原路返回 / 编码 JSON
+               │
+               ▼
+┌────────────────────────────┐
+│ JSON 响应                  │
+│ 返回 data 或 error.code    │
+└────────────────────────────┘
 ```
 
 成功路径的具体步骤如下：
@@ -159,7 +197,7 @@ sequenceDiagram
 8. `httpapi` 把结果包装成 `{"data": ...}`，设置 HTTP 200、JSON 内容类型和 `Cache-Control: no-store`，通过 `json.NewEncoder(w).Encode(...)` 写回连接。
 9. curl 接收响应并把 JSON 正文打印到终端。当前命令没有加 `-i`，所以不会同时打印 HTTP 响应头。
 
-当前没有本地数据库或缓存，每次查询都会重新执行上游查询。这里的返回链路是同一个请求内的同步调用，不经过后台任务队列。
+8181 查询 API 这条路径不读写本地数据库或缓存，每次请求都会重新执行上游查询，并在同一个请求内同步返回。后台跟踪和 SQLite 入库走独立的 `admin → tracker → storage` 路径。
 
 ## httpapi 与 B站 Provider 的职责
 
@@ -347,22 +385,43 @@ Invoke-RestMethod -Uri "http://127.0.0.1:8181/api/v1/platforms/bilibili/creators
 
 ### 查询链路与平台能力
 
-```mermaid
-sequenceDiagram
-    participant C as curl
-    participant H as httpapi
-    participant S as source.Service
-    participant P as bilibili.Provider
-    participant B as B站用户资料端点
-    C->>H: GET /api/v1/platforms/bilibili/creators/122541
-    H->>S: GetCreator(ctx, "bilibili", "122541")
-    S->>S: 查找 Provider 并检查 CreatorProvider 能力
-    S->>P: GetCreator(ctx, "122541")
-    P->>B: HTTPS GET /x/web-interface/card?mid=122541
-    B-->>P: 用户资料 JSON
-    P-->>S: source.CreatorProfile 或 error
-    S-->>H: 查询结果
-    H-->>C: HTTP 状态及 JSON
+```text
+┌────────────────────────────┐
+│ curl                       │
+│ GET creators/{id}          │
+└────────────────────────────┘
+               │
+               │ HTTP 请求
+               │
+               ▼
+┌────────────────────────────┐
+│ httpapi / handler.go       │
+│ 提取 platform 与 UID       │
+└────────────────────────────┘
+               │
+               │ GetCreator
+               │
+               ▼
+┌────────────────────────────┐                                  ┌────────────────────────────┐
+│ source.Service             │  接口分发                        │ bilibili.GetCreator        │
+│ 检查 CreatorProvider 能力  │─────────────────────────────────►│ 校验 UID / 转换资料        │
+└────────────────────────────┘                                  └────────────────────────────┘
+                                                                               │
+                                                                               │
+                                                                               │
+                                                                               ▼
+                                                                ┌────────────────────────────┐
+                                                                │ http.go / B站              │
+               ┌────────────────────────────────────────────────│ GET card?mid=...           │
+               │                                                └────────────────────────────┘
+               │
+               │ 原路返回 / 编码 JSON
+               │
+               ▼
+┌────────────────────────────┐
+│ JSON 响应                  │
+│ 返回 data 或 error.code    │
+└────────────────────────────┘
 ```
 
 通用类型及能力接口位于 [source.go](../backend/internal/source/source.go)：

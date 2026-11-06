@@ -5,15 +5,34 @@
 ## 子模块协作
 
 ```text
-source.Service
-      │ Provider / CreatorProvider / VideoLister
-      ▼
- provider/
-   └── bilibili/ ──► api.bilibili.com
-         ├─ bilibili.go   GetVideo
-         ├─ creator.go    GetCreator
-         ├─ list.go       GetCreatorVideos
-         └─ http.go       共用请求与校验
+                                ┌────────────────────────────┐
+                                │ source.Service             │
+                                │ 统一查询入口               │
+                                └────────────────────────────┘
+                                               │
+                                               │ 按平台分发
+                                               │
+                                               ▼
+                                ┌────────────────────────────┐
+                                │ source 能力接口            │
+                                │ Provider / Creator / Lister│
+                                └────────────────────────────┘
+                                               │
+ 已实现                                        │                 待扩展
+               ┌───────────────────────────────┴───────────────────────────────┐
+               ▼                                                               ▼
+┌────────────────────────────┐                                  ┌────────────────────────────┐
+│ provider/bilibili          │                                  │ provider/<platform>        │
+│ 现有平台适配器             │                                  │ 新增平台扩展位置           │
+└────────────────────────────┘                                  └────────────────────────────┘
+               │
+               │ HTTPS GET
+               │
+               ▼
+┌────────────────────────────┐
+│ api.bilibili.com           │
+│ 固定网页端点               │
+└────────────────────────────┘
 ```
 
 新增平台时复制这个目录结构，实现相同接口，再到 `cmd/server/main.go` 注册。
