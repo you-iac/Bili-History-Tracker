@@ -1,0 +1,31 @@
+# tracker 模块
+
+后台循环查询：执行单个目标、算指纹、落库、记日志，并负责调度与合集发现。
+
+> 与 [doc.go](doc.go) 的包注释保持一致；架构总览见 [docs/architecture.md](../../../docs/architecture.md)。
+
+## 子模块协作
+
+```text
+admin ──RunNow──────────────► tracker.go
+scheduler.go ──RunTarget────► tracker.go ──► source.Service
+      │                          │  │
+      │ DueTargets/MarkRun       │  └──────► log.go
+      ▼                          ▼
+    storage ◄───── SaveVideo / SaveCreator / RecordMetric
+```
+
+`tracker.go` 是一次查询的完整用例；`scheduler.go` 决定“什么时候查”；
+`log.go` 只负责记录，不参与决策。
+
+## 输入 / 输出 / 边界
+
+- **输入**：`storage.Target`（类型、ID、间隔；平台名当前由构造函数提供）。
+- **输出**：副作用——落库、指标、调度表、日志；不向调用方返回结果。
+- **它不认识**：B站 HTTP 细节、SQL、HTML 页面。
+
+## 关键约束
+
+- 同一目标用 `running` map 去重，不并发。
+- 单目标 2 分钟超时；失败也推进 `next_run`。
+- 作者发现每轮最多新增 20 个视频目标。

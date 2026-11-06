@@ -1,6 +1,9 @@
 // fingerprint.go 从上游原始 data 中投影稳定内容字段，计算 8 字节内容指纹。
 // 指纹只用于同一目标相邻版本比较；投影清单和长度由 fingerprintVersion 固化。
 // 统计、状态、作者昵称等字段保留在 payload 中但不参与指纹。
+//
+// 注意：下面的字段路径（owner.mid、pages[]、card.sign 等）目前是 B站 view/card
+// 的 data 格式；新增平台时需要按平台扩展投影，不能直接复用这份清单。
 
 package storage
 

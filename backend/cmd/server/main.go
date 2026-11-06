@@ -1,5 +1,22 @@
 // Command server 组装平台 Provider、查询服务、数据库、后台与循环调度。
 //
+// 输入：环境变量 BHT_ADDR、BHT_ADMIN_ADDR、BHT_DB、BHT_QUERY_LOG、BHT_BILI_COOKIE，
+// 以及操作系统的中断信号。
+// 输出：两个 HTTP 监听端口、一个调度 goroutine、一个 SQLite 文件；退出时按序关闭。
+// 它不认识：业务规则、SQL、B站字段；只负责创建对象、连接依赖和管理生命周期。
+//
+// 上下游关系：
+//
+//	[上游] 操作系统 / 运维（环境变量、信号）
+//	          │
+//	          ▼
+//	[当前] ┌─────────────┐
+//	       │ cmd/server  │
+//	       └──────┬──────┘
+//	              │ new + go + ListenAndServe
+//	              ▼
+//	[下游] httpapi、admin、tracker（scheduler）、storage、provider/bilibili
+//
 // 对外查询 API 默认监听 127.0.0.1:8181，后台默认监听 127.0.0.1:8182。
 // 数据库路径由 BHT_DB 指定，查询日志由 BHT_QUERY_LOG 指定。
 // 设计说明（仓库相对路径）：docs/architecture.md#module-navigation。
