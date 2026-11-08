@@ -1,6 +1,6 @@
 # storage 模块
 
-SQLite 持久化：打开库、迁移、算指纹、读写五表与调度目标。单写者连接。
+SQLite 持久化：打开库、迁移、算指纹、读写五表与调度目标，并为观察台提供只读聚合。单写者连接。
 
 > 与 [doc.go](doc.go) 的包注释保持一致；架构总览见 [docs/architecture.md](../../../docs/architecture.md)。
 
@@ -37,7 +37,7 @@ SQLite 持久化：打开库、迁移、算指纹、读写五表与调度目标�
 └────────────────────────────┘
 ```
 
-`repo.go` 是唯一的 SQL 出口；`db.go` 只管连接、PRAGMA 和迁移。
+`repo.go` 是写入五表和调度目标的 SQL 出口；`db.go` 只管连接、PRAGMA 和迁移；`dashboard.go` 是只读出口，供观察台做概览、分页列表、日指标、版本动态和快照读取。看板查询只取列表需要的当前字段和封面表达式，不返回整份 payload；口径见 [观察台](../../../docs/dashboard.md)。
 
 ## 输入 / 输出 / 边界
 
@@ -52,3 +52,4 @@ SQLite 持久化：打开库、迁移、算指纹、读写五表与调度目标�
 - `MaxOpenConns(1)`：读写串行，避免 `SQLITE_BUSY`。
 - `repo.go` 不裁剪平台数据，保存 `Video.Raw`，不接收或记录过滤规则版本。`hash_version` 继续记录内容指纹规则。
 - [0003 迁移](migrations/0003_drop_video_snapshot_version.sql) 删除 0002 曾引入的 `snapshot_version` 列，保持 payload、指纹和内容序号不变；兼容性测试见 [migration_test.go](migration_test.go)，覆盖 schema 1/2 升级与重复打开。裁剪规则变化本身不会触发内容版本。
+- [0004 迁移](migrations/0004_observation_status.sql) 为 `tracking_targets` 增加最近采集状态，并回填旧目标的 `last_success_at`；不改变内容快照、指纹和 UTC 日采样。失败只记录分类，不保存上游正文，也不推断删除。

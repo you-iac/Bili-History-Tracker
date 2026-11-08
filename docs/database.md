@@ -1,6 +1,6 @@
 # 数据库设计：当前索引、业务快照与指标采样
 
-设计由 [0001](../backend/internal/storage/migrations/0001_init.sql) 建表；[0002](../backend/internal/storage/migrations/0002_video_snapshot_version.sql) 曾增加过滤规则版本列，[0003](../backend/internal/storage/migrations/0003_drop_video_snapshot_version.sql) 删除该列。当前 `PRAGMA user_version = 3`，过滤版本仅由适配器代码管理；服务在成功查询后自动写入。内容设计为五张表，分成三类职责：
+设计由 [0001](../backend/internal/storage/migrations/0001_init.sql) 建表；[0002](../backend/internal/storage/migrations/0002_video_snapshot_version.sql) 曾增加过滤规则版本列，[0003](../backend/internal/storage/migrations/0003_drop_video_snapshot_version.sql) 删除该列，[0004](../backend/internal/storage/migrations/0004_observation_status.sql) 为调度目标增加最近采集状态与看板索引。当前 `PRAGMA user_version = 4`，过滤版本仅由适配器代码管理；服务在成功查询后自动写入。内容设计为五张表，分成三类职责：
 
 | 类别 | 表 | 保存什么 | 增长方式 |
 |---|---|---|---|
@@ -424,6 +424,19 @@ fingerprint = SHA256("bht-content-v1\n" + canonicalJSON(projection(payload)))[0:
 
 删除目标只停止调度，不删除 `creators`、`videos` 或版本行；历史仍可通过后台详情页读取。展示名称来自 `creators.name` 或 `videos.title`，不在调度表中冗余。
 
+0004 迁移为每个目标增加一份最近采集状态，供观察台判断“正常、失败、较旧、已恢复”：
+
+| 字段 | 说明 |
+|---|---|
+| `last_result` | 最近一次结果分类（`ok`、`rate_limited`、`store_failed` 等），空字符串表示尚未运行 |
+| `last_success_at` | 最近一次成功观测时间，UTC 毫秒；旧目标由已有 `last_observed_at` / `last_profile_observed_at` 回填 |
+| `failure_count` | 连续失败次数；成功清零 |
+| `last_failure_at` | 最近失败时间 |
+| `failure_reason` | 最近失败分类，不保存上游正文 |
+| `recovered_at` | 从失败恢复的时间；再次失败时清空 |
+
+状态只在成功或失败观测后覆盖，不推断删除；判定阈值与页面口径见 [观察台](dashboard.md)。同一迁移还在 `metric_samples` 和两张版本表上增加按时间查询的索引。
+
 ## 建表 SQL（设计示例）
 
 ```sql
@@ -432,7 +445,7 @@ PRAGMA foreign_keys = ON;
 
 -- 标识本项目数据库并记录 schema 版本；版本规则见下文“Schema 版本与迁移”。
 PRAGMA application_id = 1112036401;  -- ASCII 'BHT1'
-PRAGMA user_version = 3;
+PRAGMA user_version = 4;
 
 CREATE TABLE creators (
     platform                  TEXT NOT NULL CHECK (length(platform) > 0),
@@ -548,7 +561,7 @@ SQLite 文件头里预留了两个 4 字节整数，正好覆盖这两件事：
 | PRAGMA | 作用 | 本项目取值 |
 |---|---|---|
 | `application_id` | 标识文件属于哪个应用，防止误开其他 SQLite 库 | `1112036401`（ASCII `BHT1`） |
-| `user_version` | 表结构版本，每次结构变更递增 | 当前为 `3`，由 0001 → 0002 → 0003 顺序迁移 |
+| `user_version` | 表结构版本，每次结构变更递增 | 当前为 `4`，由 0001 → 0004 顺序迁移 |
 
 读取方式是一条 PRAGMA，不需要额外的元数据表：
 
@@ -876,7 +889,7 @@ PRAGMA auto_vacuum = INCREMENTAL;   -- 建库时设置，删采样数据后回�
 
 ## 当前范围与后续扩展
 
-本设计已落地：数据库驱动（`modernc.org/sqlite`）、0001/0002/0003 迁移、内容指纹、视频快照裁剪、五表读写、调度目标表、8182 本地后台和循环调度均已实现，自动化测试覆盖快照字段保留、旧库兼容、指纹稳定性、版本追加、迟到丢弃和后台表单。
+本设计已落地：数据库驱动（`modernc.org/sqlite`）、0001/0002/0003/0004 迁移、内容指纹、视频快照裁剪、五表读写、调度目标表、8182 观察台和循环调度均已实现，自动化测试覆盖快照字段保留、旧库兼容、指纹稳定性、版本追加、迟到丢弃和后台表单。
 
 已实现与未实现的边界：
 

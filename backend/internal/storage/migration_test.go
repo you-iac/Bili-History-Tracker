@@ -70,7 +70,7 @@ PRAGMA user_version = 2;`, initial.filter); err != nil {
 				t.Cleanup(func() { _ = store.Close() })
 				var version, columnCount, hashVersion, seq int
 				var storedPayload, storedHash string
-				if err := store.DB().QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 3 {
+				if err := store.DB().QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != schemaVersion {
 					t.Fatalf("schema version = %d, err=%v", version, err)
 				}
 				if err := store.DB().QueryRow(`SELECT COUNT(*) FROM pragma_table_info('video_versions')

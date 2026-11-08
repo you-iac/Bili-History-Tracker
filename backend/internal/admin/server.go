@@ -9,7 +9,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"io/fs"
+	"math"
 	"net/http"
+	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -18,12 +22,13 @@ import (
 	"bili-history-tracker/backend/internal/tracker"
 )
 
-//go:embed templates/*.html
+//go:embed templates/*.html assets/*
 var templateFS embed.FS
 
 // Server 渲染后台页面并转发操作到 storage 和 tracker。
 type Server struct {
 	store     *storage.Store
+	reader    dashboardReader
 	tracker   *tracker.Tracker
 	log       *tracker.Log
 	platform  string
@@ -32,18 +37,11 @@ type Server struct {
 
 // New 解析模板并创建后台服务。
 func New(store *storage.Store, trk *tracker.Tracker, log *tracker.Log, platform string) (*Server, error) {
-	templates, err := template.New("").Funcs(template.FuncMap{
-		"clock": func(at time.Time) string {
-			if at.IsZero() {
-				return "-"
-			}
-			return at.Local().Format("01-02 15:04:05")
-		},
-	}).ParseFS(templateFS, "templates/*.html")
+	templates, err := template.New("").Funcs(templateFunctions()).ParseFS(templateFS, "templates/*.html")
 	if err != nil {
 		return nil, fmt.Errorf("parse admin templates: %w", err)
 	}
-	return &Server{store: store, tracker: trk, log: log, platform: platform, templates: templates}, nil
+	return &Server{store: store, reader: store, tracker: trk, log: log, platform: platform, templates: templates}, nil
 }
 
 // Handler 返回后台路由。
@@ -52,8 +50,17 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte("ok"))
 	})
-	mux.HandleFunc("GET /", s.index)
-	mux.HandleFunc("GET /detail/{type}/{id}", s.detail)
+	mux.HandleFunc("GET /{$}", s.overview)
+	mux.HandleFunc("GET /videos", s.library)
+	mux.HandleFunc("GET /creators", s.library)
+	mux.HandleFunc("GET /manage", s.management)
+	mux.HandleFunc("GET /activity", s.activity)
+	mux.HandleFunc("GET /logs", s.logsPage)
+	mux.HandleFunc("GET /detail/{type}/{id}", s.contentDetail)
+	mux.HandleFunc("GET /api/metrics/{type}/{id}", s.metrics)
+	mux.HandleFunc("GET /api/targets/status", s.targetStatus)
+	assets, _ := fs.Sub(templateFS, "assets")
+	mux.Handle("GET /assets/", http.StripPrefix("/assets/", http.FileServer(http.FS(assets))))
 	mux.HandleFunc("POST /targets", s.addTarget)
 	mux.HandleFunc("POST /targets/delete", s.deleteTarget)
 	mux.HandleFunc("POST /targets/run", s.runTarget)
@@ -61,126 +68,9 @@ func (s *Server) Handler() http.Handler {
 	return mux
 }
 
-type indexData struct {
-	Counts  map[string]int64
-	Targets []targetView
-	Logs    []tracker.Entry
-	Message string
-	Error   string
-	DBPath  string
-}
-
-type targetView struct {
-	storage.Target
-	TypeLabel    string
-	IntervalText string
-	NextRunText  string
-	LastRunText  string
-}
-
-func (s *Server) index(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
-	defer cancel()
-	targets, err := s.store.ListTargets(ctx)
-	if err != nil {
-		s.renderError(w, err)
-		return
-	}
-	counts, err := s.store.Counts(ctx)
-	if err != nil {
-		s.renderError(w, err)
-		return
-	}
-	views := make([]targetView, 0, len(targets))
-	for _, target := range targets {
-		label := "UP 主"
-		if target.TargetType == "video" {
-			label = "视频"
-		}
-		lastRun := "-"
-		if target.LastRunAt != nil {
-			lastRun = time.UnixMilli(*target.LastRunAt).Local().Format("01-02 15:04:05")
-		}
-		views = append(views, targetView{
-			Target:       target,
-			TypeLabel:    label,
-			IntervalText: formatInterval(target.IntervalSeconds),
-			NextRunText:  time.UnixMilli(target.NextRunAt).Local().Format("01-02 15:04:05"),
-			LastRunText:  lastRun,
-		})
-	}
-	data := indexData{
-		Counts:  counts,
-		Targets: views,
-		Logs:    s.log.Recent(100),
-		Message: r.URL.Query().Get("message"),
-		Error:   r.URL.Query().Get("error"),
-		DBPath:  s.store.Path(),
-	}
-	_ = s.templates.ExecuteTemplate(w, "index.html", data)
-}
-
-type detailData struct {
-	Title   string
-	Subtitle string
-	Meta    [][2]string
-	Payload string
-}
-
-func (s *Server) detail(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
-	defer cancel()
-	kind := r.PathValue("type")
-	id := r.PathValue("id")
-	switch kind {
-	case "video":
-		detail, err := s.store.LatestVideo(ctx, s.platform, id)
-		if err != nil {
-			s.renderError(w, err)
-			return
-		}
-		meta := [][2]string{
-			{"视频 ID", detail.VideoID},
-			{"标题", detail.Title},
-			{"播放量", formatInt(detail.ViewCount)},
-			{"投稿时间", formatMillis(detail.PublishedAt)},
-			{"首次观测", formatMillis(&detail.FirstSeenAt)},
-			{"最近观测", formatMillis(&detail.LastObservedAt)},
-			{"当前版本", strconv.FormatInt(detail.CurrentSeq, 10)},
-			{"版本观测时间", formatMillis(&detail.ObservedAt)},
-			{"来源", detail.SourceURL},
-		}
-		_ = s.templates.ExecuteTemplate(w, "detail.html", detailData{
-			Title: "视频详情", Subtitle: detail.Title, Meta: meta, Payload: prettyJSON(detail.Payload),
-		})
-	case "creator":
-		detail, err := s.store.LatestCreator(ctx, s.platform, id)
-		if err != nil {
-			s.renderError(w, err)
-			return
-		}
-		meta := [][2]string{
-			{"作者 ID", detail.CreatorID},
-			{"昵称", detail.Name},
-			{"粉丝数", formatInt(detail.FollowerCount)},
-			{"首次观测", formatMillis(&detail.FirstSeenAt)},
-			{"最近引用", formatMillis(&detail.LastReferencedAt)},
-			{"资料观测", formatMillis(detail.ProfileObservedAt)},
-			{"当前版本", formatInt64Ptr(detail.CurrentSeq)},
-			{"版本观测时间", formatMillis(detail.ObservedAt)},
-			{"来源", detail.SourceURL},
-		}
-		_ = s.templates.ExecuteTemplate(w, "detail.html", detailData{
-			Title: "作者详情", Subtitle: detail.Name, Meta: meta, Payload: prettyJSON(detail.Payload),
-		})
-	default:
-		http.NotFound(w, r)
-	}
-}
-
 func (s *Server) addTarget(w http.ResponseWriter, r *http.Request) {
 	targetType := strings.TrimSpace(r.FormValue("type"))
-	id := strings.TrimSpace(r.FormValue("id"))
+	id := normalizeID(targetType, r.FormValue("id"))
 	if targetType != "creator" && targetType != "video" {
 		s.redirect(w, r, "", "类型无效")
 		return
@@ -190,12 +80,17 @@ func (s *Server) addTarget(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	hours, err := strconv.ParseFloat(r.FormValue("interval_hours"), 64)
-	if err != nil || hours < 0.1 || hours > 720 {
+	if err != nil || math.IsNaN(hours) || math.IsInf(hours, 0) || hours < 0.1 || hours > 720 {
 		hours = 3
 	}
 	interval := time.Duration(hours * float64(time.Hour))
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
+	existed, err := s.store.HasTarget(ctx, s.platform, targetType, id)
+	if err != nil {
+		s.redirect(w, r, "", "无法读取关注状态，请稍后重试。")
+		return
+	}
 	if err := s.store.AddTarget(ctx, s.platform, targetType, id, interval, time.Now()); err != nil {
 		s.redirect(w, r, "", "保存失败："+err.Error())
 		return
@@ -204,7 +99,11 @@ func (s *Server) addTarget(w http.ResponseWriter, r *http.Request) {
 		Platform: s.platform, TargetType: targetType, TargetID: id,
 		IntervalSeconds: int64(interval.Seconds()),
 	})
-	s.redirect(w, r, "已添加并开始查询："+id, "")
+	message := "已添加关注，正在进行首次采集：" + id
+	if existed {
+		message = "已关注该目标，已更新设置并触发刷新：" + id
+	}
+	s.redirect(w, r, message, "")
 }
 
 func (s *Server) deleteTarget(w http.ResponseWriter, r *http.Request) {
@@ -243,7 +142,7 @@ func (s *Server) setInterval(w http.ResponseWriter, r *http.Request) {
 	targetType := r.FormValue("type")
 	id := r.FormValue("id")
 	hours, err := strconv.ParseFloat(r.FormValue("interval_hours"), 64)
-	if err != nil || hours < 0.1 || hours > 720 {
+	if err != nil || math.IsNaN(hours) || math.IsInf(hours, 0) || hours < 0.1 || hours > 720 {
 		s.redirect(w, r, "", "间隔必须是 0.1 到 720 小时")
 		return
 	}
@@ -257,21 +156,33 @@ func (s *Server) setInterval(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) redirect(w http.ResponseWriter, r *http.Request, message, errorMessage string) {
-	query := "?"
+	destination := safeReturn(r.FormValue("return_to"))
+	parsed, _ := url.Parse(destination)
+	query := parsed.Query()
+	query.Del("message")
+	query.Del("error")
 	if message != "" {
-		query += "message=" + template.URLQueryEscaper(message)
+		query.Set("message", message)
 	}
 	if errorMessage != "" {
-		if query != "?" {
-			query += "&"
-		}
-		query += "error=" + template.URLQueryEscaper(errorMessage)
+		query.Set("error", errorMessage)
 	}
-	http.Redirect(w, r, "/"+query, http.StatusSeeOther)
+	parsed.RawQuery = query.Encode()
+	if strings.Contains(r.Header.Get("Accept"), "application/json") {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		if errorMessage != "" {
+			w.WriteHeader(400)
+		} else {
+			w.WriteHeader(http.StatusAccepted)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]string{"message": message, "error": errorMessage, "redirect": parsed.String()})
+		return
+	}
+	http.Redirect(w, r, parsed.String(), http.StatusSeeOther)
 }
 
 func (s *Server) renderError(w http.ResponseWriter, err error) {
-	http.Error(w, "后台查询失败: "+err.Error(), http.StatusInternalServerError)
+	http.Error(w, "暂时无法读取记录，请稍后重试。", http.StatusInternalServerError)
 }
 
 func validID(targetType, id string) bool {
@@ -279,8 +190,48 @@ func validID(targetType, id string) bool {
 		value, err := strconv.ParseInt(id, 10, 64)
 		return err == nil && value > 0 && strconv.FormatInt(value, 10) == id
 	}
-	return strings.HasPrefix(id, "BV") && len(id) == 12
+	return targetType == "video" && bvidInput.MatchString(id)
 }
+
+var bvidInput = regexp.MustCompile(`^BV[1-9A-HJ-NP-Za-km-z]{10}$`)
+
+// normalizeID 只本地提取固定 B站域名中的标识，不访问用户提供的 URL。
+func normalizeID(kind, input string) string {
+	input = strings.TrimSpace(input)
+	if strings.HasPrefix(input, "https://") || strings.HasPrefix(input, "http://") {
+		u, err := url.Parse(input)
+		if err != nil || u.User != nil || u.Port() != "" {
+			return ""
+		}
+		host := strings.ToLower(u.Hostname())
+		parts := strings.Split(strings.Trim(u.Path, "/"), "/")
+		if kind == "creator" && host == "space.bilibili.com" && len(parts) == 1 {
+			return parts[0]
+		}
+		if kind == "video" && (host == "www.bilibili.com" || host == "bilibili.com" || host == "m.bilibili.com") && len(parts) == 2 && parts[0] == "video" {
+			return parts[1]
+		}
+		return ""
+	}
+	return input
+}
+
+func safeReturn(value string) string {
+	u, err := url.Parse(value)
+	if err != nil || u.IsAbs() || u.Host != "" {
+		return "/manage"
+	}
+	switch u.Path {
+	case "/", "/manage", "/videos", "/creators", "/activity", "/logs":
+		return u.String()
+	}
+	parts := strings.Split(strings.Trim(u.Path, "/"), "/")
+	if len(parts) == 3 && parts[0] == "detail" && validID(parts[1], parts[2]) {
+		return u.String()
+	}
+	return "/manage"
+}
+func urlQuery(value string) string { return url.QueryEscape(value) }
 
 func formatInterval(seconds int64) string {
 	duration := time.Duration(seconds) * time.Second

@@ -3,8 +3,10 @@
 package tracker
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sync"
@@ -45,11 +47,32 @@ func NewLog(path string, max int) (*Log, error) {
 			return nil, fmt.Errorf("create log directory: %w", err)
 		}
 	}
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0o644)
 	if err != nil {
 		return nil, fmt.Errorf("open query log: %w", err)
 	}
 	log.file = file
+	// 有界恢复文件尾部的有效 JSON 行；不将全部历史日志加载到内存。
+	if info, err := file.Stat(); err == nil {
+		offset := info.Size() - (2 << 20)
+		if offset < 0 {
+			offset = 0
+		}
+		scanner := bufio.NewScanner(io.NewSectionReader(file, offset, info.Size()-offset))
+		scanner.Buffer(make([]byte, 4096), 2<<20)
+		if offset > 0 {
+			scanner.Scan()
+		}
+		for scanner.Scan() {
+			var entry Entry
+			if json.Unmarshal(scanner.Bytes(), &entry) == nil && !entry.Time.IsZero() {
+				log.entries = append(log.entries, entry)
+				if len(log.entries) > max {
+					log.entries = log.entries[1:]
+				}
+			}
+		}
+	}
 	return log, nil
 }
 

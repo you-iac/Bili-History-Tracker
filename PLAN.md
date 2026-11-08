@@ -26,3 +26,5 @@
 ## 已完成计划
 
 **裁剪视频快照，过滤合集中的其他视频数据**（创建时间：2026-11-07；完成时间：2026-11-08，历史记录均仅确认日期；提交：`afcd74e`）。已在 [B站适配器](backend/internal/provider/bilibili/snapshot.go) 中仅过滤顶层 `ugc_season`，保留当前视频全部分 P、统计、字幕及未知字段；过滤规则版本仅在模块代码中选择，不随数据传递或入库，通过 [0003 迁移](backend/internal/storage/migrations/0003_drop_video_snapshot_version.sql) 删除多余列并兼容旧库，保持内容指纹、版本追加规则和历史 payload 不变。快照过滤、入库与详情读取、schema 1/2 升级及完整性测试通过，`go test ./...`、`go vet ./...` 和服务端构建通过；历史快照裁剪与空间回收不在本项范围。字段图例见 [数据库设计](docs/database.md#视频快照裁剪前后对照)，验证见 [快照测试](backend/internal/provider/bilibili/snapshot_test.go) 和 [迁移测试](backend/internal/storage/migration_test.go)。
+
+**后台界面重构：B站关注管理与信息看板**（创建时间：2026-11-08 20:41；完成时间：2026-11-08 21:40）。已将 8182 后台重构为“Bili 观察台”：信息总览、视频库、UP 主库、动态与提醒、对象详情、关注管理、采集记录七个页面，配套两个只读 JSON 接口与内嵌 CSS/JS；页面只读本地，只有命令异步触发 `tracker.RunNow`。存储侧新增只读看板查询（概览、分页筛选、日指标、版本动态、增长与快照），列表不返回整份 payload；0004 迁移为 `tracking_targets` 增加最近结果、最近成功时间、连续失败与恢复时间并回填旧目标，看板据此区分正常、失败、较旧、已恢复与待采集，`running` 仅表示本进程在途查询。图表使用内联 SVG，缺失日切断、单点不造增长、回落保留负值，并提供可展开数据表。验证通过 `go test ./...`、`go vet ./...`、`node --test internal/admin/chart_test.cjs` 及页面与接口手动检查；页面与状态口径见 [观察台设计](docs/dashboard.md)，迁移见 [数据库设计](docs/database.md)。

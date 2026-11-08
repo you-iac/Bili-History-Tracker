@@ -87,25 +87,31 @@ func (t *Tracker) RunNow(target storage.Target) {
 }
 
 func (t *Tracker) runVideo(ctx context.Context, target storage.Target) {
+	outcome := "query_failed"
+	defer func() { t.recordOutcome(target, outcome) }()
 	started := time.Now()
 	video, err := t.queries.GetVideo(ctx, t.platform, target.TargetID)
 	if err != nil {
+		outcome = errorMessage(err)
 		t.log.Add(Entry{Time: started, Level: "error", Target: targetLabel(target),
 			Action: "query_video", Message: errorMessage(err), DurationMS: sinceMS(started)})
 		return
 	}
 	fingerprint, err := storage.VideoFingerprint(video.Raw)
 	if err != nil {
+		outcome = "invalid_payload"
 		t.log.Add(Entry{Time: started, Level: "error", Target: targetLabel(target),
 			Action: "query_video", Message: "invalid_payload", DurationMS: sinceMS(started)})
 		return
 	}
 	result, err := t.store.SaveVideo(ctx, video, fingerprint)
 	if err != nil {
+		outcome = "store_failed"
 		t.log.Add(Entry{Time: started, Level: "error", Target: targetLabel(target),
 			Action: "query_video", Message: "store_failed", Detail: err.Error(), DurationMS: sinceMS(started)})
 		return
 	}
+	outcome = "ok"
 	detail := fmt.Sprintf("seq=%d", result.Seq)
 	if video.ViewCount != nil {
 		detail += fmt.Sprintf(" view=%d", *video.ViewCount)
@@ -119,25 +125,31 @@ func (t *Tracker) runVideo(ctx context.Context, target storage.Target) {
 }
 
 func (t *Tracker) runCreator(ctx context.Context, target storage.Target) {
+	outcome := "query_failed"
+	defer func() { t.recordOutcome(target, outcome) }()
 	started := time.Now()
 	profile, err := t.queries.GetCreator(ctx, t.platform, target.TargetID)
 	if err != nil {
+		outcome = errorMessage(err)
 		t.log.Add(Entry{Time: started, Level: "error", Target: targetLabel(target),
 			Action: "query_creator", Message: errorMessage(err), DurationMS: sinceMS(started)})
 		return
 	}
 	fingerprint, err := storage.CreatorFingerprint(profile.Raw)
 	if err != nil {
+		outcome = "invalid_payload"
 		t.log.Add(Entry{Time: started, Level: "error", Target: targetLabel(target),
 			Action: "query_creator", Message: "invalid_payload", DurationMS: sinceMS(started)})
 		return
 	}
 	result, err := t.store.SaveCreator(ctx, profile, fingerprint)
 	if err != nil {
+		outcome = "store_failed"
 		t.log.Add(Entry{Time: started, Level: "error", Target: targetLabel(target),
 			Action: "query_creator", Message: "store_failed", Detail: err.Error(), DurationMS: sinceMS(started)})
 		return
 	}
+	outcome = "ok"
 	detail := fmt.Sprintf("seq=%d name=%s", result.Seq, profile.Name)
 	if profile.FollowerCount != nil {
 		detail += fmt.Sprintf(" followers=%d", *profile.FollowerCount)
@@ -222,4 +234,21 @@ func errorMessage(err error) string {
 
 func sinceMS(started time.Time) int64 {
 	return time.Since(started).Milliseconds()
+}
+
+// IsRunning 只反映本进程中的在途查询，不把运行中状态持久化而遗留到重启之后。
+func (t *Tracker) IsRunning(kind, id string) bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.running[kind+":"+id]
+}
+
+// recordOutcome 在查询取消时也尝试记录失败；仅使用短时本地事务，不重试上游。
+func (t *Tracker) recordOutcome(target storage.Target, outcome string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	target.Platform = t.platform
+	if err := t.store.RecordTargetResult(ctx, target, outcome, time.Now()); err != nil {
+		t.log.Add(Entry{Level: "warn", Target: targetLabel(target), Action: "status", Message: "store_failed"})
+	}
 }
