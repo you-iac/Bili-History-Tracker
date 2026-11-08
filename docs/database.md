@@ -549,6 +549,19 @@ PRAGMA user_version;
    - 存在，指纹不同：`seq = COALESCE(MAX(seq), 0) + 1` 插入版本行，再更新 `title`、`published_at`、`duration_seconds`、`view_count`、`current_hash`、`current_seq`、`last_observed_at`；`first_seen_at` 不变。
 5. 提交。
 
+```mermaid
+flowchart TD
+    A["上游查询成功"] --> B["投影内容字段并计算指纹"]
+    B --> C{"与 current_hash 相同?"}
+    C -->|是| D["只更新 view_count 与 last_observed_at"]
+    C -->|否| E["插入版本 seq + 1"]
+    E --> F["更新 current_hash / current_seq"]
+    D --> G["提交事务"]
+    F --> G
+```
+
+若渲染器不支持 Mermaid，判断顺序为：指纹与 `current_hash` 相同则只刷新计数和观测时间；不同则插入 `seq + 1` 的版本并移动当前指针；两种情况在同一事务内提交，迟到响应不写入。
+
 ### 查询完整作者资料
 
 与视频相同的骨架，差异在更新字段：`name`、`follower_count`、`last_profile_observed_at`、`current_profile_hash`、`current_profile_seq`、`last_referenced_at`。新作者首次写入时，`first_seen_at`、`last_referenced_at`、`last_profile_observed_at` 都取本次时间，插入 `creators` 后再写入 `seq = 1` 的版本行。
