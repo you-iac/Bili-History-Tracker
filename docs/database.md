@@ -126,9 +126,47 @@
 
 `source.Video.Raw` 携带快照，不进入 HTTP JSON。过滤规则和版本仅由适配器内部管理，不放进 `source.Video`，不经过 tracker 传递，不写入 JSON 或数据库。`storage` 不负责裁剪，只在新版本行保存收到的 payload。作者资料和投稿发现不采用视频裁剪规则。
 
-0003 迁移删除 0002 曾引入的 `snapshot_version`，保留迁移历史，不改变 payload、指纹或内容序号。读取快照无需根据过滤版本分支，旧的完整 data 和新的裁剪 data 都直接按 JSON 处理。过滤规则变化本身不触发新内容版本；已有目标内容未变时，详情仍可能显示历史完整快照。历史裁剪和空间回收需另行安排。前后字段图例见 [plan.md 第一项](../plan.md)。
+0003 迁移删除 0002 曾引入的 `snapshot_version`，保留迁移历史，不改变 payload、指纹或内容序号。读取快照无需根据过滤版本分支，旧的完整 data 和新的裁剪 data 都直接按 JSON 处理。过滤规则变化本身不触发新内容版本；已有目标内容未变时，详情仍可能显示历史完整快照。历史裁剪和空间回收需另行安排。实施摘要见 [计划归档](../PLAN.md#已完成计划)，前后字段图例见下方对照。
 
 `payload` 是“事实层”，可以宽；`content_hash` 是“判断层”，必须窄。两者分离后，播放量、点赞、审核状态都能在快照里保留，但不会触发新版本。
+
+### 视频快照裁剪前后对照
+
+以下图例与字段表来自历史样本 `BV18M4m1y7ga`：完整 data 含 128 个合集视频条目，其中 127 个属于其他 BV。过滤整个顶层 `ugc_season` 后，仍保留当前视频顶层的全部字段及其嵌套内容；表格是样本中的实际字段，并非固定白名单，未知字段也继续保留。采样体积对比见下文“存储成本与压缩”。
+
+字段图例（同一份样本的结构示意，省略具体值；`[=]` 保留，`[-]` 过滤）：
+
+```text
+优化前 data                          优化后 snapshot
+├─ [=] bvid / aid                     ├─ bvid / aid
+├─ [=] title / desc / desc_v2          ├─ title / desc / desc_v2
+├─ [=] pic / pubdate / duration       ├─ pic / pubdate / duration
+├─ [=] owner / stat / dynamic         ├─ owner / stat / dynamic
+├─ [=] pages[1]                       ├─ pages[1]
+│      └─ 当前 BV 的分 P              │  └─ 当前 BV 的分 P
+├─ [=] subtitle / rights / state      ├─ subtitle / rights / state
+├─ [=] season_id                      ├─ season_id
+├─ [=] 其他顶层字段                   └─ 其他顶层字段
+└─ [-] ugc_season                     （不再有 ugc_season）
+       ├─ id / title / cover / ...
+       └─ sections[]
+          └─ episodes[128]
+             ├─ 当前 BV 的合集内副本
+             └─ 其他 127 个 BV 的数据
+```
+
+样本中实际存在的顶层字段按以下规则处理；表中“保留”均包含其原有嵌套字段，并非重新用精简结构体构造快照。
+
+| 字段类别 | 优化前已有字段 | 优化后处理 |
+|---|---|---|
+| 身份与分区 | `bvid`、`aid`、`videos`、`tid`、`tid_v2`、`tname`、`tname_v2`、`copyright` | 全部保留 |
+| 内容与时间 | `pic`、`title`、`pubdate`、`ctime`、`desc`、`desc_v2`、`duration`、`dynamic` | 全部保留 |
+| 作者、统计与状态 | `owner`、`stat`、`state`、`rights`、`mission_id`、`argue_info` | 全部保留 |
+| 当前视频分 P 与字幕 | `cid`、`dimension`、`pages`、`subtitle` | 全部保留，尤其不能将分 P 当成其他视频删除 |
+| 合集归属与显示标记 | `season_id`、`is_chargeable_season`、`is_season_display` | 全部保留；仅保留关联和标记，不保留合集详情 |
+| 其他现有字段 | `premiere`、`teenage_mode`、`is_story`、`is_upower_exclusive`、`is_upower_play`、`is_upower_preview`、`enable_vt`、`vt_display`、`is_upower_exclusive_with_qa`、`is_hua_sheng`、`no_cache`、`user_garb`、`honor_reply`、`like_icon`、`need_jump_bv`、`disable_show_up_info`、`is_story_play`、`is_view_self` | 全部保留 |
+| 合集详情及所有视频条目 | `ugc_season`，含 `id`、`title`、`cover`、`mid`、`intro`、`sign_state`、`attribute`、`stat`、`ep_count`、`season_type`、`is_pay_season`、`enable_vt`、`sections` 及其全部后代 | 整个 `ugc_season` 删除，不影响顶层同名或其他路径的字段 |
+
 
 ### 内容指纹投影（`hash_version = 1`）
 
@@ -829,7 +867,7 @@ PRAGMA auto_vacuum = INCREMENTAL;   -- 建库时设置，删采样数据后回�
 ## 与当前代码如何衔接
 
 - [http.go](../backend/internal/provider/bilibili/http.go) 的 `get()` 返回原始 data 和解析结果；[bilibili.go](../backend/internal/provider/bilibili/bilibili.go) 在身份校验后调用 `videoSnapshot()`，只返回裁剪后的 `Video.Raw`，不传递过滤规则版本；`CreatorProfile.Raw` 则保留完整作者 data。
-- 存档范围由 B站适配器决定；指纹投影目前仍在 `storage/fingerprint.go`，移至适配器是 [plan.md](../plan.md) 中的另一项待实施计划，本次不改变算法。压缩尚未实现。
+- 存档范围由 B站适配器决定；指纹投影目前仍在 `storage/fingerprint.go`，移至适配器是 [PLAN.md](../PLAN.md) 中的另一项待实施计划，本次不改变算法。压缩尚未实现。
 - 已实现的持久化链路为：admin/调度器 → tracker → 查询服务/Provider → 成功观测及快照 → 投影指纹 → 存储事务。事务在网络请求之后开启。
 - 本项目 HTTP API 继续返回当前结构，不向调用方暴露版本表或采样表。
 - 采样任务需要独立的调度入口，第一期可复用 `GetVideo`/`GetCreator`，但只读取计数并写入 `metric_samples`，不触发版本写入。
