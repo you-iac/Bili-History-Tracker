@@ -1,5 +1,5 @@
 // http.go 为视频、UP 主和合集查询提供共用的 HTTP 请求、业务码检查及 JSON 数据解析。
-// get 同时返回解析后的业务结构和原始 data，持久化层用原始 data 保存完整快照。
+// get 同时返回解析后的业务结构和原始 data；各查询适配器决定存档范围，本层不裁剪。
 // 设计说明（仓库相对路径）：docs/architecture.md 的“服务端在哪里请求 B站”章节。
 
 package bilibili
@@ -17,7 +17,7 @@ import (
 
 // get applies the same transport and envelope checks to every query.
 // endpoint is constructed inside this package, never supplied by an API caller.
-// It returns the raw data object so callers can persist the unmodified payload.
+// It returns the raw data object; query adapters prepare snapshots before persistence.
 func (p *Provider) get(ctx context.Context, endpoint string, data any) (json.RawMessage, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {

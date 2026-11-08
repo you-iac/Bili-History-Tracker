@@ -4,7 +4,8 @@
 //
 // 输入：source 层传来的 BV、UID 和 context，以及 B站 HTTP 响应；
 // 输出：Video、CreatorProfile、CreatorVideo 和 *source.Error；其中 Raw 保存
-// 未裁剪的 data 对象，供 storage 存档与计算指纹。
+// 适配器准备的业务快照，供 storage 存档与计算指纹。视频经 snapshot.go 仅移除
+// 顶层 ugc_season；作者资料保留完整 data。快照规则见 docs/database.md。
 // 它不认识：数据库、调度器、8181/8182 的 HTTP 服务；Cookie 只来自 BHT_BILI_COOKIE。
 //
 // 上下游关系：
@@ -119,6 +120,10 @@ func (p *Provider) GetVideo(ctx context.Context, id string) (source.Video, error
 	if data.BVID != id || data.Title == "" || data.Owner.MID <= 0 || data.Duration < 0 || data.Pubdate < 0 {
 		return source.Video{}, invalidResponse
 	}
+	snapshot, err := videoSnapshot(raw)
+	if err != nil {
+		return source.Video{}, invalidResponse
+	}
 	var publishedAt *time.Time
 	if data.Pubdate > 0 {
 		t := time.Unix(data.Pubdate, 0).UTC()
@@ -141,7 +146,7 @@ func (p *Provider) GetVideo(ctx context.Context, id string) (source.Video, error
 		ViewCount:       viewCount,
 		ObservedAt:      time.Now().UTC(),
 		SourceURL:       endpoint,
-		Raw:             raw,
+		Raw:             snapshot,
 	}, nil
 }
 

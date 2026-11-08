@@ -2,7 +2,7 @@
 
 当前实现一次性视频元数据查询、UP 主资料查询、SQLite 持久化、8182 本地后台和循环调度。成功观测按 [数据库设计](database.md) 的五表写入当前索引与内容版本表；查询失败只记日志，不修改已有内容。尚未实现完整投稿列表发现（B站列表接口需要登录态，当前只用公开合集发现）、可访问性状态机、事件日志和 Agent 同步，不能视为完整实现 FR-005、FR-006、FR-008 或 FR-009。
 
-数据库由 0001 迁移建表，`PRAGMA user_version = 1`；调度目标单独存放在 `tracking_targets`，属于调度配置而非内容设计。
+数据库由 0001 迁移建表；0002 曾增加 `snapshot_version`，0003 删除该列，过滤规则版本改为仅由适配器代码管理。当前 `PRAGMA user_version = 3`；调度目标单独存放在 `tracking_targets`，属于调度配置而非内容设计。迁移不裁剪已有 payload，也不新增历史内容版本。
 
 <a id="module-navigation"></a>
 
@@ -16,10 +16,11 @@
 | 通用查询层 | 定义统一数据与错误，按平台和能力分发；平台格式校验交给适配器 | [source.go](../backend/internal/source/source.go) 的 `Provider`、`CreatorProvider`、`Service` | [source_test.go](../backend/internal/source/source_test.go) |
 | HTTP API | 接收调用方请求，提取参数，设置查询超时并返回 JSON | [handler.go](../backend/internal/httpapi/handler.go) 的 `Querier`、`New` | [handler_test.go](../backend/internal/httpapi/handler_test.go) |
 | B站 Provider 与视频查询 | 初始化客户端、校验 BV、转换视频元数据和业务错误 | [bilibili.go](../backend/internal/provider/bilibili/bilibili.go) 的 `Provider`、`GetVideo` | [bilibili_test.go](../backend/internal/provider/bilibili/bilibili_test.go) |
+| B站视频快照 | 仅移除顶层 `ugc_season`，保留分 P、未知字段与大整数；过滤版本只在模块代码中选择 | [snapshot.go](../backend/internal/provider/bilibili/snapshot.go) 的 `videoSnapshot`、`videoSnapshotVersion`、`videoSnapshotV1` | [snapshot_test.go](../backend/internal/provider/bilibili/snapshot_test.go) |
 | B站 UP 主资料查询 | 校验 UID、查询并归一化资料；不获取投稿列表 | [creator.go](../backend/internal/provider/bilibili/creator.go) 的 `GetCreator` | [creator_test.go](../backend/internal/provider/bilibili/creator_test.go) |
 | B站共用请求处理 | 发送上游请求，检查 HTTP 和业务状态、响应大小及 JSON；返回原始 data 和解析结果 | [http.go](../backend/internal/provider/bilibili/http.go) 的 `get` | 由 [视频测试](../backend/internal/provider/bilibili/bilibili_test.go) 和 [资料测试](../backend/internal/provider/bilibili/creator_test.go) 覆盖 |
 | B站合集发现 | 通过公开合集接口列出可跟踪视频；不代表全部投稿 | [list.go](../backend/internal/provider/bilibili/list.go) 的 `GetCreatorVideos` | [bilibili_test.go](../backend/internal/provider/bilibili/bilibili_test.go) |
-| 持久化 | 打开 SQLite、执行迁移、计算内容指纹、读写五表和调度目标 | [db.go](../backend/internal/storage/db.go)、[fingerprint.go](../backend/internal/storage/fingerprint.go)、[repo.go](../backend/internal/storage/repo.go) | [storage_test.go](../backend/internal/storage/storage_test.go)、[creator_test.go](../backend/internal/storage/creator_test.go) |
+| 持久化 | 打开 SQLite、执行迁移、计算内容指纹、保存适配器快照、读写五表和调度目标；不记录过滤规则版本 | [db.go](../backend/internal/storage/db.go)、[fingerprint.go](../backend/internal/storage/fingerprint.go)、[repo.go](../backend/internal/storage/repo.go)、[0003 迁移](../backend/internal/storage/migrations/0003_drop_video_snapshot_version.sql) | [storage_test.go](../backend/internal/storage/storage_test.go)、[creator_test.go](../backend/internal/storage/creator_test.go)、[migration_test.go](../backend/internal/storage/migration_test.go) |
 | 查询与调度 | 执行目标查询、合集发现、查询日志、到期目标调度 | [tracker.go](../backend/internal/tracker/tracker.go)、[scheduler.go](../backend/internal/tracker/scheduler.go)、[log.go](../backend/internal/tracker/log.go) | [tracker_test.go](../backend/internal/tracker/tracker_test.go) |
 | 本地后台 | 8182 端口的目标管理、日志和入库详情 | [server.go](../backend/internal/admin/server.go)、`templates/` | [admin_test.go](../backend/internal/admin/admin_test.go) |
 
@@ -118,7 +119,7 @@ go run ./cmd/server
 | 添加目标 | `POST /targets` | `type=creator` 或 `video`、`id`、`interval_hours` |
 | 立即查询 | `POST /targets/run` | 异步执行一次；内容未变化时不新增版本 |
 | 删除目标 | `POST /targets/delete` | 只停止调度，不删除已保存的历史 |
-| 入库详情 | `GET /detail/{type}/{id}` | 当前字段 + 最新版本的完整 payload |
+| 入库详情 | `GET /detail/{type}/{id}` | 当前字段 + 最新版本的业务快照；新视频快照不含合集详情 |
 
 添加 UP 主后：查询 `card` 资料并写入 `creators` / `creator_versions`；随后发现视频并加入 `tracking_targets`，立即查询一次。发现顺序是：配置了 `BHT_BILI_COOKIE` 时先调用空间投稿列表（按投稿时间分页，最多 120 个），失败或没有 Cookie 时回退公开合集接口。B站空间接口需要登录态和风控参数，未登录时通常返回 `412` 或 `-799`，因此没有 Cookie 时结果可能只包含合集内视频，此时可在后台手动添加 BV。
 
@@ -337,6 +338,41 @@ https://api.bilibili.com/x/web-interface/view?bvid=BV17x411w7KC
 ### B站字段如何转换为返回结果
 
 Provider 先从 B站返回的 `data` 中读取字段，再构造 `source.Video`，不会把上游完整响应原样透传。
+
+### 视频存档快照的边界
+
+`GetVideo()` 校验 BV 和上游身份后调用 [snapshot.go](../backend/internal/provider/bilibili/snapshot.go) 的 `videoSnapshot()`。该函数用 `map[string]json.RawMessage` 只删除顶层 `ugc_season`，保留当前视频的全部 `pages`、`dynamic`、字幕、统计、`season_id` 及其他已知或未知字段；嵌套同名字段不删除，大整数不转浮点数。`http.go` 仍返回完整上游 data，作者资料和投稿发现查询不应用视频裁剪规则。
+
+下面表示存档数据传递关系；网络请求在存储事务外完成，结果沿调用链返回。
+
+```text
++----------------------------------+
+| bilibili.GetVideo                |
+| validate identity; read data     |
++----------------------------------+
+                 |
+                 | call with full data
+                 v
++----------------------------------+
+| snapshot.go                      |
+| remove top-level ugc_season      |
++----------------------------------+
+                 |
+                 | Raw via tracker
+                 v
++----------------------------------+
+| storage.repo                     |
+| save snapshot + content hash     |
++----------------------------------+
+```
+
+`source.Video.Raw` 是适配器准备的快照，不进入 HTTP JSON。过滤版本仅在 `snapshot.go` 中用包级常量 `videoSnapshotVersion` 选择实现，当前选择 `videoSnapshotV1()`；该版本不附加到 JSON，不经过 source/tracker 传递，也不写入数据库。读取 payload 不依赖过滤版本，指纹规则 `hash_version` 与数据库 `user_version` 仍保留各自用途。
+
+已有 schema 2 数据库由 0003 迁移删除 `snapshot_version`；schema 1 和新数据库按 0001 → 0002 → 0003 顺序升级。保留已执行的迁移历史，最终视频版本表只有内容快照及相关观测、指纹信息。
+
+裁剪不改变现有指纹，内容相同时不新增版本、不重写旧快照。只有首次保存或真实内容变化后才保存新格式，因此已有目标的详情可能暂时仍含合集数据。历史裁剪和空间回收需单独安排。规则、字段图例和采样对比见 [plan.md 第一项](../plan.md)，存储契约见 [数据库设计](database.md#payload-保存什么)。
+
+### 查询 API 的字段映射
 
 | 本项目字段 | 来源或处理方式 |
 |---|---|

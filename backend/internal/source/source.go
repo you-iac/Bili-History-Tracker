@@ -59,35 +59,37 @@ type Creator struct {
 // Raw keeps the unmodified upstream business object for persistence; it is never
 // serialized into API responses.
 type CreatorProfile struct {
-	Platform      string    `json:"platform"`
-	ID            string    `json:"id"`
-	Name          string    `json:"name"`
-	Description   string    `json:"description"`
-	AvatarURL     string    `json:"avatar_url"`
-	URL           string    `json:"url"`
-	FollowerCount *int64    `json:"follower_count"`
-	ObservedAt    time.Time `json:"observed_at"`
-	SourceURL     string    `json:"source_url"`
+	Platform      string          `json:"platform"`
+	ID            string          `json:"id"`
+	Name          string          `json:"name"`
+	Description   string          `json:"description"`
+	AvatarURL     string          `json:"avatar_url"`
+	URL           string          `json:"url"`
+	FollowerCount *int64          `json:"follower_count"`
+	ObservedAt    time.Time       `json:"observed_at"`
+	SourceURL     string          `json:"source_url"`
 	Raw           json.RawMessage `json:"-"`
 }
 
 // Video is observed metadata, not proof that a video can currently be played.
 // A nil PublishedAt means the source did not supply a publication time.
-// A nil ViewCount means the source did not supply a count. Raw keeps the
-// unmodified upstream business object for persistence and is not serialized.
+// A nil ViewCount means the source did not supply a count.
+// Raw 是适配器准备的业务 JSON 快照，可按平台规则裁剪，不保证是完整上游 data。
+// Raw 仅用于持久化，不进入 HTTP API；过滤规则及其版本由适配器内部管理。
+// 契约见 docs/database.md 的“payload 保存什么”。
 type Video struct {
-	Platform        string     `json:"platform"`
-	ID              string     `json:"id"`
-	Title           string     `json:"title"`
-	Description     string     `json:"description"`
-	URL             string     `json:"url"`
-	CoverURL        string     `json:"cover_url"`
-	Creator         Creator    `json:"creator"`
-	PublishedAt     *time.Time `json:"published_at"`
-	DurationSeconds int64      `json:"duration_seconds"`
-	ViewCount       *int64     `json:"view_count"`
-	ObservedAt      time.Time  `json:"observed_at"`
-	SourceURL       string     `json:"source_url"`
+	Platform        string          `json:"platform"`
+	ID              string          `json:"id"`
+	Title           string          `json:"title"`
+	Description     string          `json:"description"`
+	URL             string          `json:"url"`
+	CoverURL        string          `json:"cover_url"`
+	Creator         Creator         `json:"creator"`
+	PublishedAt     *time.Time      `json:"published_at"`
+	DurationSeconds int64           `json:"duration_seconds"`
+	ViewCount       *int64          `json:"view_count"`
+	ObservedAt      time.Time       `json:"observed_at"`
+	SourceURL       string          `json:"source_url"`
 	Raw             json.RawMessage `json:"-"`
 }
 

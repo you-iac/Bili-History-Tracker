@@ -22,7 +22,7 @@ import (
 var migrationsFS embed.FS
 
 // schemaVersion 是当前程序期望的 schema 版本，由 migrations 目录中的文件数决定。
-const schemaVersion = 1
+const schemaVersion = 3
 
 // Store 是数据库句柄。单写者连接串行化写入，避免 SQLite 的锁竞争。
 type Store struct {

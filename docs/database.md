@@ -1,14 +1,14 @@
-# 数据库设计：当前索引、完整快照与指标采样
+# 数据库设计：当前索引、业务快照与指标采样
 
-设计已由 `backend/internal/storage/migrations/0001_init.sql` 落地，`PRAGMA user_version = 1`；当前服务在成功查询后自动写入。内容设计为五张表，分成三类职责：
+设计由 [0001](../backend/internal/storage/migrations/0001_init.sql) 建表；[0002](../backend/internal/storage/migrations/0002_video_snapshot_version.sql) 曾增加过滤规则版本列，[0003](../backend/internal/storage/migrations/0003_drop_video_snapshot_version.sql) 删除该列。当前 `PRAGMA user_version = 3`，过滤版本仅由适配器代码管理；服务在成功查询后自动写入。内容设计为五张表，分成三类职责：
 
 | 类别 | 表 | 保存什么 | 增长方式 |
 |---|---|---|---|
 | 当前索引 | `creators`、`videos` | 展示、排序、调度需要的最新值 + 当前版本指针 | 每个目标一行，原地更新 |
-| 内容版本 | `creator_versions`、`video_versions` | **完整上游快照** + 内容指纹 | 只在实际内容变化时追加 |
+| 内容版本 | `creator_versions`、`video_versions` | **适配器业务快照** + 内容指纹 | 只在实际内容变化时追加 |
 | 指标采样 | `metric_samples` | 播放量、粉丝数的时间序列 | 按采样窗口追加 |
 
-核心取舍是：**快照尽量宽，指纹尽量窄，写入尽量少**。版本行保存完整上游数据，可以重新解析和复原；指纹只覆盖稳定的内容字段，播放量变化不会制造新版本；内容没变时既不构造快照也不写版本。
+核心取舍是：**快照保留目标自身的信息，指纹只覆盖稳定内容，版本仅在内容变化时写入**。视频快照保留当前视频的字段，过滤整份跨视频合集；作者资料保留完整 data。适配器在查询后准备快照，内容没变时不写版本，也不重写已有 payload。
 
 以下 SQL 以 SQLite 为示例，尚不是运行中的迁移。
 
@@ -22,7 +22,7 @@
 
 如果让内容指纹覆盖接口返回的全部字段，播放量每增加一次就会产生一条版本，版本表实际变成每次查询的日志。按 1 万个视频、每天查询 4 次估算，全量记录约 1460 万行/年；而只记录真实内容变化，按每个视频每年变化 3 次估算约 3 万行/年。
 
-但“指纹窄”不等于“快照窄”。版本表存完整上游数据，只在内容变化时写一次，因此低频大行是可接受的；真正不能接受的是**高频小行**。
+快照仍保留字幕、统计、状态和未知字段等非指纹数据，供历史重新解析；但不再让每个视频反复存储整份合集。低频写入和去除跨目标冗余需要同时满足。
 
 ## 表关系
 
@@ -100,9 +100,9 @@
 
 `title`、`published_at`、`duration_seconds` 会与最新版本行的内容重复。这是有意的冗余：版本行要能自包含地复原当时状态，当前表要能独立支撑列表和调度。两份数据由同一事务写入，测试应覆盖写入后的一致性。
 
-## 内容版本表：存完整快照，指纹只覆盖内容字段
+## 内容版本表：存业务快照，指纹只覆盖内容字段
 
-两张表结构相同，只把 `creator_id` 换成 `video_id`。
+两张表共用以下字段，目标 ID 分别为 `creator_id` 和 `video_id`；不记录过滤规则版本。
 
 | 字段 | 类型 | 含义 |
 |---|---|---|
@@ -114,15 +114,19 @@
 | `content_hash` | BLOB | 内容字段投影后的指纹，SHA-256 前 8 字节 |
 | `hash_version` | INTEGER | 投影字段清单、序列化规则与指纹长度的版本 |
 | `payload_encoding` | TEXT | `json` 或 `zstd`，说明 `payload` 的编码方式 |
-| `payload` | TEXT/BLOB | **完整上游业务数据**（`data` 对象原样，不裁剪） |
+| `payload` | TEXT/BLOB | 适配器准备的业务 JSON 快照，直接读取其中保存的数据 |
 
 ### payload 保存什么
 
-`payload` 保存上游响应的业务数据对象原样，而不是本服务转换后的 `source.Video`。原因：现有转换只保留部分字段，裁剪后的结构无法复原完整响应，Provider 以后新增字段时也无法从历史数据重新解析。
+`payload` 保存适配器准备的业务 JSON，不是将本服务的精简 `source.Video` 重新序列化。快照保留当前目标的字段及嵌套内容，便于以后重新解析；视频快照不承诺能够复原包含整份合集的完整上游响应。
 
-- 视频版本：保存 `GET /x/web-interface/view` 响应中的 `data` 对象。
+- 视频版本：`GetVideo()` 校验身份后调用 [snapshot.go](../backend/internal/provider/bilibili/snapshot.go) 的 `videoSnapshot()`，用模块内常量 `videoSnapshotVersion` 选择过滤实现。当前 `videoSnapshotV1()` 只移除 `/x/web-interface/view` 返回 data 的顶层 `ugc_season`。`pages` 全部分 P、`dynamic`、`season_id`、字幕、统计、未知字段及嵌套同名字段均保留，大整数不转浮点。字段不存在时直接使用原始 data。
 - 作者版本：保存 `GET /x/web-interface/card` 响应中的 `data` 对象。
 - 不保存 HTTP 外壳（状态行、响应头、顶层 `code`/`message`）：只有成功观测才会产生版本，外壳不携带可复原的信息；失败也没有版本行。
+
+`source.Video.Raw` 携带快照，不进入 HTTP JSON。过滤规则和版本仅由适配器内部管理，不放进 `source.Video`，不经过 tracker 传递，不写入 JSON 或数据库。`storage` 不负责裁剪，只在新版本行保存收到的 payload。作者资料和投稿发现不采用视频裁剪规则。
+
+0003 迁移删除 0002 曾引入的 `snapshot_version`，保留迁移历史，不改变 payload、指纹或内容序号。读取快照无需根据过滤版本分支，旧的完整 data 和新的裁剪 data 都直接按 JSON 处理。过滤规则变化本身不触发新内容版本；已有目标内容未变时，详情仍可能显示历史完整快照。历史裁剪和空间回收需另行安排。前后字段图例见 [plan.md 第一项](../plan.md)。
 
 `payload` 是“事实层”，可以宽；`content_hash` 是“判断层”，必须窄。两者分离后，播放量、点赞、审核状态都能在快照里保留，但不会触发新版本。
 
@@ -152,7 +156,8 @@ fingerprint = SHA256("bht-content-v1\n" + canonicalJSON(projection(payload)))[0:
 | `ctime` | 否 | 创建时间，稳定 |
 | `rights.*`、`is_chargeable_season` 等权限字段 | 否 | 权限状态，不属于内容 |
 | `tid`、`tname` | 否 | 分区调整可能批量变化，第一版不纳入 |
-| `subtitle`、`staff`、`ugc_season` | 否 | 第一版不纳入；仍然完整保存在 payload 中 |
+| `subtitle`、`staff` | 否 | 第一版不纳入指纹；仍保留在 payload 中 |
+| `ugc_season` | 否 | 历史快照可能包含；B站当前 `videoSnapshotV1()` 删除整个对象 |
 
 作者投影：
 
@@ -204,7 +209,7 @@ fingerprint = SHA256("bht-content-v1\n" + canonicalJSON(projection(payload)))[0:
 | 查询 | 内容 | 版本表 | `current_hash` | `current_seq` |
 |---|---|---|---|---|
 | 第一次 | A | 新增 `seq=1` | A | 1 |
-| 第二次 | A | 不新增，**不构造 payload** | A | 1 |
+| 第二次 | A | 不新增，**不写入 payload** | A | 1 |
 | 第三次 | B | 新增 `seq=2` | B | 2 |
 | 第四次 | A | 新增 `seq=3` | A | **3** |
 
@@ -214,14 +219,14 @@ fingerprint = SHA256("bht-content-v1\n" + canonicalJSON(projection(payload)))[0:
 
 ### 存储成本与压缩
 
-完整快照比裁剪结构大得多。实测 B站 `view` 的 `data` 单个约 **90 KB**（包含 `ugc_season` 合集全集、`staff`、`subtitle`、`desc_v2` 等，远大于最初估计的 5–10 KB）。按 90 KB 估算：
+历史完整 data 可因 `ugc_season` 达到约 90 KB，部分更大。对本地样本 `BV18M4m1y7ga` 的只读模拟中，213,419 字节的原始 payload 含 128 个合集视频，移除整个 `ugc_season` 后紧凑 JSON 为 2,821 字节，减少约 98.7%；Go 编码后的字节数可能略有差异，具体大小仍取决于其余字段。以下按 90 KB 估算的表格用于历史完整快照的容量参考，不代表新快照固定大小：
 
 | 场景 | 版本行/年 | 未压缩 | zstd 压缩后（约 5:1） |
 |---|---|---|---|
 | 1 万视频，每视频每年变化 3 次 | 约 3 万行 | 约 2.7 GB | 约 0.54 GB |
 | 1 万视频，每视频每年变化 12 次 | 约 12 万行 | 约 11 GB | 约 2.2 GB |
 
-当前实现把 payload 以未压缩 JSON 写入，`payload_encoding` 恒为 `json`。若单个 payload 超过 8 KB，应启用 zstd 压缩后写 BLOB 并把 `payload_encoding` 设为 `zstd`；读取时先按编码解压再解析。压缩由应用层完成，SQLite 不感知，因此 `CHECK (payload_encoding <> 'json' OR json_valid(payload))` 只校验未压缩的 JSON。在启用压缩之前，应按 90 KB/行规划磁盘。
+当前实现把裁剪后的 payload 以未压缩 JSON 写入，`payload_encoding` 恒为 `json`，历史快照不自动缩小。zstd 是后续独立优化：可将较大 payload 压缩为 BLOB 并标为 `zstd`，读取时解压；当前尚未实现。`CHECK (payload_encoding <> 'json' OR json_valid(payload))` 只校验未压缩的 JSON。
 
 ## 指标采样表：metric_samples
 
@@ -337,7 +342,7 @@ fingerprint = SHA256("bht-content-v1\n" + canonicalJSON(projection(payload)))[0:
 | `content_hash` | BLOB | 否 | 8 | 投影指纹 |
 | `hash_version` | INTEGER | 否 | 1 | 指纹规则版本 |
 | `payload_encoding` | TEXT | 否 | 4–8 | `json` 或 `zstd` |
-| `payload` | TEXT/BLOB | 否 | 4–12 KB | 完整上游 `data` |
+| `payload` | TEXT/BLOB | 否 | 随目标字段变化 | 适配器业务快照，历史视频行可能含完整合集 |
 
 ### metric_samples
 
@@ -389,7 +394,7 @@ PRAGMA foreign_keys = ON;
 
 -- 标识本项目数据库并记录 schema 版本；版本规则见下文“Schema 版本与迁移”。
 PRAGMA application_id = 1112036401;  -- ASCII 'BHT1'
-PRAGMA user_version = 1;
+PRAGMA user_version = 3;
 
 CREATE TABLE creators (
     platform                  TEXT NOT NULL CHECK (length(platform) > 0),
@@ -505,7 +510,7 @@ SQLite 文件头里预留了两个 4 字节整数，正好覆盖这两件事：
 | PRAGMA | 作用 | 本项目取值 |
 |---|---|---|
 | `application_id` | 标识文件属于哪个应用，防止误开其他 SQLite 库 | `1112036401`（ASCII `BHT1`） |
-| `user_version` | 表结构版本，每次结构变更递增 | 第一版为 `1` |
+| `user_version` | 表结构版本，每次结构变更递增 | 当前为 `3`，由 0001 → 0002 → 0003 顺序迁移 |
 
 读取方式是一条 PRAGMA，不需要额外的元数据表：
 
@@ -524,14 +529,16 @@ PRAGMA user_version;
 5. **迁移结束执行 `PRAGMA optimize`**，刷新统计信息，避免查询规划器沿用旧分布。
 6. 迁移期间关闭其他连接，写事务使用 `BEGIN IMMEDIATE`。
 
-与 `hash_version` 的分工：
+与指纹版本的分工：
 
 | 版本 | 管什么 | 变更代价 |
 |---|---|---|
 | `user_version` | 表结构：加列、改索引、改约束 | 迁移脚本，通常秒级 |
 | `hash_version` | 内容指纹规则：投影字段、序列化、截断长度 | 可能要给全库重算指纹 |
 
-两者独立演进：改表结构不必动指纹规则；改指纹规则必须处理历史数据——要么保留多个 `hash_version` 并存、旧版本按旧规则解释，要么全量重算后统一升版本。**不能直接覆盖已有 `content_hash`**，否则历史版本和当前版本会失去可比性，`A → B → A` 的判定也会出错。
+两者独立演进：改表结构或移除非指纹字段不必动指纹规则；改指纹规则必须处理历史数据——要么保留多个 `hash_version` 并存、旧版本按旧规则解释，要么全量重算后统一升版本。**不能直接覆盖已有 `content_hash`**，否则历史版本和当前版本会失去可比性，`A → B → A` 的判定也会出错。过滤规则版本仅留在适配器代码中，不属于持久化契约。
+
+[migration_test.go](../backend/internal/storage/migration_test.go) 验证 schema 1/2 升级到 3 后，过滤版本列已删除、历史内容和指针不变、重复打开正常；[snapshot_test.go](../backend/internal/provider/bilibili/snapshot_test.go) 验证快照裁剪、指纹不变和新旧快照共存。已有 0001/0002 迁移保持不变，不能通过删除旧迁移来修改已升级的数据库。
 
 版本号本身不要写进文件名或目录名，它只存在数据库文件里，跟着备份一起移动。
 
@@ -540,14 +547,16 @@ PRAGMA user_version;
 ### 查询视频元数据
 
 1. 先在事务外完成上游请求，避免等待网络时占用写事务。
-2. **只算投影指纹**：从原始 `data` 中取内容字段、规范化、取 SHA-256 前 8 字节。这一步不序列化完整 payload，内容未变化时也完全不产生大对象。
+2. 适配器按模块代码选择的规则准备视频快照；tracker 从快照取内容字段、规范化、取 SHA-256 前 8 字节。仅删除 `ugc_season` 不改变现有指纹。裁剪在查库前完成，仍需读取完整网络响应，并非内容未变时完全不产生 JSON 对象。
 3. 开启事务，确保作者行存在：不存在则插入 `name`（来自视频的 `owner.name`）、`first_seen_at`、`last_referenced_at`；已存在则只推进 `last_referenced_at`，不覆盖资料字段，也不推进完整资料时间。
 4. 读取当前视频行：
    - 不存在：先插入 `videos`（`current_hash` 取本次值，`current_seq = 1`，`first_seen_at`、`last_observed_at` 都取本次时间），再插入 `seq = 1` 的版本行。顺序不能反，版本行外键要求视频行已存在。
    - 存在，且本次 `observed_at` 早于 `last_observed_at`：判定为迟到响应，本次不更新任何字段、不写版本。
-   - 存在，指纹相同：只更新 `view_count` 与 `last_observed_at`，**不构造 payload、不写版本、不改 `current_seq`**。
+   - 存在，指纹相同：只更新 `view_count` 与 `last_observed_at`，**不写版本、不改 `current_seq`、不更新旧快照**。
    - 存在，指纹不同：`seq = COALESCE(MAX(seq), 0) + 1` 插入版本行，再更新 `title`、`published_at`、`duration_seconds`、`view_count`、`current_hash`、`current_seq`、`last_observed_at`；`first_seen_at` 不变。
 5. 提交。
+
+一次视频查询成功后的写入判定：
 
 ```mermaid
 flowchart TD
@@ -754,7 +763,7 @@ flowchart TD
 | 首次发现 | 两次 INSERT + 一次 INSERT 版本 | 是，仅一次 |
 | 定时采样 | 一个事务批量 upsert 多行 | 否 |
 
-**优化第一原则：大对象只在冷路径产生。** 热路径只计算投影指纹并更新窄表，不序列化 `payload`。
+**写入优化原则：大快照只在首次保存或内容变化时落库。** 当前适配器在查库前准备视频快照，仍有响应解析和裁剪的内存成本；内容相同时只更新窄表，不写入或重写版本 payload。
 
 指纹本身只占 9 字节，`current_seq` 占 1–2 字节，对页密度的影响远小于一条 `description`。当前表一行约 150 字节，一页实际能放约 18 行；如果把这些内容字段搬回当前表，一行会涨到 800 字节以上，一页只剩 3–4 行，列表查询的页数会翻几倍。
 
@@ -819,9 +828,9 @@ PRAGMA auto_vacuum = INCREMENTAL;   -- 建库时设置，删采样数据后回�
 
 ## 与当前代码如何衔接
 
-- 版本表要保存完整 `data`，而当前 [http.go](../backend/internal/provider/bilibili/http.go) 的 `get()` 只返回解析后的业务结构。需要让 Provider 额外提供原始业务数据（例如在 `source.Video`/`CreatorProfile` 上增加不参与 JSON 输出的原始 `json.RawMessage`，或让持久化用例直接接收原始响应）。这会改动 [bilibili.go](../backend/internal/provider/bilibili/bilibili.go) 和 [creator.go](../backend/internal/provider/bilibili/creator.go)，但不改变现有 API 响应。
-- 指纹投影需要读取原始字段路径，因此投影、规范化、指纹与压缩应放在持久化/规范化模块，不放在 B站 Provider 中；换平台时只新增投影清单，不改写入流程。
-- 预期链路为：HTTP API → 持久化用例 → 查询服务/Provider → 成功观测 → 投影指纹 → 存储事务 → 提交后返回。事务必须在网络请求之后开启。
+- [http.go](../backend/internal/provider/bilibili/http.go) 的 `get()` 返回原始 data 和解析结果；[bilibili.go](../backend/internal/provider/bilibili/bilibili.go) 在身份校验后调用 `videoSnapshot()`，只返回裁剪后的 `Video.Raw`，不传递过滤规则版本；`CreatorProfile.Raw` 则保留完整作者 data。
+- 存档范围由 B站适配器决定；指纹投影目前仍在 `storage/fingerprint.go`，移至适配器是 [plan.md](../plan.md) 中的另一项待实施计划，本次不改变算法。压缩尚未实现。
+- 已实现的持久化链路为：admin/调度器 → tracker → 查询服务/Provider → 成功观测及快照 → 投影指纹 → 存储事务。事务在网络请求之后开启。
 - 本项目 HTTP API 继续返回当前结构，不向调用方暴露版本表或采样表。
 - 采样任务需要独立的调度入口，第一期可复用 `GetVideo`/`GetCreator`，但只读取计数并写入 `metric_samples`，不触发版本写入。
 
@@ -829,7 +838,7 @@ PRAGMA auto_vacuum = INCREMENTAL;   -- 建库时设置，删采样数据后回�
 
 ## 当前范围与后续扩展
 
-本设计已落地：数据库驱动（`modernc.org/sqlite`）、0001 迁移、内容指纹、五表读写、调度目标表、8182 本地后台和循环调度均已实现，自动化测试覆盖指纹稳定性、版本追加、迟到丢弃和后台表单。
+本设计已落地：数据库驱动（`modernc.org/sqlite`）、0001/0002/0003 迁移、内容指纹、视频快照裁剪、五表读写、调度目标表、8182 本地后台和循环调度均已实现，自动化测试覆盖快照字段保留、旧库兼容、指纹稳定性、版本追加、迟到丢弃和后台表单。
 
 已实现与未实现的边界：
 
@@ -837,6 +846,7 @@ PRAGMA auto_vacuum = INCREMENTAL;   -- 建库时设置，删采样数据后回�
 |---|---|
 | 五表写入、当前表版本指针、迟到丢弃 | 已实现 |
 | 8 字节内容指纹（`hash_version = 1`） | 已实现 |
+| B站视频过滤顶层 `ugc_season` | 已实现，规则版本仅在适配器代码中选择，不入库、不回写历史 |
 | 调度目标、默认 3 小时间隔、查询日志 | 已实现 |
 | payload 压缩（zstd） | 未实现，`payload_encoding` 恒为 `json` |
 | 指标降采样与清理 | 未实现，只按查询顺带写入日窗口样本 |
@@ -844,7 +854,7 @@ PRAGMA auto_vacuum = INCREMENTAL;   -- 建库时设置，删采样数据后回�
 
 相对早期“两张表只保留最新值”的设计，变化是：内容历史从“覆盖旧值”改为“变化时追加完整快照”，计数从“混在内容里”改为“当前表覆盖 + 采样表按时记录”。
 
-早期设想的“保存每次原始响应正文并按哈希去重”未采用：逐次保存会让存储量随查询次数增长，与“不把版本表变成日志”的目标冲突。现在改为“**内容变化时保存完整快照**”，既保留复原能力，又保持低频写入；快照包含统计与状态字段，但指纹只投影内容字段，因此计数变化不会制造版本。
+早期设想的“保存每次原始响应正文并按哈希去重”未采用：逐次保存会让存储量随查询次数增长，与“不把版本表变成日志”的目标冲突。现在是“**内容变化时保存目标业务快照**”：保留当前视频内容、统计与状态字段，过滤跨视频合集详情，指纹只投影内容字段，因此计数或快照格式变化不会制造版本。
 
 后续需要单独设计的内容：
 
