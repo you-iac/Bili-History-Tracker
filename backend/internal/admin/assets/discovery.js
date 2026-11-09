@@ -9,22 +9,27 @@
     rows(query) { const q = query.trim().toLocaleLowerCase(); return [...this.items.values()].filter(item => !q || `${item.id} ${item.title}`.toLocaleLowerCase().includes(q)); }
     imported(results) { for (const item of results) if (item.status === "added" || item.status === "existing") { this.items.delete(item.id); this.selected.delete(item.id); } }
   }
-  if (typeof module !== "undefined") module.exports = { Selection };
+  if (typeof module !== "undefined") module.exports = { Selection, parseTarget };
   if (typeof document === "undefined") return;
 
   // 统一添加入口：BV/视频链接直接添加；UID/空间链接进入作者视频列表。
   function parseTarget(value) {
-    const text = (value || "").trim();
-    if (!text) return null;
-    const bv = text.match(/BV[0-9A-Za-z]{10}/);
-    if (bv) return { type: "video", id: bv[0] };
-    const uid = text.match(/(?:space\.bilibili\.com\/)?(\d{1,19})/);
-    if (uid) return { type: "creator", id: uid[1] };
+    let text = (value || "").trim();
+    if (/^https?:\/\//.test(text)) {
+      let url; try { url = new URL(text); } catch { return null; }
+      if (url.username || url.password || url.port) return null;
+      const parts = url.pathname.split("/").filter(Boolean);
+      if (url.hostname === "space.bilibili.com" && parts.length === 1) text = parts[0];
+      else if (["bilibili.com", "www.bilibili.com", "m.bilibili.com"].includes(url.hostname) && parts.length === 2 && parts[0] === "video") text = parts[1];
+      else return null;
+    }
+    if (/^BV[1-9A-HJ-NP-Za-km-z]{10}$/.test(text)) return { type: "video", id: text };
+    if (/^[1-9]\d{0,18}$/.test(text) && BigInt(text) <= 9223372036854775807n) return { type: "creator", id: text };
     return null;
   }
   document.querySelectorAll("[data-quick-add]").forEach(form => {
     const hint = form.parentElement.querySelector("[data-quick-hint]");
-    form.addEventListener("submit", event => {
+    form.addEventListener("submit", async event => {
       event.preventDefault();
       const input = form.querySelector('input[name="target"]');
       const target = parseTarget(input.value);
@@ -39,9 +44,14 @@
       const interval = form.querySelector("[data-quick-interval]");
       const body = new URLSearchParams({ type: "video", id: target.id, interval_hours: (interval && interval.value) || "3", return_to: "/manage" });
       if (hint) hint.textContent = "正在添加视频…";
-      fetch("/targets", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "text/html" }, body })
-        .then(() => location.assign(`/manage?message=${encodeURIComponent(`已添加视频，正在采集：${target.id}`)}`))
-        .catch(() => { if (hint) hint.textContent = "添加失败，请稍后重试。"; });
+      const button = form.querySelector("button[type=submit],button:not([type])"); if (button) button.disabled = true;
+      try {
+        const response = await fetch("/targets", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" }, body });
+        const result = await response.json();
+        if (!response.ok || result.error) throw new Error(result.error || "添加失败，请稍后重试。");
+        location.assign(result.redirect);
+      } catch (error) { if (hint) hint.textContent = error.message || "添加失败，请稍后重试。"; }
+      finally { if (button) button.disabled = false; }
     });
   });
 
@@ -84,7 +94,7 @@
       try {
         const params = new URLSearchParams({ platform: root.dataset.platform, scope: "available", limit: "30" });
         if (cursor) params.set("cursor", cursor); if (retry) params.set("retry", "1");
-        const page = await json(`${endpoint}?${params}`); model.merge(page.items); cursor = page.next_cursor || ""; session = page.session; state = page.state;
+        const page = await json(`${endpoint}?${params}`); if (stopped) return; model.merge(page.items); cursor = page.next_cursor || ""; session = page.session; state = page.state;
         get("video-state").textContent = state === "partial" ? "视频列表加载不完整，已保留当前结果。可稍后重试或手动添加。" : state === "complete" ? "已读取服务器本次可获取的视频；这不保证覆盖作者的全部投稿。" : "正在发现更多视频，已有结果可以选择。";
         get("video-retry").hidden = state !== "partial"; get("video-retry").disabled = page.retry_at && new Date(page.retry_at).getTime() > Date.now();
         if (get("video-retry").disabled) { const delay = Math.min(new Date(page.retry_at).getTime() - Date.now(), 2147483647); setTimeout(() => { get("video-retry").disabled = false; }, delay); }

@@ -43,14 +43,16 @@
 ## 输入 / 输出 / 边界
 
 - **输入**：URL 参数（`q`、`sort`、`following`、`kind`、`tab`、`days`、`page`、`seq`）；表单（`type`、`id`、`interval_hours`）。BV、UID 和可本地解析的标准链接在入口规范化，短链和任意 URL 不传给上游。
-- **输出**：HTML 页面、两个 JSON 接口；副作用是写 `tracking_targets`、触发 `RunNow`、读取 storage 和内存日志。
+- **输出**：HTML 页面、指标和状态 JSON、作者视频与导入任务 API；副作用是写 `tracking_targets`、触发 `RunNow`、读取 storage 和内存日志。
 - **它不认识**：B站端点、指纹算法、调度器内部；自身不直接请求上游。
 
 ## 关键约束
 
 - 不设登录与权限，默认只监听回环地址。
-- 浏览页面不触发采集；只有添加、刷新等命令会调用 `RunNow`。
+- 常规内容页只读本地；可添加视频列表通过 discovery 只读发现，勾选提交或添加全部才写入。新增接口和工作区口径见 [作者视频设计](../../../docs/video-discovery.md)。
 - 状态判定在 `storage.scanContent`；阈值是 `max(间隔×2, 30 分钟) + 30 分钟`。`running` 只来自本进程的在途查询，不持久化。
 - 列表只读当前字段和封面表达式，不返回整份 payload；详情快照默认收起，选中历史版本才读取对应 `seq`。
 - 查询日志最多保留 500 条，重启时从文件末尾恢复；日志不是异常状态的唯一来源。
 - 测试：[pages_test.go](pages_test.go) 覆盖页面、API、空库、输入规范化和停止关注；[chart_test.cjs](chart_test.cjs) 覆盖图表数据边界，用 `node --test internal/admin/chart_test.cjs` 执行。
+
+新增入口：[discovery.go](discovery.go) 提供统一作者视频页、显式导入和任务进度；[discovery_test.go](discovery_test.go) 覆盖 HTTP 闭环及跨来源写入保护，[discovery_test.cjs](discovery_test.cjs) 验证选择与输入解析。

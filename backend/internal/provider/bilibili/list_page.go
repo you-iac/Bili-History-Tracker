@@ -97,7 +97,7 @@ func (p *Provider) GetCreatorVideoPage(ctx context.Context, id, cursor string) (
 		if err := p.listGet(ctx, endpoint, &data); err != nil {
 			return result, err
 		}
-		if data.ItemsLists == nil {
+		if data.ItemsLists == nil || (data.ItemsLists.Seasons == nil && data.ItemsLists.Series == nil) {
 			return result, &source.Error{Kind: source.InvalidResponse, Platform: platform}
 		}
 		before := len(state.Collections)
@@ -229,6 +229,12 @@ func (p *Provider) listGet(ctx context.Context, endpoint string, data any) error
 			delay = cooldown
 		}
 		if delay > 0 {
+			if deadline, ok := ctx.Deadline(); ok && time.Now().Add(delay).After(deadline) {
+				if last != nil {
+					return last
+				}
+				return &source.Error{Kind: source.RateLimited, Platform: platform, RetryAt: time.Now().Add(delay)}
+			}
 			if err := wait(ctx, delay); err != nil {
 				return err
 			}
@@ -259,6 +265,9 @@ func (p *Provider) listGet(ctx context.Context, endpoint string, data any) error
 func retryList(err error) bool {
 	var se *source.Error
 	if errors.As(err, &se) {
+		if se.UpstreamCode == -799 {
+			return false
+		}
 		return se.Kind == source.RateLimited || (se.Kind == source.UpstreamFailure && (se.HTTPStatus == 500 || se.HTTPStatus == 502 || se.HTTPStatus == 503 || se.HTTPStatus == 504))
 	}
 	var ne net.Error

@@ -29,3 +29,4 @@
 .quick-add .add-fields{display:flex;gap:10px;align-items:end;flex-wrap:wrap}
 .quick-add .add-fields label{flex:1;min-width:220px}
 @media(max-width:720px){.import-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.creator-video-picker .panel-heading{flex-wrap:wrap;gap:12px}.creator-video-picker .panel-heading>div:first-child{min-width:0;flex:1 1 220px}.creator-video-picker .heading-actions{flex-wrap:wrap}.creator-video-picker .data-table th:first-child,.creator-video-picker .data-table td:first-child{width:56px;min-width:56px}

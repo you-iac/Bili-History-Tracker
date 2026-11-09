@@ -16,6 +16,7 @@ import (
 // 当前 Subscribed 映射全局 Tracking；未来用户关系应独立计算。
 type CreatorVideoRecord struct {
 	source.CreatorVideo
+	CreatorID  string     `json:"-"`
 	Recorded   bool       `json:"recorded"`
 	Tracking   bool       `json:"tracking"`
 	Subscribed bool       `json:"subscribed"`
@@ -73,7 +74,7 @@ func (s *Store) VideoStates(ctx context.Context, platform string, ids []string) 
 		args = append(args, id)
 	}
 	marks := strings.TrimSuffix(strings.Repeat("?,", len(ids)), ",")
-	rows, err := s.db.QueryContext(ctx, `SELECT video_id,title,published_at,duration_seconds,view_count,current_seq,last_observed_at
+	rows, err := s.db.QueryContext(ctx, `SELECT video_id,title,published_at,duration_seconds,view_count,current_seq,last_observed_at,creator_id
 FROM videos WHERE platform=? AND video_id IN (`+marks+`)`, args...)
 	if err != nil {
 		return nil, err
@@ -82,7 +83,7 @@ FROM videos WHERE platform=? AND video_id IN (`+marks+`)`, args...)
 		var item CreatorVideoRecord
 		var published *int64
 		var observed int64
-		if err := rows.Scan(&item.ID, &item.Title, &published, &item.DurationSeconds, &item.ViewCount, &item.Versions, &observed); err != nil {
+		if err := rows.Scan(&item.ID, &item.Title, &published, &item.DurationSeconds, &item.ViewCount, &item.Versions, &observed, &item.CreatorID); err != nil {
 			rows.Close()
 			return nil, err
 		}

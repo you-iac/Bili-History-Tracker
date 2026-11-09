@@ -1,5 +1,6 @@
 // Package storage 负责 SQLite 持久化：打开数据库、执行 schema 迁移、
 // 按 docs/database.md 的五表设计读写当前索引、内容版本、指标采样与调度目标。
+// creator_videos.go 为作者视频融合提供稳定续页和批量本地状态，见 docs/video-discovery.md。
 //
 // 输入：tracker 传入的 source.Video / CreatorProfile 及内容指纹；admin 传入的
 // 目标增删改查参数和详情读取请求。

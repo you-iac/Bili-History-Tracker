@@ -1,6 +1,6 @@
 # 观察台：页面、数据口径与接口
 
-8182 观察台的产品化重构。页面只读本地 SQLite，不通过浏览触发上游采集；添加、刷新、停止关注等命令仍走 POST，由 `tracker` 异步执行。代码入口：[pages.go](../backend/internal/admin/pages.go)、[views.go](../backend/internal/admin/views.go)、[server.go](../backend/internal/admin/server.go)、[dashboard.go](../backend/internal/storage/dashboard.go)；模板与静态资源在 [templates](../backend/internal/admin/templates) 和 [assets](../backend/internal/admin/assets)。
+8182 观察台的产品化重构。常规内容与统计页面只读本地 SQLite；作者可添加视频列表可只读发现平台视频，列表本身不写入内容或关注；添加、刷新、停止关注等命令仍走 POST，由 `tracker` 异步执行。代码入口：[pages.go](../backend/internal/admin/pages.go)、[views.go](../backend/internal/admin/views.go)、[server.go](../backend/internal/admin/server.go)、[dashboard.go](../backend/internal/storage/dashboard.go)；模板与静态资源在 [templates](../backend/internal/admin/templates) 和 [assets](../backend/internal/admin/assets)。
 
 ## 信息架构
 
@@ -19,7 +19,7 @@
 └───────────────┘     └───────────────┘     └───────────────┘
 ```
 
-浏览页面不触发采集；只有“添加关注”“立即刷新”会调用 `tracker.RunNow`。
+常规浏览不触发采集；“可添加视频”经 discovery 只读发现，勾选提交或添加全部才采集入库。作者关注只查询资料，不自动添加视频。
 
 ## 路由
 
@@ -146,6 +146,8 @@
 ## 边界
 
 - 不新增登录、权限、多平台或前端构建流程。
-- 不发生活跃采集：浏览页面只读；只有命令触发 `RunNow`。
+- 内容页只读本地；作者视频发现只读，显式提交才经共用用例采集和关注。
 - 不把 `last_run_at` 当最近成功时间；不使用内存日志推断对象状态。
-- 不展示虚构曲线、全站排名、完整投稿数或未经确认的删除状态；投稿发现上限与 Cookie 限制见 [架构说明](architecture.md)。
+- 不展示虚构曲线、全站排名、完整投稿数或未经确认的删除状态；作者视频发现范围、分页与限制见 [架构说明](architecture.md)。
+
+作者视频选择、跨页添加全部、任务失败恢复和取消见 [作者视频设计](video-discovery.md)。

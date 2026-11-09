@@ -144,6 +144,32 @@ func TestDiscoveryRetryCancellationAndRecovery(t *testing.T) {
 		t.Fatalf("recovery=%+v error=%v calls=%d", page, err, calls)
 	}
 }
+
+func TestDiscoveryStopsBlockedBusinessAndPreservesLongCooldown(t *testing.T) {
+	for _, body := range []string{`{"code":-799}`, `{"code":0,"data":{"items_lists":{}}}`} {
+		p := New()
+		calls := 0
+		p.listWait = func(context.Context, time.Duration) error { return nil }
+		p.client.Transport = roundTripFunc(func(*http.Request) (*http.Response, error) { calls++; return jsonResponse(200, body), nil })
+		if _, err := p.GetCreatorVideoPage(context.Background(), "1", ""); err == nil || calls != 1 {
+			t.Fatalf("invalid response retried: %s calls=%d err=%v", body, calls, err)
+		}
+	}
+	p := New()
+	calls := 0
+	p.client.Transport = roundTripFunc(func(*http.Request) (*http.Response, error) {
+		calls++
+		response := jsonResponse(429, `{}`)
+		response.Header.Set("Retry-After", "120")
+		return response, nil
+	})
+	started := time.Now()
+	_, err := p.GetCreatorVideoPage(context.Background(), "1", "")
+	var se *source.Error
+	if !errors.As(err, &se) || se.RetryAt.Before(started.Add(time.Minute)) || calls != 1 || time.Since(started) > time.Second {
+		t.Fatalf("long cooldown lost or waited without budget: %v calls=%d", err, calls)
+	}
+}
 func TestDiscoveryDetectsRepeatedMemberPage(t *testing.T) {
 	p := New()
 	p.client.Transport = roundTripFunc(func(r *http.Request) (*http.Response, error) {

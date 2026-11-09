@@ -19,17 +19,19 @@
 | B站视频快照 | 仅移除顶层 `ugc_season`，保留分 P、未知字段与大整数；过滤版本只在模块代码中选择 | [snapshot.go](../backend/internal/provider/bilibili/snapshot.go) 的 `videoSnapshot`、`videoSnapshotVersion`、`videoSnapshotV1` | [snapshot_test.go](../backend/internal/provider/bilibili/snapshot_test.go) |
 | B站 UP 主资料查询 | 校验 UID、查询并归一化资料；不获取投稿列表 | [creator.go](../backend/internal/provider/bilibili/creator.go) 的 `GetCreator` | [creator_test.go](../backend/internal/provider/bilibili/creator_test.go) |
 | B站共用请求处理 | 发送上游请求，检查 HTTP 和业务状态、响应大小及 JSON；返回原始 data 和解析结果 | [http.go](../backend/internal/provider/bilibili/http.go) 的 `get` | 由 [视频测试](../backend/internal/provider/bilibili/bilibili_test.go) 和 [资料测试](../backend/internal/provider/bilibili/creator_test.go) 覆盖 |
-| B站合集发现 | 通过公开合集接口列出可跟踪视频；不代表全部投稿 | [list.go](../backend/internal/provider/bilibili/list.go) 的 `GetCreatorVideos` | [bilibili_test.go](../backend/internal/provider/bilibili/bilibili_test.go) |
+| B站作者视频发现 | 适配器内部续页遍历公开目录与成员，扁平化为视频；不发送 Cookie，分类有限重试 | [list_page.go](../backend/internal/provider/bilibili/list_page.go) 的 `GetCreatorVideoPage`、`listGet` | [list_page_test.go](../backend/internal/provider/bilibili/list_page_test.go) |
+| 作者视频融合与导入任务 | 融合本地和平台视频、过滤已关注、统一续页；显式选择或跨页添加全部，保留失败并可恢复 | [service.go](../backend/internal/discovery/service.go) 的 `Service`、[jobs.go](../backend/internal/discovery/jobs.go) 的 `Start`、`Retry`、[模块说明](../backend/internal/discovery/README.md) | [service_test.go](../backend/internal/discovery/service_test.go)、[HTTP 测试](../backend/internal/admin/discovery_test.go) |
+| 作者视频本地查询 | 按视频 ID 稳定续页与批量状态，记录和关注独立 | [creator_videos.go](../backend/internal/storage/creator_videos.go) 的 `CreatorVideos`、`VideoStates` | [creator_videos_test.go](../backend/internal/storage/creator_videos_test.go) |
 | 持久化 | 打开 SQLite、执行迁移、计算内容指纹、保存适配器快照、读写五表和调度目标；不记录过滤规则版本 | [db.go](../backend/internal/storage/db.go)、[fingerprint.go](../backend/internal/storage/fingerprint.go)、[repo.go](../backend/internal/storage/repo.go)、[0003 迁移](../backend/internal/storage/migrations/0003_drop_video_snapshot_version.sql)、[0004 迁移](../backend/internal/storage/migrations/0004_observation_status.sql) | [storage_test.go](../backend/internal/storage/storage_test.go)、[creator_test.go](../backend/internal/storage/creator_test.go)、[migration_test.go](../backend/internal/storage/migration_test.go) |
-| 查询与调度 | 执行目标查询、合集发现、查询日志、到期目标调度 | [tracker.go](../backend/internal/tracker/tracker.go)、[scheduler.go](../backend/internal/tracker/scheduler.go)、[log.go](../backend/internal/tracker/log.go) | [tracker_test.go](../backend/internal/tracker/tracker_test.go) |
-| 观察台（本地后台） | 8182 端口的信息看板、对象详情、关注管理与采集记录；页面只读本地，命令异步触发采集 | [pages.go](../backend/internal/admin/pages.go)、[views.go](../backend/internal/admin/views.go)、[server.go](../backend/internal/admin/server.go)、[templates](../backend/internal/admin/templates)、[assets](../backend/internal/admin/assets) | [pages_test.go](../backend/internal/admin/pages_test.go)、[chart_test.cjs](../backend/internal/admin/chart_test.cjs) |
+| 查询与调度 | 执行目标查询、经作者归属验证的显式视频导入、日志、到期调度；作者采集不自动关注视频 | [tracker.go](../backend/internal/tracker/tracker.go)、[ingest.go](../backend/internal/tracker/ingest.go) 的 `IngestVideo`、`persistVideo`、[scheduler.go](../backend/internal/tracker/scheduler.go)、[log.go](../backend/internal/tracker/log.go) | [tracker_test.go](../backend/internal/tracker/tracker_test.go)、[ingest_test.go](../backend/internal/tracker/ingest_test.go) |
+| 观察台（本地后台） | 8182 信息看板、对象详情、关注管理与作者视频选择；常规页面读本地，发现只读，显式导入才采集 | [pages.go](../backend/internal/admin/pages.go)、[views.go](../backend/internal/admin/views.go)、[server.go](../backend/internal/admin/server.go)、[templates](../backend/internal/admin/templates)、[assets](../backend/internal/admin/assets) | [pages_test.go](../backend/internal/admin/pages_test.go)、[chart_test.cjs](../backend/internal/admin/chart_test.cjs) |
 | 看板查询 | 概览统计、内容库分页、日指标、版本动态与快照读取；只读本地，不返回整份 payload | [dashboard.go](../backend/internal/storage/dashboard.go) 的 `Catalog`、`Summary`、`Metrics`、`Versions`、`ReadSnapshot` | [dashboard_test.go](../backend/internal/storage/dashboard_test.go) |
 
 注释与技术文档分工：包注释和文件头说明模块职责、边界及文档位置；接口、关键方法和复杂逻辑附近解释输入约束、错误语义及设计原因；本文负责模块关系、执行链路、API、字段映射及扩展方式。普通赋值和显而易见的调用不需要逐行注释。
 
 各模块目录下的 `README.md` 以一张子模块协作图为主，说明内部文件如何协作，以及输入、输出和边界；模块地图见 [backend/internal/README.md](../backend/internal/README.md)。架构与协作图统一使用 `text` 代码块中的等宽字符框图，方框表示模块，箭头标明调用、组装或读写关系；查询结果沿调用链返回。
 
-规划中的作者视频融合、去重并排除已关注、统一分页、一键添加全部、适配器重试及单管理员工作区方案见 [作者视频融合与按需关注设计](video-discovery.md)。通用接口与用户端只处理作者和视频，B站合集遍历封装在适配器内部。该方案尚未实施；本文模块导航与下文运行链路仍描述当前代码，实施时需同步更新。
+作者视频融合、关注过滤、统一分页、添加全部及单管理员口径见 [作者视频融合与按需关注设计](video-discovery.md)。通用接口与用户端只处理作者和视频，B站合集遍历封装在适配器内部；发现和导入会话只保存在当前进程，重启后需重新加载，成功采集的历史与关注保持持久化。
 
 新增或移动模块、变更接口或职责时，同步更新上述导航及相关章节。定位实现优先使用文件链接和符号名，避免固定行号随着代码调整而失效。具体要求见 [AGENTS.md](../AGENTS.md)。
 
@@ -46,7 +48,7 @@
   │                        ▼                                                 │
   │         ┌────────────────────────────┐                                   │
   │读写库   │ tracker                    │                                   │ 只查上游
-  │         │ 查询 / 调度 / 发现         │────────┐                          │
+  │         │ 查询 / 调度 / 保存         │────────┐                          │
   │         └────────────────────────────┘        │                          │
   │                        │                      │                          │
   │                        │ 保存 / 采样          │                          │
@@ -128,9 +130,9 @@ go run ./cmd/server
 | 状态 JSON | `GET /api/targets/status` | 当前关注状态，不含上游请求 |
 | 命令 | `POST /targets`、`/targets/run`、`/targets/delete`、`/targets/interval` | 异步执行；页面浏览本身不触发采集 |
 
-页面只读本地数据库，只有命令会调用 `tracker.RunNow`。页面职责、状态判定和统计口径见 [观察台](dashboard.md)。
+常规内容与统计页面只读本地；作者的“可添加视频”会触发只读平台发现，列表结果不写入内容或关注。添加、刷新与视频导入才会采集并写入。页面口径见 [观察台](dashboard.md)，新增接口见 [作者视频设计](video-discovery.md#分页与状态契约)。
 
-添加 UP 主后：查询 `card` 资料并写入 `creators` / `creator_versions`；随后发现视频并加入 `tracking_targets`，立即查询一次。发现顺序是：配置了 `BHT_BILI_COOKIE` 时先调用空间投稿列表（按投稿时间分页，最多 120 个），失败或没有 Cookie 时回退公开合集接口。B站空间接口需要登录态和风控参数，未登录时通常返回 `412` 或 `-799`，因此没有 Cookie 时结果可能只包含合集内视频，此时可在后台手动添加 BV。
+添加 UP 主只查询并关注作者资料，不自动关注视频。用户浏览统一作者视频列表时，`discovery` 融合本地记录和平台发现、去重并排除已关注项；B站适配器使用公开目录和成员接口，不附带 Cookie、不调用空间投稿列表。勾选提交或点击“一键添加全部”后，由后台任务继续枚举并复用 `tracker.IngestVideo` 校验作者、保存与关注。失败页只按适配器策略有限重试，最终不完整时保留成功结果并等待显式恢复。旧 `VideoLister` 保留兼容代码，新链路只使用 `CreatorVideoPager`。
 
 调度器每 30 秒检查一次到期目标，按 `next_run_at` 顺序串行执行，每轮最多 10 个。执行完成后把 `next_run_at` 推后一个间隔（默认 3 小时）；失败也推进，避免反复重试。网络请求在事务外完成，成功后才写入数据库。
 

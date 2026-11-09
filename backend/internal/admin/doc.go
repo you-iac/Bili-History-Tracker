@@ -1,5 +1,7 @@
 // Package admin 提供 8182 端口的本地后台：查看跟踪目标、查询日志和入库详情，
 // 并允许添加、删除、立即查询目标和调整查询间隔。
+// 作者视频经 discovery 提供统一发现、分页及显式导入；列表不写内容或关注，
+// 添加全部和逐项选择共用写入用例。设计见 docs/video-discovery.md。
 //
 // 输入：浏览器提交的表单（type、id、interval_hours）和 URL 参数。
 // 输出：HTML 页面；副作用是写 tracking_targets、触发 tracker.RunNow、

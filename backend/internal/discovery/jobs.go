@@ -216,7 +216,14 @@ func (s *Service) run(v *job, retry []string) {
 		if v.ctx.Err() != nil || s.queries == nil {
 			return false
 		}
+		// 多个导入任务也串行请求，等待队列可以取消，不持有服务或会话锁。
+		select {
+		case s.importGate <- struct{}{}:
+		case <-v.ctx.Done():
+			return false
+		}
 		status, err := s.queries.IngestVideo(v.ctx, v.request.Creator, id, time.Duration(v.request.IntervalSeconds)*time.Second)
+		<-s.importGate
 		result := ImportResult{ID: id, Status: status}
 		if err != nil {
 			result.Status = "failed"

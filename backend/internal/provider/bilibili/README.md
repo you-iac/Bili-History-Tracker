@@ -57,6 +57,8 @@ B站网页端点适配器：把上游 JSON 转成 `source` 的统一结构，准
 
 ## 关键约束
 
-- 端点固定，不接受调用方 URL；不跟随重定向、不重试。
+- 端点固定，不接受调用方 URL；不跟随重定向；单视频和资料不自动重试，公开视频发现由 `list_page.go` 分类有限重试。
 - 响应体上限 2 MiB；HTTP 200 与业务 `code=0` 分开检查。
 - 视频当前使用 `videoSnapshotV1()`，只删除顶层 `ugc_season`，保留所有分 P、统计、字幕、未知字段和大整数；不递归过滤。过滤版本只在代码中管理，测试见 [snapshot_test.go](snapshot_test.go)。裁剪发生在响应读取后，不减少上游网络流量，也不改变响应体上限。
+
+作者视频分页入口为 [list_page.go](list_page.go) 的 `GetCreatorVideoPage`：内部遍历目录和成员，输出扁平视频页；不带 Cookie、不请求空间投稿列表，不把预览当作完整成员。测试见 [list_page_test.go](list_page_test.go)，策略见 [作者视频设计](../../../../docs/video-discovery.md#retry-policy)。旧 `list.go` 仅保留兼容能力，新链路不使用其 Cookie 回退。

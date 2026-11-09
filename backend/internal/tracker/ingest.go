@@ -43,7 +43,11 @@ func (t *Tracker) IngestVideo(ctx context.Context, creator, id string, interval 
 	if err != nil {
 		return "failed", err
 	}
-	if states[id].Subscribed {
+	// 本地成功观测可验证已有目标归属；待首次采集的目标仍须查询详情。
+	if states[id].Recorded && states[id].CreatorID != creator {
+		return "rejected", nil
+	}
+	if states[id].Subscribed && states[id].Recorded {
 		return "existing", nil
 	}
 	video, err := t.queries.GetVideo(ctx, t.platform, id)
@@ -52,6 +56,9 @@ func (t *Tracker) IngestVideo(ctx context.Context, creator, id string, interval 
 	}
 	if video.Platform != t.platform || video.ID != id || video.Creator.ID != creator {
 		return "rejected", nil
+	}
+	if states[id].Subscribed {
+		return "existing", nil
 	}
 	target := storage.Target{Platform: t.platform, TargetType: "video", TargetID: id, IntervalSeconds: int64(interval.Seconds())}
 	_, err = t.persistVideo(ctx, target, video)

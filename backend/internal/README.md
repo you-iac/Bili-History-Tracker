@@ -46,7 +46,8 @@
 | `provider` | 平台适配器目录 | [README](provider/README.md) |
 | `provider/bilibili` | B站网页端点适配 | [README](provider/bilibili/README.md) |
 | `storage` | SQLite 持久化、指纹、五表读写、看板查询 | [README](storage/README.md) |
-| `tracker` | 查询用例、循环调度、合集发现 | [README](tracker/README.md) |
+| `tracker` | 查询用例、循环调度、显式导入 | [README](tracker/README.md) |
+| `discovery` | 作者视频融合、关注过滤、分页与导入任务 | [README](discovery/README.md) |
 | `admin` | 8182 观察台页面、详情与命令 | [README](admin/README.md) |
 | `httpapi` | 8181 只读 JSON API | [README](httpapi/README.md) |
 
@@ -55,7 +56,7 @@
 ## 依赖规则
 
 - 入口层（`admin`、`httpapi`）只依赖用例层或契约层；
-- `tracker` 依赖 `source` 与 `storage`；
+- `tracker` 依赖 `source` 与 `storage`；`discovery` 通过小接口调用本地读取和 tracker 的发现、导入能力；
 - `storage` 依赖 `source` 的数据类型；
 - `provider/*` 只依赖 `source`；
 - 任何包都不反向依赖 `cmd/server`，组装集中在入口。
@@ -63,5 +64,5 @@
 ## 数据流向
 
 - 写：`admin` → `tracker` → `storage`；`scheduler` → `tracker` → `storage`。
-- 读：`httpapi` → `source`；`admin` → `storage`。
+- 读：`httpapi` → `source`；常规页面 `admin` → `storage`；作者可添加视频 `admin` → `discovery` → `storage` / `tracker` → `source`。
 - 上游：所有取数最终经 `source` 分发到 `provider/bilibili`。

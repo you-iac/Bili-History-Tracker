@@ -41,15 +41,16 @@ type Queries interface {
 
 // Service 可并发使用；服务退出时须 Close 取消全部任务。
 type Service struct {
-	mu       sync.Mutex
-	reader   Reader
-	queries  Queries
-	platform string
-	ctx      context.Context
-	cancel   context.CancelFunc
-	sessions map[string]*session
-	jobs     map[string]*job
-	keys     map[string]string
+	mu         sync.Mutex
+	reader     Reader
+	queries    Queries
+	platform   string
+	ctx        context.Context
+	cancel     context.CancelFunc
+	sessions   map[string]*session
+	jobs       map[string]*job
+	keys       map[string]string
+	importGate chan struct{}
 }
 type session struct {
 	mu                          sync.Mutex
@@ -79,7 +80,7 @@ type Page struct {
 
 func New(reader Reader, queries Queries, platform string) *Service {
 	ctx, cancel := context.WithCancel(context.Background())
-	return &Service{reader: reader, queries: queries, platform: platform, ctx: ctx, cancel: cancel, sessions: map[string]*session{}, jobs: map[string]*job{}, keys: map[string]string{}}
+	return &Service{reader: reader, queries: queries, platform: platform, ctx: ctx, cancel: cancel, sessions: map[string]*session{}, jobs: map[string]*job{}, keys: map[string]string{}, importGate: make(chan struct{}, 1)}
 }
 
 // Close 取消全部在途任务，不删除成功采集的历史。
