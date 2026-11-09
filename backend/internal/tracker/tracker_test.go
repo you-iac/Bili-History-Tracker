@@ -24,7 +24,7 @@ func (f *fakeQuerier) GetVideo(_ context.Context, platform, id string) (source.V
 		`"stat":{"view":%d},"pages":[]}`, id, view))
 	return source.Video{
 		Platform: platform, ID: id, Title: "T", Description: "D",
-		Creator: source.Creator{ID: "1", Name: "U"},
+		Creator:         source.Creator{ID: "1", Name: "U"},
 		DurationSeconds: 10, ViewCount: &view,
 		ObservedAt: time.Now().UTC(), SourceURL: "https://example.test/view", Raw: raw,
 	}, nil
@@ -80,7 +80,7 @@ func TestRunVideoStoresOneVersion(t *testing.T) {
 	}
 }
 
-func TestRunCreatorDiscoversVideos(t *testing.T) {
+func TestRunCreatorDoesNotSubscribeVideos(t *testing.T) {
 	trk, store, log := newTestTracker(t)
 	trk.queries = &fakeQuerier{videos: []source.CreatorVideo{
 		{ID: "BV1oa41137pj", Title: "T"},
@@ -99,8 +99,8 @@ func TestRunCreatorDiscoversVideos(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if videoCount != 1 {
-		t.Fatalf("discovered video version count = %d, want 1", videoCount)
+	if videoCount != 0 {
+		t.Fatalf("unselected video version count = %d, want 0", videoCount)
 	}
 	found := false
 	for _, entry := range log.Recent(20) {
@@ -108,7 +108,14 @@ func TestRunCreatorDiscoversVideos(t *testing.T) {
 			found = true
 		}
 	}
-	if !found {
-		t.Fatal("expected a discover log entry")
+	if found {
+		t.Fatal("creator profile query must not discover or subscribe videos")
+	}
+	targets, err := store.ListTargets(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(targets) != 0 {
+		t.Fatalf("unselected targets created: %+v", targets)
 	}
 }

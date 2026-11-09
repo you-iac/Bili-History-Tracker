@@ -11,6 +11,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
+	"time"
 
 	"bili-history-tracker/backend/internal/source"
 )
@@ -19,15 +21,21 @@ import (
 // endpoint is constructed inside this package, never supplied by an API caller.
 // It returns the raw data object; query adapters prepare snapshots before persistence.
 func (p *Provider) get(ctx context.Context, endpoint string, data any) (json.RawMessage, error) {
+	return p.getRequest(ctx, endpoint, data, true)
+}
+
+// getRequest 的 public 调用明确不携带进程配置的 Cookie。
+func (p *Provider) getRequest(ctx context.Context, endpoint string, data any, credentials bool) (json.RawMessage, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, fmt.Errorf("build bilibili request: %w", err)
 	}
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("User-Agent", "Bili-History-Tracker/0.1")
-	if p.cookie != "" {
+	if credentials && p.cookie != "" {
 		req.Header.Set("Cookie", p.cookie)
 	}
+	req.Header.Set("Referer", "https://space.bilibili.com/")
 	resp, err := p.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("query bilibili: %w", err)
@@ -42,7 +50,15 @@ func (p *Provider) get(ctx context.Context, endpoint string, data any) (json.Raw
 			kind = source.RateLimited
 		}
 		// A missing API route does not mean the requested resource is missing.
-		return nil, &source.Error{Kind: kind, Platform: platform, HTTPStatus: resp.StatusCode}
+		var retryAt time.Time
+		if value := resp.Header.Get("Retry-After"); value != "" {
+			if seconds, err := strconv.Atoi(value); err == nil && seconds >= 0 && seconds <= 86400 {
+				retryAt = time.Now().Add(time.Duration(seconds) * time.Second)
+			} else if at, err := http.ParseTime(value); err == nil {
+				retryAt = at
+			}
+		}
+		return nil, &source.Error{Kind: kind, Platform: platform, HTTPStatus: resp.StatusCode, RetryAt: retryAt}
 	}
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseSize+1))
 	if err != nil {

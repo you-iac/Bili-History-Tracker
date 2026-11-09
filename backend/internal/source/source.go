@@ -95,9 +95,25 @@ type Video struct {
 
 // CreatorVideo is a compact entry from a creator's published video list.
 type CreatorVideo struct {
-	ID          string     `json:"id"`
-	Title       string     `json:"title"`
-	PublishedAt *time.Time `json:"published_at"`
+	ID              string     `json:"id"`
+	Title           string     `json:"title"`
+	PublishedAt     *time.Time `json:"published_at"`
+	CoverURL        string     `json:"cover_url,omitempty"`
+	DurationSeconds *int64     `json:"duration_seconds,omitempty"`
+	ViewCount       *int64     `json:"view_count"`
+}
+
+// CreatorVideoPage 是平台当前可发现的视频页。空 Items 不表示结束；只有
+// NextCursor 为空才表示本次枚举结束。游标仅由对应适配器解释，不保证覆盖全部投稿。
+type CreatorVideoPage struct {
+	Items      []CreatorVideo `json:"items"`
+	NextCursor string         `json:"next_cursor,omitempty"`
+}
+
+// CreatorVideoPager 是可选的作者视频能力，不要求平台存在合集。
+// 实现须尊重 ctx；返回错误时调用方可保留原游标恢复，不能丢弃成功页。
+type CreatorVideoPager interface {
+	GetCreatorVideoPage(ctx context.Context, id, cursor string) (CreatorVideoPage, error)
 }
 
 // Provider implementations own platform-specific identifiers, requests and parsing.
@@ -139,6 +155,7 @@ type Error struct {
 	Platform     string
 	HTTPStatus   int
 	UpstreamCode int
+	RetryAt      time.Time
 }
 
 func (e *Error) Error() string {
@@ -200,6 +217,19 @@ func (s *Service) ListCreatorVideos(ctx context.Context, platform, id string) ([
 		return nil, &Error{Kind: UnsupportedOperation, Platform: platform}
 	}
 	return lister.GetCreatorVideos(ctx, id)
+}
+
+// GetCreatorVideoPage 按平台注册表分发可续页的作者视频查询，不解释平台游标。
+func (s *Service) GetCreatorVideoPage(ctx context.Context, platform, id, cursor string) (CreatorVideoPage, error) {
+	p, err := s.lookup(platform, id)
+	if err != nil {
+		return CreatorVideoPage{}, err
+	}
+	pager, ok := p.(CreatorVideoPager)
+	if !ok {
+		return CreatorVideoPage{}, &Error{Kind: UnsupportedOperation, Platform: platform}
+	}
+	return pager.GetCreatorVideoPage(ctx, id, cursor)
 }
 
 func (s *Service) lookup(platform, id string) (Provider, error) {

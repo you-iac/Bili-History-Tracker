@@ -17,14 +17,10 @@ import (
 // DefaultInterval 是未指定时使用的查询周期。
 const DefaultInterval = 3 * time.Hour
 
-// maxDiscoverPerRun 限制单次作者查询新增的视频目标数，避免一次请求过多。
-const maxDiscoverPerRun = 20
-
 // Querier 是 tracker 需要的查询能力，*source.Service 满足该接口。
 type Querier interface {
 	GetVideo(ctx context.Context, platform, id string) (source.Video, error)
 	GetCreator(ctx context.Context, platform, id string) (source.CreatorProfile, error)
-	ListCreatorVideos(ctx context.Context, platform, id string) ([]source.CreatorVideo, error)
 }
 
 // Tracker 串行执行查询并落库。同一目标不会并发执行。
@@ -91,37 +87,15 @@ func (t *Tracker) runVideo(ctx context.Context, target storage.Target) {
 	defer func() { t.recordOutcome(target, outcome) }()
 	started := time.Now()
 	video, err := t.queries.GetVideo(ctx, t.platform, target.TargetID)
+	if err == nil {
+		_, err = t.persistVideo(ctx, target, video)
+	}
 	if err != nil {
 		outcome = errorMessage(err)
-		t.log.Add(Entry{Time: started, Level: "error", Target: targetLabel(target),
-			Action: "query_video", Message: errorMessage(err), DurationMS: sinceMS(started)})
-		return
-	}
-	fingerprint, err := storage.VideoFingerprint(video.Raw)
-	if err != nil {
-		outcome = "invalid_payload"
-		t.log.Add(Entry{Time: started, Level: "error", Target: targetLabel(target),
-			Action: "query_video", Message: "invalid_payload", DurationMS: sinceMS(started)})
-		return
-	}
-	result, err := t.store.SaveVideo(ctx, video, fingerprint)
-	if err != nil {
-		outcome = "store_failed"
-		t.log.Add(Entry{Time: started, Level: "error", Target: targetLabel(target),
-			Action: "query_video", Message: "store_failed", Detail: err.Error(), DurationMS: sinceMS(started)})
+		t.log.Add(Entry{Time: started, Level: "error", Target: targetLabel(target), Action: "query_video", Message: outcome, DurationMS: sinceMS(started)})
 		return
 	}
 	outcome = "ok"
-	detail := fmt.Sprintf("seq=%d", result.Seq)
-	if video.ViewCount != nil {
-		detail += fmt.Sprintf(" view=%d", *video.ViewCount)
-	}
-	t.log.Add(Entry{Time: started, Level: "info", Target: targetLabel(target),
-		Action: "query_video", Message: "ok", Detail: detail,
-		DurationMS: sinceMS(started), VersionAdded: result.VersionAdded})
-	if video.ViewCount != nil {
-		t.recordMetric(ctx, "video", target.TargetID, "view", *video.ViewCount)
-	}
 }
 
 func (t *Tracker) runCreator(ctx context.Context, target storage.Target) {
@@ -160,51 +134,6 @@ func (t *Tracker) runCreator(ctx context.Context, target storage.Target) {
 	if profile.FollowerCount != nil {
 		t.recordMetric(ctx, "creator", target.TargetID, "follower", *profile.FollowerCount)
 	}
-	t.discoverVideos(ctx, target)
-}
-
-// discoverVideos 尝试从公开合集发现视频，并把新视频加入跟踪。
-// 发现失败只记录警告，不影响已经完成的作者资料入库。
-func (t *Tracker) discoverVideos(ctx context.Context, target storage.Target) {
-	started := time.Now()
-	videos, err := t.queries.ListCreatorVideos(ctx, t.platform, target.TargetID)
-	if err != nil {
-		t.log.Add(Entry{Time: started, Level: "warn", Target: targetLabel(target),
-			Action: "discover", Message: errorMessage(err), DurationMS: sinceMS(started)})
-		return
-	}
-	interval := time.Duration(target.IntervalSeconds) * time.Second
-	if interval <= 0 {
-		interval = DefaultInterval
-	}
-	added := 0
-	for _, video := range videos {
-		if added >= maxDiscoverPerRun {
-			break
-		}
-		exists, err := t.store.HasTarget(ctx, t.platform, "video", video.ID)
-		if err != nil {
-			t.log.Add(Entry{Time: time.Now(), Level: "error", Target: targetLabel(target),
-				Action: "discover", Message: "store_failed", Detail: err.Error()})
-			return
-		}
-		if exists {
-			continue
-		}
-		if err := t.store.AddTarget(ctx, t.platform, "video", video.ID, interval, time.Now()); err != nil {
-			t.log.Add(Entry{Time: time.Now(), Level: "error", Target: targetLabel(target),
-				Action: "discover", Message: "store_failed", Detail: err.Error()})
-			return
-		}
-		added++
-		t.runVideo(ctx, storage.Target{
-			Platform: t.platform, TargetType: "video", TargetID: video.ID,
-			IntervalSeconds: int64(interval.Seconds()),
-		})
-	}
-	t.log.Add(Entry{Time: started, Level: "info", Target: targetLabel(target),
-		Action: "discover", Message: "ok",
-		Detail: fmt.Sprintf("found=%d added=%d", len(videos), added), DurationMS: sinceMS(started)})
 }
 
 func (t *Tracker) recordMetric(ctx context.Context, subjectType, subjectID, metric string, value int64) {

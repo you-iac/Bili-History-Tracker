@@ -50,6 +50,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"bili-history-tracker/backend/internal/source"
@@ -68,8 +69,11 @@ var _ source.Provider = (*Provider)(nil)
 // Provider 持有可并发复用的 HTTP 客户端，实现视频查询和可选的作者资料查询能力。
 // cookie 来自 BHT_BILI_COOKIE，仅用于访问需要登录态的投稿列表接口。
 type Provider struct {
-	client *http.Client
-	cookie string
+	client       *http.Client
+	cookie       string
+	listMu       sync.Mutex
+	listCooldown time.Time
+	listWait     func(context.Context, time.Duration) error
 }
 
 // New uses a dedicated HTTP client. The adapter never supplies login cookies

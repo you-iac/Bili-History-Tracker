@@ -28,6 +28,7 @@ type logView struct {
 	Duration                                        int64
 }
 type viewData struct {
+	CreatorID, Platform                                                                  string
 	Nav, Title, Subtitle, Message, Error, Q, Sort, Following, Kind, Tab, Days, ReturnURL string
 	Summary                                                                              storage.DashboardSummary
 	Items, Videos, Creators, Issues                                                      []storage.ContentItem

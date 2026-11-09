@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	"bili-history-tracker/backend/internal/discovery"
 	"bili-history-tracker/backend/internal/storage"
 	"bili-history-tracker/backend/internal/tracker"
 )
@@ -33,6 +34,7 @@ type Server struct {
 	log       *tracker.Log
 	platform  string
 	templates *template.Template
+	discovery *discovery.Service
 }
 
 // New 解析模板并创建后台服务。
@@ -41,8 +43,15 @@ func New(store *storage.Store, trk *tracker.Tracker, log *tracker.Log, platform 
 	if err != nil {
 		return nil, fmt.Errorf("parse admin templates: %w", err)
 	}
-	return &Server{store: store, reader: store, tracker: trk, log: log, platform: platform, templates: templates}, nil
+	var queries discovery.Queries
+	if trk != nil {
+		queries = trk
+	}
+	return &Server{store: store, reader: store, tracker: trk, log: log, platform: platform, templates: templates, discovery: discovery.New(store, queries, platform)}, nil
 }
+
+// Close 取消作者视频发现和导入任务，应在关闭数据库前调用。
+func (s *Server) Close() { s.discovery.Close() }
 
 // Handler 返回后台路由。
 func (s *Server) Handler() http.Handler {
@@ -59,6 +68,11 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /detail/{type}/{id}", s.contentDetail)
 	mux.HandleFunc("GET /api/metrics/{type}/{id}", s.metrics)
 	mux.HandleFunc("GET /api/targets/status", s.targetStatus)
+	mux.HandleFunc("GET /api/creators/{id}/videos", s.creatorVideos)
+	mux.HandleFunc("POST /api/creators/{id}/videos/cancel", s.cancelCreatorVideos)
+	mux.HandleFunc("POST /api/ingest/videos", s.ingestVideos)
+	mux.HandleFunc("GET /api/ingest/jobs/{id}", s.ingestProgress)
+	mux.HandleFunc("POST /api/ingest/jobs/{id}/{action}", s.ingestAction)
 	assets, _ := fs.Sub(templateFS, "assets")
 	mux.Handle("GET /assets/", http.StripPrefix("/assets/", http.FileServer(http.FS(assets))))
 	mux.HandleFunc("POST /targets", s.addTarget)
@@ -102,6 +116,10 @@ func (s *Server) addTarget(w http.ResponseWriter, r *http.Request) {
 	message := "已添加关注，正在进行首次采集：" + id
 	if existed {
 		message = "已关注该目标，已更新设置并触发刷新：" + id
+	}
+	if targetType == "creator" && strings.HasPrefix(r.FormValue("return_to"), "/manage") {
+		r.Form.Set("return_to", "/manage?creator="+url.QueryEscape(id)+"#creator-videos")
+		message += "；作者资料与视频关注独立，请在可添加视频中选择。"
 	}
 	s.redirect(w, r, message, "")
 }

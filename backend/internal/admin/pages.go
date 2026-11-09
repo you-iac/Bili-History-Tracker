@@ -27,7 +27,7 @@ type dashboardReader interface {
 }
 
 func (s *Server) base(r *http.Request, nav, title, subtitle string) viewData {
-	return viewData{Nav: nav, Title: title, Subtitle: subtitle, Message: r.URL.Query().Get("message"), Error: r.URL.Query().Get("error"), Q: strings.TrimSpace(r.URL.Query().Get("q")), Sort: r.URL.Query().Get("sort"), Following: r.URL.Query().Get("following"), Kind: r.URL.Query().Get("kind"), Tab: r.URL.Query().Get("tab"), Days: r.URL.Query().Get("days"), ReturnURL: r.URL.RequestURI()}
+	return viewData{Platform: s.platform, Nav: nav, Title: title, Subtitle: subtitle, Message: r.URL.Query().Get("message"), Error: r.URL.Query().Get("error"), Q: strings.TrimSpace(r.URL.Query().Get("q")), Sort: r.URL.Query().Get("sort"), Following: r.URL.Query().Get("following"), Kind: r.URL.Query().Get("kind"), Tab: r.URL.Query().Get("tab"), Days: r.URL.Query().Get("days"), ReturnURL: r.URL.RequestURI()}
 }
 func (s *Server) render(w http.ResponseWriter, name string, data viewData) {
 	var buffer bytes.Buffer
@@ -135,6 +135,11 @@ func (s *Server) library(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) management(w http.ResponseWriter, r *http.Request) {
 	data := s.base(r, "manage", "关注管理", "添加你关心的视频和 UP 主，让变化持续被记录。")
+	data.CreatorID = normalizeID("creator", r.URL.Query().Get("creator"))
+	if data.CreatorID != "" && !validID("creator", data.CreatorID) {
+		data.Error = "作者标识无效，请填写 UID 或作者空间链接。"
+		data.CreatorID = ""
+	}
 	f := filter(r)
 	f.OnlyTargets = true
 	f.Limit = 20
