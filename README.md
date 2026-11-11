@@ -20,7 +20,9 @@ go run ./cmd/server
 
 ## 客户端与本地 Agent（规划）
 
-[frontend 设计](frontend/README.md) 定义客户端从服务器读取UP主、视频及历史记录，在本地使用自己的 Cookie 分页发现和跟踪新投稿，并进一步将视频、评论区保存到本机。服务器持续采集已知目标，本地离线后可恢复同步和补发现；Cookie 与下载内容不上传服务器。目前仅完成需求与界面文档，尚无可运行的客户端，实施阶段见 [PLAN](PLAN.md)。
+客户端统一放在 [client/](client/README.md)，共同需求与设计维护在该目录的 README；[client/frontend/](client/frontend/README.md) 放浏览器界面，[client/agent/](client/agent/README.md) 放本地后台。启动 Agent 后，在浏览器打开它提供的本地页面；Agent 同源提供网页和 API，处理配置、Cookie、同步、发现及后续下载，关闭网页后仍可继续后台任务。
+
+[客户端需求与设计](client/README.md) 定义客户端从服务器读取UP主、视频及历史记录，在本地使用自己的 Cookie 分页发现和跟踪新投稿，并进一步将视频、评论区保存到本机。服务器持续采集已知目标，本地离线后可恢复同步和补发现；Cookie 与下载内容不上传服务器。目前仅完成需求与界面文档，尚无可运行的客户端，实施阶段见 [PLAN](PLAN.md)。
 
 ## 观察台
 

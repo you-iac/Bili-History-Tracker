@@ -26,7 +26,9 @@
 | 查询与调度 | 执行目标查询、经作者归属验证的显式视频导入、日志、到期调度；作者采集不自动关注视频 | [tracker.go](../backend/internal/tracker/tracker.go)、[ingest.go](../backend/internal/tracker/ingest.go) 的 `IngestVideo`、`persistVideo`、[scheduler.go](../backend/internal/tracker/scheduler.go)、[log.go](../backend/internal/tracker/log.go) | [tracker_test.go](../backend/internal/tracker/tracker_test.go)、[ingest_test.go](../backend/internal/tracker/ingest_test.go) |
 | 观察台（本地后台） | 8182 信息看板、对象详情、关注管理与作者视频选择；常规页面读本地，发现只读，显式导入才采集 | [pages.go](../backend/internal/admin/pages.go)、[views.go](../backend/internal/admin/views.go)、[server.go](../backend/internal/admin/server.go)、[templates](../backend/internal/admin/templates)、[assets](../backend/internal/admin/assets) | [pages_test.go](../backend/internal/admin/pages_test.go)、[chart_test.cjs](../backend/internal/admin/chart_test.cjs) |
 | 看板查询 | 概览统计、内容库分页、日指标、版本动态与快照读取；只读本地，不返回整份 payload | [dashboard.go](../backend/internal/storage/dashboard.go) 的 `Catalog`、`Summary`、`Metrics`、`Versions`、`ReadSnapshot` | [dashboard_test.go](../backend/internal/storage/dashboard_test.go) |
-| 客户端与本地 Agent（规划） | 读取服务器记录，本地 Cookie 发现、新投稿规则及离线恢复；后续本地视频和评论下载 | [frontend/README.md](../frontend/README.md)，目前仅有设计，无实现入口 | 同文档“实施阶段与验收”，待实现后补测试入口 |
+| 客户端整体（规划） | 统一组织浏览器界面与本地 Agent，维护两者共同需求、运行方式及验收 | [client/README.md](../client/README.md)，目前仅有文档，无实现入口 | [客户端验收](../client/README.md#实施阶段与验收)，待实现后补测试入口 |
+| 浏览器界面（规划） | 通过同源本地 API 展示记录、配置与任务，由 Agent 托管前端产物 | [client/frontend/README.md](../client/frontend/README.md)，目前仅有职责说明，无实现入口 | [客户端验收](../client/README.md#实施阶段与验收)，待实现后补测试入口 |
+| 本地 Agent（规划） | 提供网页及配置 API，读取服务器记录，本地 Cookie 发现、新投稿规则及离线恢复；后续本地视频和评论下载 | [client/agent/README.md](../client/agent/README.md)，目前仅有职责说明，无实现入口 | [客户端验收](../client/README.md#实施阶段与验收)，待实现后补测试入口 |
 
 注释与技术文档分工：包注释和文件头说明模块职责、边界及文档位置；接口、关键方法和复杂逻辑附近解释输入约束、错误语义及设计原因；本文负责模块关系、执行链路、API、字段映射及扩展方式。普通赋值和显而易见的调用不需要逐行注释。
 
@@ -34,7 +36,9 @@
 
 作者视频融合、关注过滤、统一分页、添加全部及单管理员口径见 [作者视频融合与按需关注设计](video-discovery.md)。通用接口与用户端只处理作者和视频，B站合集遍历封装在适配器内部；发现和导入会话只保存在当前进程，重启后需重新加载，成功采集的历史与关注保持持久化。
 
-规划中的 [客户端与本地 Agent](../frontend/README.md) 将读取服务器持久化的作者、视频、版本与指标；本地保存用户 Cookie、发现规则、缓存、提交队列、视频和评论文件。服务器持续跟踪已经接纳的目标；本地离线时不替它执行登录态发现或下载。新视频交接仅提交标识，由服务器公开查询并校验，不能把本地私有观测直接写成服务器历史。
+规划中的 [浏览器界面](../client/frontend/README.md) 与 [本地 Agent](../client/agent/README.md) 统一组织在 `client/`，共同需求维护在 [client/README.md](../client/README.md)。界面通过同源本地 HTTP API 访问 Agent，由 Agent 在回环地址托管网页产物、校验并持久化配置，统一执行远端服务器与平台请求。浏览器关闭不停止 Agent 已接收的任务；Agent 停止后本地网页与 API 不可用，重启后恢复持久化状态。具体本地通信与调用方校验约定见 [运行方式与协作关系](../client/README.md#运行方式与协作关系)。
+
+Agent 将读取服务器持久化的作者、视频、版本与指标；本地保存用户 Cookie、发现规则、缓存、提交队列、视频和评论文件。服务器持续跟踪已经接纳的目标；本地离线时不替它执行登录态发现或下载。新视频交接仅提交标识，由服务器公开查询并校验，不能把本地私有观测直接写成服务器历史。
 
 当前8181接口只查上游，不读取历史库；8182已有本地查询页面和部分 JSON，但尚无设备认证及持久化事件同步协议。客户端接入需要补齐受鉴权的记录读取、跟踪申请对账、设备凭据与可恢复同步，不能把现有来源检查或短期发现游标当作这些能力。以上为后续设计，本次未调整现有 Go 模块职责。
 
