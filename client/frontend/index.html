@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="description" content="在本机配置 B站账号，获取 UP 主当前可见的全部投稿视频 ID。">
+  <title>视频发现 · Bili History Tracker</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/app.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Bili History Tracker 首页"><span class="brand-icon" aria-hidden="true">b<span>·</span></span><span>Bili History <strong>Tracker</strong><small>个人客户端</small></span></a>
+    <div class="top-status"><span class="local-tag"><span class="dot"></span>本地运行</span><span id="connection-status" class="connection-status" role="status">连接中…</span></div>
+  </header>
+  <main>
+    <div class="page-heading"><p class="eyebrow">客户端 <span>/</span> 视频发现</p><h1>UP 主视频 ID 提取<span class="heading-dot">.</span></h1><p class="intro">从一位 UP 主开始，整理当前账号可见的全部投稿。</p></div>
+    <section id="connect-card" class="connect-card" hidden aria-labelledby="connect-title">
+      <div><h2 id="connect-title">连接本地 Agent</h2><p>请用启动终端显示的完整链接打开此页面，或输入链接中 <code>token=</code> 后的连接密钥。</p></div>
+      <form id="connect-form"><label class="sr-only" for="connect-token">本地连接密钥</label><input id="connect-token" type="password" autocomplete="off" placeholder="本次启动的连接密钥" required><button class="button primary" type="submit">连接</button></form>
+    </section>
+    <div id="notice" class="notice" role="status" hidden></div>
+    <div class="workspace">
+      <section class="card account-card" aria-labelledby="account-title">
+        <div class="card-heading"><span class="step">01</span><h2 id="account-title">连接 B站账号</h2><span id="account-badge" class="badge muted">未配置</span></div>
+        <p class="card-description">使用自己的登录状态，读取可见投稿。</p>
+        <div class="account-summary"><div id="account-avatar" class="account-avatar" aria-hidden="true">B</div><div><strong id="account-name">尚未连接账号</strong><span id="account-id">配置 Cookie 后验证身份</span></div><span id="account-check" class="account-check" hidden aria-label="已验证">✓</span></div>
+        <form id="cookie-form">
+          <label for="cookie-input">Cookie 请求头</label>
+          <textarea id="cookie-input" rows="4" placeholder="SESSDATA=…; bili_jct=…; DedeUserID=…" autocomplete="off" spellcheck="false" required></textarea>
+          <p id="storage-note" class="field-note">Cookie 仅交给本机 Agent，不发送到项目服务器。</p>
+          <button id="save-cookie" class="button primary full" type="submit" disabled>验证并保存 Cookie <span aria-hidden="true">↗</span></button>
+        </form>
+        <div class="account-actions"><button id="validate-cookie" class="text-button" type="button" disabled>验证现有 Cookie</button><button id="clear-cookie" class="text-button danger" type="button" disabled>清除账号</button></div>
+        <details class="cookie-help"><summary>如何获取 Cookie？</summary><ol><li>在浏览器登录 <a href="https://www.bilibili.com/" target="_blank" rel="noreferrer">哔哩哔哩</a>。</li><li>按 F12 打开开发者工具，进入“网络 / Network”，刷新页面。</li><li>选择一个发往 B站的请求，在请求标头中复制 <code>Cookie</code> 的完整值，粘贴到此处。</li></ol><p>此页面无法直接读取 B站网站的 Cookie。请勿分享 Cookie；退出账号可在这里清除。</p></details>
+      </section>
+      <section class="card scan-card" aria-labelledby="scan-title">
+        <div class="card-heading"><span class="step">02</span><h2 id="scan-title">获取投稿视频</h2><span class="small-label">自动分页 · 跨页去重</span></div>
+        <p class="card-description">输入 UID 或个人空间链接，扫描全部可见投稿的视频 ID。</p>
+        <form id="scan-form"><label for="creator-input">UP 主 UID / 空间链接</label><div class="scan-input-row"><div class="input-wrapper"><span aria-hidden="true">@</span><input id="creator-input" placeholder="例如 122541 或 space.bilibili.com 链接" autocomplete="off" required></div><button id="start-scan" class="button primary" type="submit" disabled>开始扫描 <span aria-hidden="true">→</span></button></div></form>
+        <div class="scan-rule"><span aria-hidden="true">ⓘ</span><p>“全部”指本次账号和接口当前可枚举的投稿，包含合作视频；不包含已删除或无权访问的内容。</p></div>
+        <div class="scan-progress-panel">
+          <div class="progress-heading"><span id="scan-badge" class="badge muted">等待开始</span><span id="scan-uid" class="scan-uid">准备你的第一份视频清单</span></div>
+          <div class="metrics"><div><span>已获取视频 ID</span><strong id="collected-count">0<small>条</small></strong></div><div><span>平台报告投稿数</span><strong id="reported-count">—</strong></div><div><span>已读取页数</span><strong id="page-count">0<small>页</small></strong></div></div>
+          <progress id="scan-progress" max="100" value="0" aria-label="投稿扫描进度"></progress>
+          <div class="progress-footer"><p id="scan-message" role="status">配置账号并输入 UP 主 UID，即可开始。</p><div class="scan-actions"><button id="resume-scan" class="text-button" type="button" hidden>继续上次扫描</button><button id="cancel-scan" class="text-button danger" type="button" hidden>停止扫描</button></div></div>
+        </div>
+        <div class="background-note"><span class="background-icon" aria-hidden="true">↻</span><div><strong>扫描在本地后台执行</strong><p>关闭网页后 Agent 继续工作；已获取的结果按页保存，重新打开即可查看。</p></div></div>
+      </section>
+    </div>
+    <section class="card results-card" aria-labelledby="results-title">
+      <div class="results-heading"><div><h2 id="results-title">视频清单 <span id="results-count" class="count-badge">0</span></h2><p id="results-description">扫描结果将在这里显示。</p></div><div class="export-actions"><button id="copy-ids" class="button secondary" type="button" disabled>复制全部 ID</button><button id="export-txt" class="button secondary" type="button" disabled>↓ 导出 TXT</button><button id="export-json" class="button secondary compact" type="button" disabled aria-label="导出 JSON">JSON</button></div></div>
+      <div id="empty-state" class="empty-state"><div class="empty-icon" aria-hidden="true">≡</div><strong>还没有视频清单</strong><p>连接账号，输入 UP 主 UID，让第一份清单从这里开始。</p></div>
+      <div id="table-container" class="table-container" hidden><table><thead><tr><th class="index-column" scope="col">序号</th><th class="id-column" scope="col">视频 ID</th><th scope="col">标题</th><th class="date-column" scope="col">投稿时间</th></tr></thead><tbody id="video-rows"></tbody></table></div>
+      <div class="results-footer"><span id="page-range">共 0 条视频 ID</span><div><button id="previous-page" class="page-button" type="button" disabled aria-label="上一页">←</button><span id="page-number">1</span><button id="next-page" class="page-button" type="button" disabled aria-label="下一页">→</button></div></div>
+    </section>
+    <footer class="page-footer"><span>Bili History Tracker</span><span>你的登录状态与扫描结果，留在你的设备上。</span></footer>
+  </main>
+</body>
+</html>

@@ -18,11 +18,18 @@ go run ./cmd/server
 
 后台不设登录和权限，默认只监听回环地址。
 
-## 客户端与本地 Agent（规划）
+## 浏览器客户端与本地 Agent
 
 客户端统一放在 [client/](client/README.md)，共同需求与设计维护在该目录的 README；[client/frontend/](client/frontend/README.md) 放浏览器界面，[client/agent/](client/agent/README.md) 放本地后台。启动 Agent 后，在浏览器打开它提供的本地页面；Agent 同源提供网页和 API，处理配置、Cookie、同步、发现及后续下载，关闭网页后仍可继续后台任务。
 
-[客户端需求与设计](client/README.md) 定义客户端从服务器读取UP主、视频及历史记录，在本地使用自己的 Cookie 分页发现和跟踪新投稿，并进一步将视频、评论区保存到本机。服务器持续采集已知目标，本地离线后可恢复同步和补发现；Cookie 与下载内容不上传服务器。目前仅完成需求与界面文档，尚无可运行的客户端，实施阶段见 [PLAN](PLAN.md)。
+当前已实现独立的 Cookie 配置与 UP 主视频 ID 扫描：验证自己的 B站 Cookie，输入 UID 或空间链接，分页获取当前可见投稿的全部 BV 号，支持停止/继续、复制和 TXT/JSON 导出。Windows Cookie 由当前账户加密保存，扫描结果逐页落盘；普通网页不能直接读取 B站 Cookie，本期采用手动导入。
+
+```powershell
+cd client
+go run ./agent/cmd/agent
+```
+
+打开终端显示的完整本地链接（默认 `127.0.0.1:8183`）。[客户端说明](client/README.md#当前实现与启动) 包含构建、数据目录和使用方式；[技术说明](docs/client-discovery.md) 记录接口及验证边界。服务器同步、跟踪交接、自动规则、视频和评论下载仍待实施，见 [PLAN](PLAN.md)。
 
 ## 观察台
 

@@ -7,7 +7,7 @@
 ### 客户端界面与本地 Agent
 
 - 创建时间：2026-11-10 23:41（Asia/Shanghai）。
-- 状态：待实施；已补充需求与界面设计，并于 2026-11-11 确定浏览器界面 + 本地常驻 Agent，尚未新增客户端或 Agent 代码。
+- 状态：部分完成；已实现浏览器界面、本地会话、Cookie 配置与验证、UP 主投稿视频 ID 扫描和导出。服务器同步、跟踪交接、自动规则、下载及评论仍待实施；已交付范围见 [客户端发现](docs/client-discovery.md)。
 - 目录与运行形态：客户端统一在 `client/` 下，`client/frontend/` 为浏览器界面；`client/agent/` 提供前端产物与同源本地 HTTP API，负责配置持久化、Cookie、同步、发现及任务。关闭网页不停止仍运行的 Agent；详见 [运行方式](client/README.md#运行方式与协作关系) 与 [Agent 说明](client/agent/README.md)。
 - 目标：客户端从服务器读取已记录的UP主、视频、指标与历史；本地使用用户 Cookie 分页发现作者可见视频，显式选择或按新投稿规则提交跟踪；视频及评论下载作为后续本地能力。
 - 需求与设计：平台级 [PRD](docs/PRD.md)、界面与 Agent 共用的 [客户端需求与设计](client/README.md)；服务端现状与依赖见 [架构导航](docs/architecture.md#module-navigation)。
@@ -88,3 +88,5 @@
 **添加作者时的视频融合与按需关注**（创建时间：2026-11-08 23:59；完成时间：2026-11-09 23:10，Asia/Shanghai；主实现：`8536126`；后续修复见下方实现与测试链接）。已实现平台无关的作者视频续页，哔哩哔哩适配器内部遍历公开目录与成员并有限重试；服务器融合本地记录、跨来源去重并排除已关注，页面默认不添加，支持逐项选择和跨页添加全部，任务保留成功项、支持取消及恢复。作者资料采集不再自动关注视频，当前管理员关注映射全局跟踪，历史与关注分开；发现不携带 Cookie，不保证全部投稿，会话与进度在内存中保存 20 分钟，重启需重新加载。已补充归属校验、稳定续页、重试预算、批量串行、输入解析及手机布局修复，模块注释与导航同步；`go test ./...`、`go vet ./...`、服务构建、6 项 Node 测试及浏览器桌面/手机默认选择、分页、添加全部和进度验证通过，竞态检测因本机未启用 cgo 未运行。设计与边界见 [作者视频设计](docs/video-discovery.md)，实现与测试入口见 [discovery 模块](backend/internal/discovery/README.md)、[HTTP 测试](backend/internal/admin/discovery_test.go) 和 [适配器测试](backend/internal/provider/bilibili/list_page_test.go)。
 
 **客户端目录归并与统一需求文档**（创建时间：2026-11-11 23:05；完成时间：2026-11-11 23:08，Asia/Shanghai）。已将浏览器界面与本地后台统一组织为 [client/frontend/](client/frontend/README.md) 和 [client/agent/](client/agent/README.md)，共同需求、协作方式、实施阶段及验收集中维护在 [client/README.md](client/README.md)，子目录保留各自职责说明；平台级 [PRD](docs/PRD.md) 继续维护整体产品范围，根 README、架构导航、视频发现设计和待实施计划同步修正。原设计全部 16 个章节保留，文档相对链接、章节锚点、代码围栏、框图对齐和 Git diff 检查通过，原根目录已移除；本项仅调整目录与文档，客户端功能仍待实施。
+
+**客户端 Cookie 配置与 UP 主视频 ID 扫描**（创建时间：2026-11-11 23:32；完成时间：2026-11-11 23:57，Asia/Shanghai）。已交付独立 Go Agent 与内嵌浏览器界面，支持手动 Cookie 验证、Windows 用户级 DPAPI 保存、WBI 投稿全量分页、BV 去重与清单导出、取消和检查点恢复；回环监听、会话、Host/Origin/CSRF 分别校验，Cookie 不回传网页或项目服务器，其他平台暂仅内存保留凭据。数量变化、停滞、风控和失败保留部分结果，不将其标为完整；浏览器扩展、服务器同步、自动规则和下载继续留待后续。Go 测试、vet、Windows 构建、前端语法与 4 项 Node 测试通过，Edge 桌面及手机联调验证 135 条分页、复制、导出、取消/继续及标题文本渲染，文档链接和格式检查通过；联调用模拟 API，未使用真实账号 Cookie 完成平台全量验收。启动见 [客户端说明](client/README.md#当前实现与启动)，实现与验证边界见 [技术说明](docs/client-discovery.md)，模块及测试见 [架构导航](docs/architecture.md#module-navigation)。

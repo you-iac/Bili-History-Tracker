@@ -26,9 +26,12 @@
 | 查询与调度 | 执行目标查询、经作者归属验证的显式视频导入、日志、到期调度；作者采集不自动关注视频 | [tracker.go](../backend/internal/tracker/tracker.go)、[ingest.go](../backend/internal/tracker/ingest.go) 的 `IngestVideo`、`persistVideo`、[scheduler.go](../backend/internal/tracker/scheduler.go)、[log.go](../backend/internal/tracker/log.go) | [tracker_test.go](../backend/internal/tracker/tracker_test.go)、[ingest_test.go](../backend/internal/tracker/ingest_test.go) |
 | 观察台（本地后台） | 8182 信息看板、对象详情、关注管理与作者视频选择；常规页面读本地，发现只读，显式导入才采集 | [pages.go](../backend/internal/admin/pages.go)、[views.go](../backend/internal/admin/views.go)、[server.go](../backend/internal/admin/server.go)、[templates](../backend/internal/admin/templates)、[assets](../backend/internal/admin/assets) | [pages_test.go](../backend/internal/admin/pages_test.go)、[chart_test.cjs](../backend/internal/admin/chart_test.cjs) |
 | 看板查询 | 概览统计、内容库分页、日指标、版本动态与快照读取；只读本地，不返回整份 payload | [dashboard.go](../backend/internal/storage/dashboard.go) 的 `Catalog`、`Summary`、`Metrics`、`Versions`、`ReadSnapshot` | [dashboard_test.go](../backend/internal/storage/dashboard_test.go) |
-| 客户端整体（规划） | 统一组织浏览器界面与本地 Agent，维护两者共同需求、运行方式及验收 | [client/README.md](../client/README.md)，目前仅有文档，无实现入口 | [客户端验收](../client/README.md#实施阶段与验收)，待实现后补测试入口 |
-| 浏览器界面（规划） | 通过同源本地 API 展示记录、配置与任务，由 Agent 托管前端产物 | [client/frontend/README.md](../client/frontend/README.md)，目前仅有职责说明，无实现入口 | [客户端验收](../client/README.md#实施阶段与验收)，待实现后补测试入口 |
-| 本地 Agent（规划） | 提供网页及配置 API，读取服务器记录，本地 Cookie 发现、新投稿规则及离线恢复；后续本地视频和评论下载 | [client/agent/README.md](../client/agent/README.md)，目前仅有职责说明，无实现入口 | [客户端验收](../client/README.md#实施阶段与验收)，待实现后补测试入口 |
+| 客户端启动 | 独立 Go 模块，组装本地 Cookie 与 UP 主视频 ID 扫描，只监听回环地址 | [main.go](../client/agent/cmd/agent/main.go) 的 `run`、[使用说明](../client/README.md#当前实现与启动) | [客户端验证](client-discovery.md#验证) |
+| 浏览器界面 | 同源 Cookie 配置、扫描进度、清单分页、复制及导出，无外部运行依赖 | [assets.go](../client/frontend/assets.go) 的 `Files`、[app.js](../client/frontend/app.js)、[界面说明](../client/frontend/README.md) | [view.test.mjs](../client/frontend/view.test.mjs)、[HTTP 测试](../client/agent/internal/httpapi/server_test.go) |
+| 客户端本地 API | 会话、Host/Origin/CSRF、Cookie 与扫描 API；不提供任意代理或凭据读取 | [server.go](../client/agent/internal/httpapi/server.go) 的 `New`、`ServeHTTP` | [server_test.go](../client/agent/internal/httpapi/server_test.go) |
+| 本地平台适配器 | Cookie 登录验证、WBI 签名、全部可见投稿分页，无 120 条截断或合集回退 | [client.go](../client/agent/internal/bilibili/client.go) 的 `Login`、`Videos`、[wbi.go](../client/agent/internal/bilibili/wbi.go) | [client_test.go](../client/agent/internal/bilibili/client_test.go) |
+| 本地扫描任务 | 后台逐页去重、完整性判断、取消与恢复，网页关闭不取消任务 | [service.go](../client/agent/internal/scanner/service.go) 的 `Service`、`Start`、`Close` | [service_test.go](../client/agent/internal/scanner/service_test.go) |
+| 客户端持久化 | Windows 用户级 DPAPI Cookie 保护、扫描状态原子写入；其他平台凭据仅在内存保留 | [store.go](../client/agent/internal/localstate/store.go)、[protect_windows.go](../client/agent/internal/localstate/protect_windows.go) | [store_test.go](../client/agent/internal/localstate/store_test.go) |
 
 注释与技术文档分工：包注释和文件头说明模块职责、边界及文档位置；接口、关键方法和复杂逻辑附近解释输入约束、错误语义及设计原因；本文负责模块关系、执行链路、API、字段映射及扩展方式。普通赋值和显而易见的调用不需要逐行注释。
 
@@ -36,9 +39,9 @@
 
 作者视频融合、关注过滤、统一分页、添加全部及单管理员口径见 [作者视频融合与按需关注设计](video-discovery.md)。通用接口与用户端只处理作者和视频，B站合集遍历封装在适配器内部；发现和导入会话只保存在当前进程，重启后需重新加载，成功采集的历史与关注保持持久化。
 
-规划中的 [浏览器界面](../client/frontend/README.md) 与 [本地 Agent](../client/agent/README.md) 统一组织在 `client/`，共同需求维护在 [client/README.md](../client/README.md)。界面通过同源本地 HTTP API 访问 Agent，由 Agent 在回环地址托管网页产物、校验并持久化配置，统一执行远端服务器与平台请求。浏览器关闭不停止 Agent 已接收的任务；Agent 停止后本地网页与 API 不可用，重启后恢复持久化状态。具体本地通信与调用方校验约定见 [运行方式与协作关系](../client/README.md#运行方式与协作关系)。
+已实现的 [浏览器界面](../client/frontend/README.md) 与 [本地 Agent](../client/agent/README.md) 统一在 `client/`，本期仅提供 Cookie 配置与 UP 主投稿视频 ID 扫描。界面与 API 由 Agent 同源托管，会话、来源和 CSRF 分别校验；后台任务独立于网页并逐页落盘。Cookie 使用 Windows 用户级保护，其他平台暂仅在内存使用。实现、协议、系统边界及验证见 [客户端发现技术说明](client-discovery.md)，共同需求见 [client/README.md](../client/README.md)。
 
-Agent 将读取服务器持久化的作者、视频、版本与指标；本地保存用户 Cookie、发现规则、缓存、提交队列、视频和评论文件。服务器持续跟踪已经接纳的目标；本地离线时不替它执行登录态发现或下载。新视频交接仅提交标识，由服务器公开查询并校验，不能把本地私有观测直接写成服务器历史。
+后续 Agent 将读取服务器持久化的作者、视频、版本与指标，保存发现规则、缓存、提交队列、视频和评论文件；这些能力当前尚未实现。服务器持续跟踪已接纳目标，不替本地执行登录态发现或下载。未来的新视频交接仅提交标识，由服务器公开查询并校验，不能把本地私有观测写成服务器历史。
 
 当前8181接口只查上游，不读取历史库；8182已有本地查询页面和部分 JSON，但尚无设备认证及持久化事件同步协议。客户端接入需要补齐受鉴权的记录读取、跟踪申请对账、设备凭据与可恢复同步，不能把现有来源检查或短期发现游标当作这些能力。以上为后续设计，本次未调整现有 Go 模块职责。
 
@@ -417,7 +420,7 @@ Provider 先从 B站返回的 `data` 中读取字段，再构造 `source.Video`�
 
 适配器只输出元数据，没有 `AVAILABLE` 或“已删除”状态。后续状态机必须另行记录观测依据、失败原因与确认次数；元数据可读取不等于当前可播放。
 
-UID 投稿列表扫描暂未实现。后续可增加独立的列表查询能力契约，以不透明分页游标隔离平台差异，而不强制所有平台 Provider 都支持投稿列表。
+服务器公开发现仍通过独立列表能力与不透明续页隔离平台差异；本地登录态的完整投稿扫描已在独立客户端适配器实现，见 [客户端发现](client-discovery.md)，不在服务器公开请求中注入用户 Cookie。
 
 ## 按 UID 查询 UP 主资料
 
