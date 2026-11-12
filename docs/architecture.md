@@ -32,7 +32,7 @@
 | 本地平台适配器 | Cookie 登录验证、WBI 签名、全部可见投稿分页，无 120 条截断或合集回退 | [client.go](../client/agent/internal/bilibili/client.go) 的 `Login`、`Videos`、[wbi.go](../client/agent/internal/bilibili/wbi.go) | [client_test.go](../client/agent/internal/bilibili/client_test.go) |
 | 本地扫描任务 | 后台逐页去重、完整性判断、取消与恢复，网页关闭不取消任务 | [service.go](../client/agent/internal/scanner/service.go) 的 `Service`、`Start`、`Close` | [service_test.go](../client/agent/internal/scanner/service_test.go) |
 | 客户端持久化 | Windows 用户级 DPAPI Cookie 保护、扫描状态原子写入；其他平台凭据仅在内存保留 | [store.go](../client/agent/internal/localstate/store.go)、[protect_windows.go](../client/agent/internal/localstate/protect_windows.go) | [store_test.go](../client/agent/internal/localstate/store_test.go) |
-| 远程协作与视频下载（规划） | 服务器长期跟踪，Agent 读取两个关注库与历史、按需发现、提交关注及本地下载；不运行本地周期跟踪 | [目标架构与身份设计](client-server-architecture.md)，尚无实现入口 | 同文档“实施顺序与验收”，实现后补测试入口 |
+| 公共数据池与本地私人关注（规划） | 服务器提供公共历史与受控目标接纳，无个人账户/订阅；Agent 保存私人关注、合并历史、按需发现和下载 | [目标架构与身份设计](client-server-architecture.md)，尚无实现入口 | 同文档“实施顺序与验收”，实现后补测试入口 |
 
 注释与技术文档分工：包注释和文件头说明模块职责、边界及文档位置；接口、关键方法和复杂逻辑附近解释输入约束、错误语义及设计原因；本文负责模块关系、执行链路、API、字段映射及扩展方式。普通赋值和显而易见的调用不需要逐行注释。
 
@@ -42,9 +42,9 @@
 
 已实现的 [浏览器界面](../client/frontend/README.md) 与 [本地 Agent](../client/agent/README.md) 统一在 `client/`，本期仅提供 Cookie 配置与 UP 主投稿视频 ID 扫描。界面与 API 由 Agent 同源托管，会话、来源和 CSRF 分别校验；后台任务独立于网页并逐页落盘。Cookie 使用 Windows 用户级保护，其他平台暂仅在内存使用。实现、协议、系统边界及验证见 [客户端发现技术说明](client-discovery.md)，共同需求见 [client/README.md](../client/README.md)。
 
-目标架构由服务器负责全部长期跟踪；Agent 读取关注 UP 库、视频库、版本和指标，按需搜索发现、管理远程关注及执行本地视频下载，只保存必要配置、缓存和任务状态，不维护本地周期跟踪。评论和弹幕文件为后续。远程模块、接口和身份建议见 [协作设计](client-server-architecture.md)，当前尚未实现。
+目标是多人共用公共数据池，服务器不保存私人关注或用户账户；Agent 保存本地关注，按标识读取公共历史，必要时提交受控采集申请。已跟踪目标复用，有数据未跟踪单独处理，未知目标验证成功后入库；本地取消不停止公共任务，普通客户端无全局管理权限。本地下载与评论/弹幕文件留在各自设备，具体草案见 [协作设计](client-server-architecture.md)，当前尚未实现。
 
-当前8181接口只查上游，不读取历史库；8182已有本地查询页面和部分 JSON，但尚无设备认证及持久化事件同步协议。客户端接入需要补齐受鉴权的记录读取、跟踪申请对账、设备凭据与可恢复同步，不能把现有来源检查或短期发现游标当作这些能力。以上为后续设计，本次未调整现有 Go 模块职责。
+当前8181只查上游，8182有本地查询页和部分 JSON，均不是完整公共客户端协议。还需补公共历史读取、目标状态、有界申请/对账和准入限额，保留管理员停采及清理权限；不以服务器个人账户或完整事件复制为前置条件，不将来源检查当作服务准入。以上为后续设计，本次未调整 Go 模块职责。
 
 新增或移动模块、变更接口或职责时，同步更新上述导航及相关章节。定位实现优先使用文件链接和符号名，避免固定行号随着代码调整而失效。具体要求见 [AGENTS.md](../AGENTS.md)。
 
