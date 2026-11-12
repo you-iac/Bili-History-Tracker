@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "lint": "node --check frontend/app.js && node --check frontend/view.mjs",
+    "lint": "node --check frontend/app.js && node --check frontend/library.js && node --check frontend/view.mjs",
     "test": "node --test frontend/view.test.mjs"
   }
 }

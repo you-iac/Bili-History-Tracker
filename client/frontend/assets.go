@@ -4,5 +4,5 @@ package frontend
 
 import "embed"
 
-//go:embed index.html app.css app.js view.mjs favicon.svg
+//go:embed index.html app.css app.js library.js view.mjs favicon.svg
 var Files embed.FS

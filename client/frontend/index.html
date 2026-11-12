@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light">
   <meta name="description" content="在本机配置 B站账号，获取 UP 主当前可见的全部投稿视频 ID。">
-  <title>视频发现 · Bili History Tracker</title>
+  <title>个人关注 · Bili History Tracker</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/app.css">
   <script type="module" src="/app.js"></script>
@@ -16,12 +16,21 @@
     <div class="top-status"><span class="local-tag"><span class="dot"></span>本地运行</span><span id="connection-status" class="connection-status" role="status">连接中…</span></div>
   </header>
   <main>
-    <div class="page-heading"><p class="eyebrow">客户端 <span>/</span> 视频发现</p><h1>UP 主视频 ID 提取<span class="heading-dot">.</span></h1><p class="intro">从一位 UP 主开始，整理当前账号可见的全部投稿。</p></div>
+    <div class="page-heading"><p class="eyebrow">客户端 <span>/</span> 关注与发现</p><h1>我的关注与视频发现<span class="heading-dot">.</span></h1><p class="intro">关注保存在本机，资料与历史由你连接的服务器提供。</p></div>
     <section id="connect-card" class="connect-card" hidden aria-labelledby="connect-title">
       <div><h2 id="connect-title">连接本地 Agent</h2><p>请用启动终端显示的完整链接打开此页面，或输入链接中 <code>token=</code> 后的连接密钥。</p></div>
       <form id="connect-form"><label class="sr-only" for="connect-token">本地连接密钥</label><input id="connect-token" type="password" autocomplete="off" placeholder="本次启动的连接密钥" required><button class="button primary" type="submit">连接</button></form>
     </section>
     <div id="notice" class="notice" role="status" hidden></div>
+    <section id="library-panel" class="card library-panel" aria-labelledby="library-title">
+      <div class="results-heading"><div><h2 id="library-title">本地关注库</h2><p>无需 B站 Cookie 即可管理关注；提交服务器后由服务器持续跟踪。</p></div></div>
+      <form id="server-form" class="server-form"><label for="server-url">服务器地址（8182）</label><div class="library-form-row"><input id="server-url" type="url" placeholder="http://127.0.0.1:8182" autocomplete="off"><button class="button primary" type="submit" disabled>保存连接</button><button id="test-server" class="button secondary" type="button" disabled>测试已保存连接</button></div><p id="server-note" class="field-note">未配置服务器；本地关注可独立使用。</p></form>
+      <form id="follow-form"><label for="follow-input">添加本地关注</label><div class="library-form-row"><select id="follow-kind" aria-label="关注类型"><option value="creator">UP 主</option><option value="video">视频</option></select><input id="follow-input" placeholder="UP 的 UID / 视频 BV 号，或标准链接" required autocomplete="off"><button class="button primary" type="submit" disabled>添加关注</button></div><label class="checkbox-label"><input id="submit-on-follow" type="checkbox" checked>配置服务器后，同时申请服务器跟踪</label></form>
+      <div class="library-toolbar"><div class="library-tabs"><button type="button" data-library-kind="creator" aria-pressed="true">关注的 UP <span id="creator-library-count">0</span></button><button type="button" data-library-kind="video" aria-pressed="false">关注的视频 <span id="video-library-count">0</span></button></div><form id="library-search"><input id="library-query" aria-label="搜索本地关注" placeholder="搜索本地 ID 或缓存名称"><button class="button secondary" type="submit">搜索</button></form><button id="refresh-library" class="button secondary" type="button" disabled>刷新本页服务器资料</button></div>
+      <div id="follow-rows" aria-live="polite"><p class="library-empty">连接本地 Agent 后显示关注列表。</p></div>
+      <div class="results-footer"><span>取消关注只影响本地，服务器跟踪与历史保留。</span><div><button id="library-previous" class="page-button" type="button" disabled aria-label="关注上一页">←</button><span id="library-page">1 / 1 · 0 项</span><button id="library-next" class="page-button" type="button" disabled aria-label="关注下一页">→</button></div></div>
+    </section>
+    <dialog id="library-detail" class="library-dialog" aria-labelledby="detail-title"><div class="results-heading"><h2 id="detail-title">详情与历史</h2><button id="detail-close" class="button secondary" type="button">关闭</button></div><p id="detail-summary"></p><h3>最近30天指标</h3><p id="detail-metric-note" class="field-note"></p><div class="detail-table"><table><thead><tr><th>观测日期（北京时间）</th><th>观测值</th></tr></thead><tbody id="detail-metrics"></tbody></table></div><h3>元数据版本</h3><div id="detail-versions" class="detail-versions"></div><div class="results-footer"><span id="detail-version-page"></span><div><button id="detail-previous" class="page-button" type="button" disabled aria-label="版本上一页">←</button><button id="detail-next" class="page-button" type="button" disabled aria-label="版本下一页">→</button></div></div><details><summary>查看所选版本的元数据</summary><pre id="detail-snapshot"></pre></details></dialog>
     <div class="workspace">
       <section class="card account-card" aria-labelledby="account-title">
         <div class="card-heading"><span class="step">01</span><h2 id="account-title">连接 B站账号</h2><span id="account-badge" class="badge muted">未配置</span></div>
@@ -53,7 +62,7 @@
     <section class="card results-card" aria-labelledby="results-title">
       <div class="results-heading"><div><h2 id="results-title">视频清单 <span id="results-count" class="count-badge">0</span></h2><p id="results-description">扫描结果将在这里显示。</p></div><div class="export-actions"><button id="copy-ids" class="button secondary" type="button" disabled>复制全部 ID</button><button id="export-txt" class="button secondary" type="button" disabled>↓ 导出 TXT</button><button id="export-json" class="button secondary compact" type="button" disabled aria-label="导出 JSON">JSON</button></div></div>
       <div id="empty-state" class="empty-state"><div class="empty-icon" aria-hidden="true">≡</div><strong>还没有视频清单</strong><p>连接账号，输入 UP 主 UID，让第一份清单从这里开始。</p></div>
-      <div id="table-container" class="table-container" hidden><table><thead><tr><th class="index-column" scope="col">序号</th><th class="id-column" scope="col">视频 ID</th><th scope="col">标题</th><th class="date-column" scope="col">投稿时间</th></tr></thead><tbody id="video-rows"></tbody></table></div>
+      <div id="table-container" class="table-container" hidden><table><thead><tr><th class="index-column" scope="col">序号</th><th class="id-column" scope="col">视频 ID</th><th scope="col">标题</th><th class="date-column" scope="col">投稿时间</th><th scope="col">关注</th></tr></thead><tbody id="video-rows"></tbody></table></div>
       <div class="results-footer"><span id="page-range">共 0 条视频 ID</span><div><button id="previous-page" class="page-button" type="button" disabled aria-label="上一页">←</button><span id="page-number">1</span><button id="next-page" class="page-button" type="button" disabled aria-label="下一页">→</button></div></div>
     </section>
     <footer class="page-footer"><span>Bili History Tracker</span><span>你的登录状态与扫描结果，留在你的设备上。</span></footer>

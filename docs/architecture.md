@@ -26,14 +26,17 @@
 | 查询与调度 | 执行目标查询、经作者归属验证的显式视频导入、日志、到期调度；作者采集不自动关注视频 | [tracker.go](../backend/internal/tracker/tracker.go)、[ingest.go](../backend/internal/tracker/ingest.go) 的 `IngestVideo`、`persistVideo`、[scheduler.go](../backend/internal/tracker/scheduler.go)、[log.go](../backend/internal/tracker/log.go) | [tracker_test.go](../backend/internal/tracker/tracker_test.go)、[ingest_test.go](../backend/internal/tracker/ingest_test.go) |
 | 观察台（本地后台） | 8182 信息看板、对象详情、关注管理与作者视频选择；常规页面读本地，发现只读，显式导入才采集 | [pages.go](../backend/internal/admin/pages.go)、[views.go](../backend/internal/admin/views.go)、[server.go](../backend/internal/admin/server.go)、[templates](../backend/internal/admin/templates)、[assets](../backend/internal/admin/assets) | [pages_test.go](../backend/internal/admin/pages_test.go)、[chart_test.cjs](../backend/internal/admin/chart_test.cjs) |
 | 看板查询 | 概览统计、内容库分页、日指标、版本动态与快照读取；只读本地，不返回整份 payload | [dashboard.go](../backend/internal/storage/dashboard.go) 的 `Catalog`、`Summary`、`Metrics`、`Versions`、`ReadSnapshot` | [dashboard_test.go](../backend/internal/storage/dashboard_test.go) |
-| 客户端启动 | 独立 Go 模块，组装本地 Cookie 与 UP 主视频 ID 扫描，只监听回环地址 | [main.go](../client/agent/cmd/agent/main.go) 的 `run`、[Agent 架构](../client/agent/README.md)、[使用说明](../client/README.md#当前实现与启动) | [客户端验证](client-discovery.md#验证) |
-| 浏览器界面 | 同源 Cookie 配置、扫描进度、清单分页、复制及导出，无外部运行依赖 | [assets.go](../client/frontend/assets.go) 的 `Files`、[app.js](../client/frontend/app.js)、[界面说明](../client/frontend/README.md) | [view.test.mjs](../client/frontend/view.test.mjs)、[HTTP 测试](../client/agent/internal/httpapi/server_test.go) |
-| 客户端本地 API | 会话、Host/Origin/CSRF、Cookie 与扫描 API；不提供任意代理或凭据读取 | [server.go](../client/agent/internal/httpapi/server.go) 的 `New`、`ServeHTTP` | [server_test.go](../client/agent/internal/httpapi/server_test.go) |
+| 客户端启动 | 组装扫描、本地关注和远程接入，只监听回环 | [main.go](../client/agent/cmd/agent/main.go)、[Agent说明](../client/agent/README.md) | [关注接入验证](client-library.md#验证) |
+| 浏览器界面 | 本地关注、远程资料、Cookie/扫描/导出，同源无外部依赖 | [assets.go](../client/frontend/assets.go)、[app.js](../client/frontend/app.js)、[library.js](../client/frontend/library.js) | [view.test.mjs](../client/frontend/view.test.mjs)、[接入验证](client-library.md#验证) |
+| 客户端本地 API | 会话、Host/Origin/CSRF、扫描与关注/远程19个API | [server.go](../client/agent/internal/httpapi/server.go)、[library.go](../client/agent/internal/httpapi/library.go) | [server_test.go](../client/agent/internal/httpapi/server_test.go)、[library_test.go](../client/agent/internal/httpapi/library_test.go) |
 | 本地平台适配器 | Cookie 登录验证、WBI 签名、全部可见投稿分页，无 120 条截断或合集回退 | [client.go](../client/agent/internal/bilibili/client.go) 的 `Login`、`Videos`、[wbi.go](../client/agent/internal/bilibili/wbi.go) | [client_test.go](../client/agent/internal/bilibili/client_test.go) |
 | 本地扫描任务 | 后台逐页去重、完整性判断、取消与恢复，网页关闭不取消任务 | [service.go](../client/agent/internal/scanner/service.go) 的 `Service`、`Start`、`Close` | [service_test.go](../client/agent/internal/scanner/service_test.go) |
-| 客户端持久化 | Windows 用户级 DPAPI Cookie 保护、扫描状态原子写入；其他平台凭据仅在内存保留 | [store.go](../client/agent/internal/localstate/store.go)、[protect_windows.go](../client/agent/internal/localstate/protect_windows.go) | [store_test.go](../client/agent/internal/localstate/store_test.go) |
-| 公共数据池与本地私人关注（规划） | 服务器提供公共历史与受控目标接纳，无个人账户/订阅；Agent 保存私人关注、合并历史、按需发现和下载 | [目标架构与身份设计](client-server-architecture.md)，尚无实现入口 | 同文档“实施顺序与验收”，实现后补测试入口 |
-| 用户档案与数据管理（规划） | 本地管理、导入导出和备份恢复；未来直连用户自选云盘自动备份，公共服务器不托管私人数据 | [数据管理设计](client-data-management.md)，尚无实现入口；现有 [localstate](../client/agent/internal/localstate/store.go) 仅保存 Cookie/扫描 | 同文档“实施顺序与验收”，实现后补测试入口 |
+| 客户端持久化 | Cookie保护、扫描和关注库/配置/缓存原子写入 | [store.go](../client/agent/internal/localstate/store.go)、[protect_windows.go](../client/agent/internal/localstate/protect_windows.go) | [store_test.go](../client/agent/internal/localstate/store_test.go)、[关注测试](../client/agent/internal/library/service_test.go) |
+| 本地关注库 | 本地增删/分页/搜索，失败保留、切服清缓存，取消不全局停采 | [service.go](../client/agent/internal/library/service.go)，[接入说明](client-library.md) | [service_test.go](../client/agent/internal/library/service_test.go) |
+| Agent远程客户端 | 固定8182路径，JSON/超时/大小与重定向限制，无Cookie转发 | [client.go](../client/agent/internal/remote/client.go) | [client_test.go](../client/agent/internal/remote/client_test.go) |
+| 8182客户端接入 | 同路径JSON、精确状态、验证后提交，复用存储/采集 | [client.go](../backend/internal/admin/client.go)、[request.go](../backend/internal/tracker/request.go)、[target_lookup.go](../backend/internal/storage/target_lookup.go) | [client_test.go](../backend/internal/admin/client_test.go)、[request_test.go](../backend/internal/tracker/request_test.go) |
+| 公共准入与下载（规划） | 完整准入、总预算、公共搜索增强及本地下载 | [目标设计](client-server-architecture.md) | 见该文验收，当前尚未全部实现 |
+| 用户档案与数据管理（规划） | 本地管理、导入导出和备份恢复；未来直连用户自选云盘自动备份，公共服务器不托管私人数据 | [数据管理设计](client-data-management.md)，尚无实现入口；现有 [localstate](../client/agent/internal/localstate/store.go) 已保存 Cookie/扫描/关注/配置/缓存，完整档案与备份未实现 | 同文档“实施顺序与验收”，实现后补测试入口 |
 
 注释与技术文档分工：包注释和文件头说明模块职责、边界及文档位置；接口、关键方法和复杂逻辑附近解释输入约束、错误语义及设计原因；本文负责模块关系、执行链路、API、字段映射及扩展方式。普通赋值和显而易见的调用不需要逐行注释。
 
@@ -41,11 +44,11 @@
 
 作者视频融合、关注过滤、统一分页、添加全部及单管理员口径见 [作者视频融合与按需关注设计](video-discovery.md)。通用接口与用户端只处理作者和视频，B站合集遍历封装在适配器内部；发现和导入会话只保存在当前进程，重启后需重新加载，成功采集的历史与关注保持持久化。
 
-已实现的 [浏览器界面](../client/frontend/README.md) 与 [本地 Agent](../client/agent/README.md) 统一在 `client/`，本期仅提供 Cookie 配置与 UP 主投稿视频 ID 扫描。界面与 API 由 Agent 同源托管，会话、来源和 CSRF 分别校验；后台任务独立于网页并逐页落盘。Cookie 使用 Windows 用户级保护，其他平台暂仅在内存使用。实现、协议、系统边界及验证见 [客户端发现技术说明](client-discovery.md)，共同需求见 [client/README.md](../client/README.md)。
+已实现的 [浏览器界面](../client/frontend/README.md) 与 [Agent](../client/agent/README.md) 统一在 `client/`，提供扫描及本地关注库，关注和缓存保存 `library.json`；通过更新后的8182提交目标和读取历史。浏览器与API同源，保留会话/来源/CSRF校验，Cookie不转发公共服务器。协议与验证见 [本地关注接入](client-library.md)，原扫描见 [客户端发现](client-discovery.md)。
 
-目标是多人共用公共数据池，服务器不保存私人关注或用户账户；Agent 保存本地关注，按标识读取公共历史，必要时提交受控采集申请。已跟踪目标复用，有数据未跟踪单独处理，未知目标验证成功后入库；本地取消不停止公共任务，普通客户端无全局管理权限。本地下载与评论/弹幕文件留在各自设备，具体草案见 [协作设计](client-server-architecture.md)，当前尚未实现。
+已实现多人共用公共数据、各自 Agent 保存私人关注的基本接入：按标识读取公共资料与历史，提交目标经验证后加入跟踪，已有目标直接复用；本地取消不停止公共任务。当前按可信8182服务部署，完整公共准入仍待实现。本地下载、评论/弹幕等后续能力见 [协作设计](client-server-architecture.md)。
 
-当前8181只查上游；Agent 远程数据优先复用8182：指标、跟踪状态、单个/批量提交和任务进度已有 JSON 输出，库、详情和版本主要由服务器读取 SQLite 后渲染 HTML。缺少的 JSON 优先在原页面路径补输出，共用 `Catalog / Content / Metrics / Versions / ReadSnapshot`，状态补按目标 ID 查询，提交补普通客户端准入与幂等；不另建查询服务或预设一套重复路由。管理员停采及清理权限保持独立，来源检查不当作服务准入，详见 [8182 复用范围](client-server-architecture.md#复用-8182-远程能力)。以上为后续设计，本次未调整 Go 模块职责。
+当前8181只查上游；8182已在原路径补库/详情/版本 JSON、按目标ID状态与验证后提交，Agent通过它们读取公共资料和申请跟踪，默认HTML行为保留。公共服务器仍沿用可信管理服务部署方式，完整准入和预算待实施，见 [接入边界](client-library.md#本地-api-与边界)。
 
 新增或移动模块、变更接口或职责时，同步更新上述导航及相关章节。定位实现优先使用文件链接和符号名，避免固定行号随着代码调整而失效。具体要求见 [AGENTS.md](../AGENTS.md)。
 

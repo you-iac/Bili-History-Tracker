@@ -1,5 +1,6 @@
 // app.js 只向同源 Agent 发起请求；Cookie 和连接密钥不写入浏览器存储。
 import {stateLabel, progress, publishedAt, rangeLabel} from './view.mjs';
+import {initLibrary} from './library.js';
 
 const $ = id => document.getElementById(id);
 let csrf = '', connected = false, online = false, config = null, job = null;
@@ -36,7 +37,9 @@ async function request(path, options = {}) {
   return response;
 }
 async function api(path, options) { return (await request(path, options)).json(); }
+const libraryUI = initLibrary({api,notify,onScan:id => {$('creator-input').value = id;$('scan-title').scrollIntoView({behavior:'smooth',block:'center'});$('creator-input').focus();}});
 function buttons() {
+	libraryUI.setConnected(connected && online);
   const usable = connected && online && !busyAction;
   const running = job?.state === 'running' || job?.state === 'cancelling';
   $('save-cookie').disabled = !usable || running;
@@ -92,7 +95,8 @@ function renderResult(result) {
     const link = document.createElement('a'); link.textContent = video.id; link.href = `https://www.bilibili.com/video/${encodeURIComponent(video.id)}`; link.target = '_blank'; link.rel = 'noreferrer'; id.append(link);
     const title = document.createElement('td'); title.textContent = video.title || '未提供标题';
     const date = document.createElement('td'); date.textContent = publishedAt(video.published_at);
-    row.append(number,id,title,date); rows.append(row);
+    const follow = document.createElement('td');const add = document.createElement('button');add.type = 'button';add.className = 'text-button';add.textContent = '关注';add.addEventListener('click',() => libraryUI.add('video',video.id));follow.append(add);
+    row.append(number,id,title,date,follow); rows.append(row);
   });
   $('video-rows').replaceChildren(rows);
   $('page-range').textContent = rangeLabel(offset,result.videos.length,count);
@@ -121,7 +125,7 @@ async function refresh() {
 async function connect(token) {
   const result = await api('/api/session', token ? {method:'POST',body:JSON.stringify({token})} : undefined);
   csrf = result.csrf_token; connected = true; connection('Agent 已连接',true);
-  $('connect-card').hidden = true; $('connect-token').value = ''; notify(''); await refresh();
+  $('connect-card').hidden = true; $('connect-token').value = ''; notify(''); await refresh();await libraryUI.connect();
 }
 async function action(work) {
   if (busyAction) return;

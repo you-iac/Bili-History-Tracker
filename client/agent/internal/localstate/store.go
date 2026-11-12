@@ -1,6 +1,6 @@
-// Package localstate 负责客户端固定目录下的扫描状态与 Cookie 持久化。
+// Package localstate 负责客户端固定目录下的关注库、服务器配置、扫描状态与 Cookie 持久化。
 // Windows Cookie 使用当前用户 DPAPI 保护；其他平台仅在进程内保留，绝不明文回退。
-// 写入先同步临时文件再原子替换，不接受 HTTP 调用方指定文件名。见 docs/client-discovery.md。
+// 写入先同步临时文件再原子替换，不接受 HTTP 调用方指定文件名。见 docs/client-discovery.md、docs/client-library.md。
 package localstate
 
 import (
@@ -75,6 +75,27 @@ func (s *Store) SaveScan(value any) error {
 		return err
 	}
 	return s.write("scan.json", data)
+}
+
+func (s *Store) LoadLibrary(target any) error {
+	data, err := readLimited(filepath.Join(s.directory, "library.json"), 64<<20)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(data, target)
+}
+func (s *Store) SaveLibrary(value any) error {
+	data, err := json.Marshal(value)
+	if err != nil {
+		return err
+	}
+	if len(data) > 64<<20 {
+		return errors.New("关注库超出大小限制")
+	}
+	return s.write("library.json", data)
 }
 
 func readLimited(filename string, limit int64) ([]byte, error) {

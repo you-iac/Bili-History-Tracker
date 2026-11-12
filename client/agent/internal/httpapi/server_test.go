@@ -12,7 +12,9 @@ import (
 	"time"
 
 	"bili-history-tracker/client/agent/internal/bilibili"
+	"bili-history-tracker/client/agent/internal/library"
 	"bili-history-tracker/client/agent/internal/localstate"
+	"bili-history-tracker/client/agent/internal/remote"
 	"bili-history-tracker/client/agent/internal/scanner"
 )
 
@@ -47,7 +49,11 @@ func setup(t *testing.T) *harness {
 		t.Fatal(err)
 	}
 	t.Cleanup(service.Close)
-	s, err := New(service, "127.0.0.1:8183")
+	collection, err := library.New(store, remote.New(nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := New(service, "127.0.0.1:8183", collection)
 	if err != nil {
 		t.Fatal(err)
 	}

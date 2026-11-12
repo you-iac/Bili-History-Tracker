@@ -1,4 +1,4 @@
-// Command agent 启动本地浏览器客户端；只监听回环地址，不依赖项目服务器。
+// Command agent 启动本地浏览器客户端；回环提供扫描和关注库，按需连接项目服务器。
 // 启动与使用说明见 client/README.md，API 与持久化边界见 docs/client-discovery.md。
 package main
 
@@ -16,7 +16,9 @@ import (
 
 	"bili-history-tracker/client/agent/internal/bilibili"
 	"bili-history-tracker/client/agent/internal/httpapi"
+	"bili-history-tracker/client/agent/internal/library"
 	"bili-history-tracker/client/agent/internal/localstate"
+	"bili-history-tracker/client/agent/internal/remote"
 	"bili-history-tracker/client/agent/internal/scanner"
 )
 
@@ -42,12 +44,16 @@ func run(address, directory string) error {
 		return err
 	}
 	defer service.Close()
+	collection, err := library.New(store, remote.New(nil))
+	if err != nil {
+		return err
+	}
 	listener, err := net.Listen("tcp", address)
 	if err != nil {
 		return fmt.Errorf("启动本地端口失败: %w", err)
 	}
 	defer listener.Close()
-	handler, err := httpapi.New(service, listener.Addr().String())
+	handler, err := httpapi.New(service, listener.Addr().String(), collection)
 	if err != nil {
 		return err
 	}

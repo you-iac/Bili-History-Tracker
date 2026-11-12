@@ -2,6 +2,8 @@
 
 本文描述已实现的客户端首个功能。统一需求与启动见 [client/README.md](../client/README.md)，平台产品范围见 [PRD](PRD.md)，模块与测试索引见 [架构导航](architecture.md#module-navigation)。
 
+本文的“不接入服务器、不建立关注”仅描述扫描模块边界；Agent 后续已加入独立的 [本地关注与服务器接入](client-library.md)，不改变 Cookie 扫描链路。
+
 ## 范围与调用关系
 
 本期只实现手动 Cookie 导入、账号验证、指定 UP 主投稿分页、BV 号清单、取消/继续、TXT/JSON 导出。不接入项目服务器，不建立关注或自动规则，不下载媒体和评论。合作视频可能由其他作者发布，仍保留在该 UP 的投稿列表内，不按响应的 `mid/author` 过滤。

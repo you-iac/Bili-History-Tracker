@@ -83,6 +83,10 @@ func (s *Server) Handler() http.Handler {
 }
 
 func (s *Server) addTarget(w http.ResponseWriter, r *http.Request) {
+	if strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
+		s.requestTarget(w, r)
+		return
+	}
 	targetType := strings.TrimSpace(r.FormValue("type"))
 	id := normalizeID(targetType, r.FormValue("id"))
 	if targetType != "creator" && targetType != "video" {

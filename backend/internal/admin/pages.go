@@ -116,6 +116,10 @@ func (s *Server) library(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/creators" {
 		kind, title, subtitle, nav = "creator", "UP 主库", "在已记录的内容中，发现创作与成长。", "creators"
 	}
+	if wantsJSON(r) {
+		s.clientLibrary(w, r, kind)
+		return
+	}
 	data := s.base(r, nav, title, subtitle)
 	data.Kind = kind
 	f := filter(r)
@@ -205,6 +209,10 @@ func (s *Server) contentDetail(w http.ResponseWriter, r *http.Request) {
 	kind, id := r.PathValue("type"), r.PathValue("id")
 	if !validID(kind, id) || (kind != "video" && kind != "creator") {
 		http.NotFound(w, r)
+		return
+	}
+	if wantsJSON(r) {
+		s.clientDetail(w, r, kind, id)
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
@@ -336,6 +344,10 @@ func (s *Server) metrics(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) targetStatus(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Query().Has("id") || r.URL.Query().Has("kind") {
+		s.clientTargetStatus(w, r)
+		return
+	}
 	f := filter(r)
 	f.OnlyTargets = true
 	f.Limit = 20

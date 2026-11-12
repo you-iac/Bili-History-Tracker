@@ -1,6 +1,6 @@
-// Package httpapi 提供仅监听回环地址的客户端网页、会话、Cookie 配置与扫描 API。
+// Package httpapi 提供回环客户端网页、会话、Cookie/扫描、本地关注与远程资料 API。
 // Host/Origin、HttpOnly 会话和写操作 CSRF 分别检查；首次连接用启动链接的片段密钥换取会话。
-// 不向网页返回 Cookie，不提供任意 URL 代理或本地文件读取。见 docs/client-discovery.md。
+// 不向网页返回 Cookie，不提供任意 URL 代理或本地文件读取。见 docs/client-discovery.md、docs/client-library.md。
 package httpapi
 
 import (
@@ -20,6 +20,8 @@ import (
 	"time"
 
 	"bili-history-tracker/client/agent/internal/bilibili"
+	"bili-history-tracker/client/agent/internal/library"
+	"bili-history-tracker/client/agent/internal/remote"
 	"bili-history-tracker/client/agent/internal/scanner"
 	"bili-history-tracker/client/frontend"
 )
@@ -30,6 +32,7 @@ type session struct {
 }
 type Server struct {
 	service   *scanner.Service
+	library   *library.Service
 	address   string
 	bootstrap string
 	mu        sync.Mutex
@@ -38,12 +41,13 @@ type Server struct {
 }
 
 // New 的 address 必须是实际监听的回环 host:port，不能来自请求头。
-func New(service *scanner.Service, address string) (*Server, error) {
+func New(service *scanner.Service, address string, collection *library.Service) (*Server, error) {
 	token, err := randomToken()
 	if err != nil {
 		return nil, err
 	}
-	s := &Server{service: service, address: address, bootstrap: token, sessions: map[string]session{}, mux: http.NewServeMux()}
+	s := &Server{service: service, library: collection, address: address, bootstrap: token, sessions: map[string]session{}, mux: http.NewServeMux()}
+	s.libraryRoutes()
 	s.mux.HandleFunc("POST /api/session", s.connect)
 	s.mux.HandleFunc("GET /api/session", func(w http.ResponseWriter, r *http.Request) {
 		current, _ := s.session(r)
@@ -279,6 +283,16 @@ func decode(w http.ResponseWriter, r *http.Request, target any) bool {
 	return true
 }
 func writeError(w http.ResponseWriter, err error) {
+	var local *library.Error
+	if errors.As(err, &local) {
+		apiError(w, local.Status, "library_error", local.Message)
+		return
+	}
+	var external *remote.Error
+	if errors.As(err, &external) {
+		apiError(w, external.Status, "remote_error", external.Message)
+		return
+	}
 	var known *bilibili.Error
 	if errors.As(err, &known) {
 		status := 502
