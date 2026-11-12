@@ -33,6 +33,7 @@
 | 本地扫描任务 | 后台逐页去重、完整性判断、取消与恢复，网页关闭不取消任务 | [service.go](../client/agent/internal/scanner/service.go) 的 `Service`、`Start`、`Close` | [service_test.go](../client/agent/internal/scanner/service_test.go) |
 | 客户端持久化 | Windows 用户级 DPAPI Cookie 保护、扫描状态原子写入；其他平台凭据仅在内存保留 | [store.go](../client/agent/internal/localstate/store.go)、[protect_windows.go](../client/agent/internal/localstate/protect_windows.go) | [store_test.go](../client/agent/internal/localstate/store_test.go) |
 | 公共数据池与本地私人关注（规划） | 服务器提供公共历史与受控目标接纳，无个人账户/订阅；Agent 保存私人关注、合并历史、按需发现和下载 | [目标架构与身份设计](client-server-architecture.md)，尚无实现入口 | 同文档“实施顺序与验收”，实现后补测试入口 |
+| 用户档案与数据管理（规划） | 本地管理、导入导出和备份恢复；未来直连用户自选云盘自动备份，公共服务器不托管私人数据 | [数据管理设计](client-data-management.md)，尚无实现入口；现有 [localstate](../client/agent/internal/localstate/store.go) 仅保存 Cookie/扫描 | 同文档“实施顺序与验收”，实现后补测试入口 |
 
 注释与技术文档分工：包注释和文件头说明模块职责、边界及文档位置；接口、关键方法和复杂逻辑附近解释输入约束、错误语义及设计原因；本文负责模块关系、执行链路、API、字段映射及扩展方式。普通赋值和显而易见的调用不需要逐行注释。
 
@@ -47,6 +48,8 @@
 当前8181只查上游；Agent 远程数据优先复用8182：指标、跟踪状态、单个/批量提交和任务进度已有 JSON 输出，库、详情和版本主要由服务器读取 SQLite 后渲染 HTML。缺少的 JSON 优先在原页面路径补输出，共用 `Catalog / Content / Metrics / Versions / ReadSnapshot`，状态补按目标 ID 查询，提交补普通客户端准入与幂等；不另建查询服务或预设一套重复路由。管理员停采及清理权限保持独立，来源检查不当作服务准入，详见 [8182 复用范围](client-server-architecture.md#复用-8182-远程能力)。以上为后续设计，本次未调整 Go 模块职责。
 
 新增或移动模块、变更接口或职责时，同步更新上述导航及相关章节。定位实现优先使用文件链接和符号名，避免固定行号随着代码调整而失效。具体要求见 [AGENTS.md](../AGENTS.md)。
+
+私人数据由用户自行管理，规划在 Agent 提供档案、导入导出、备份恢复和清理，再支持直接备份到用户自选存储；不要求公共服务器提供个人账户或中转数据。当前 Windows Cookie 保护与扫描导出不能视为完整可迁移档案，具体范围、凭据和多设备边界见 [本地数据管理](client-data-management.md)。本次只更新设计，未调整 `localstate` 等 Go 包职责。
 
 ## 模块边界
 

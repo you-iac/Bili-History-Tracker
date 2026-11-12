@@ -13,3 +13,5 @@
 使用原生 HTML/CSS/JavaScript，无运行时外部依赖或 CDN。[assets.go](assets.go) 通过 `go:embed` 将资源编入 Agent；修改资源后重新运行或构建 Go 程序。在 `client/` 执行 `npm run lint` 和 `npm test` 检查前端，无需安装依赖；已安装 pnpm 时也可使用 `pnpm lint`、`pnpm test`。
 
 下一步是本地私人 UP/视频关注库，按标识合并服务器公共历史；本地增删关注，必要时申请公共跟踪，取消不全局停采。多人各自用 Agent，服务器无需个人账户；视频下载本地执行，评论和弹幕后续加入。页面与边界见 [共同需求](../README.md#页面与操作) 和 [协作设计](../../docs/client-server-architecture.md)。
+
+规划提供“数据管理”：档案与占用、分类清理、导入导出、备份恢复；未来展示用户自选云盘的连接、自动计划、进度、历史版本和恢复控制。敏感凭据与媒体默认不随档案备份，恢复先预览，见 [数据管理设计](../../docs/client-data-management.md)。这些页面尚未实现。
