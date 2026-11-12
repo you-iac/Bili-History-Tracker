@@ -1,6 +1,6 @@
 # 服务器跟踪与本地 Agent 协作设计
 
-状态：目标设计，待实施。本次只更新设计和文档。当前代码仍只提供本地 Cookie 验证、UP 投稿 ID 扫描和导出，见 [现有实现](client-discovery.md)。远程查询、公共采集申请、本地关注库和视频下载尚未实现，评论和弹幕留待后续。
+状态：目标设计，待实施。本次只更新设计和文档。当前 Agent 仍只提供本地 Cookie 验证、UP 投稿 ID 扫描和导出，见 [现有实现](client-discovery.md)。服务器 8182 已能读取历史、管理跟踪和批量导入；Agent 接入远程查询与采集申请、本地关注库和视频下载尚未实现，评论和弹幕留待后续。
 
 目标改为多人共用公共数据池：服务器不建设用户注册登录，不保存“谁关注了谁”；每个人在自己的 Agent 保存关注、平台 Cookie、任务与文件。服务访问凭据和管理员身份不属于个人关注账户。
 
@@ -94,19 +94,26 @@ UP 详情的“获取全部视频”复用现有 Cookie 分页扫描，全部仅
 
 ### 已有本地 API
 
-现有 10 个接口仍只提供本地会话、Cookie 和扫描，见 [Agent API 清单](../client/agent/README.md#api-接口)。下面均为未来协议草案，不是当前已存在的路由。
+现有 10 个接口仍只提供本地会话、Cookie 和扫描，见 [Agent API 清单](../client/agent/README.md#api-接口)。远程能力按下表复用 8182；后面的本地扩展路由仍为草案。
 
-### 待新增远程 API
+### 复用 8182 远程能力
 
-| 能力 | 路由草案 | 边界 |
+Agent 连接现有服务器 8182 的同一套数据能力，不另建查询服务，不预设另一套 `/api/v1/public/...` 或 `/api/v1/target-requests` 路由。已有 JSON 接口直接使用；缺少 JSON 的页面优先在原路径支持 `Accept: application/json`，默认 HTML 行为保留。下表的补齐项均尚未实现。
+
+| 能力 | 当前路由与实现 | Agent 接入需要补齐 |
 |---|---|---|
-| 公共库与按 ID 查询 | `/api/v1/public/creators`、`/api/v1/public/videos` | 只读允许公开的数据，分页、搜索或有界批量查询；没有“我的关注”过滤 |
-| 详情、版本、指标 | 公共对象下的详情、`versions`、`metrics` | 只读历史库，返回真实观测范围，不因读取触发平台采集 |
-| 公共跟踪状态 | `/api/v1/public/targets/status` | 只返回公共目标是否已记录、待处理或正在跟踪 |
-| 申请采集 | `POST /api/v1/target-requests` | 只收目标标识，校验、去重和受限入队，支持逐项结果及对账 |
-| 管理停采与保留 | 现有管理端或受保护管理接口 | 仅管理员可改全局间隔、停采、拒绝或删除，不授予普通客户端 |
+| UP / 视频库 | `GET /creators`、`GET /videos`，目前返回 HTML | 共用 `Catalog` 补 JSON 分页及有界按 ID 查询，供本地关注列表合并资料 |
+| 详情与版本 | `GET /detail/{type}/{id}`，目前返回 HTML，支持版本选择与列表分页 | 共用 `Content`、`Versions`、`ReadSnapshot` 补结构化 JSON，不解析页面 HTML |
+| 粉丝 / 播放指标 | `GET /api/metrics/{type}/{id}?days=30` 已返回 JSON | 直接复用现有指标口径与时间范围 |
+| 公共跟踪状态 | `GET /api/targets/status` 已返回当前跟踪列表的分页状态，主要供页面展示 | 补按目标标识查询、明确已记录/未跟踪/处理中等状态，不能把某页未出现当成不存在 |
+| 单个目标提交 | `POST /targets` 已接受 `type`、`id` 表单，添加后异步采集，可按 `Accept` 返回 JSON | 复用新增与调度链路；公共重复申请不能沿用立即刷新和改间隔行为，不能让未验证目标被报为采集成功 |
+| 批量视频提交 | `POST /api/ingest/videos` 已接受 JSON，需 `creator_id` 和 `videos`，显式列表每次最多 100 个 | 复用既有校验入库任务；按真实作者组织视频，保留准入、去重与管理员暂停策略，不将现有协议描述成只需 BV 列表 |
+| 导入结果 | `GET /api/ingest/jobs/{id}` 已返回逐项结果 | 直接复用结果，补公共目标状态对账；现有内存任务不能视为永久申请记录 |
+| 管理停采与保留 | 8182 已有管理命令 | 保留管理员权限，普通 Agent 只查询和申请采集 |
 
-普通客户端不使用 `DELETE /follows` 来影响公共服务器，也不上传或读取个人订阅关系。8182 继续作为管理端，与公共 API 复用存储和采集用例；不能直接开放全部管理路由。
+管理网页由服务器调用 `Catalog / Content / Metrics / Versions` 读取 SQLite 后渲染；Agent 经 HTTP 获取相同查询结果。复用的是数据与业务逻辑，远程 Agent 不直接调用服务器 Go 对象或打开数据库。已有 JSON 可在部署可达时由 Agent 调用，当前尚缺普通客户端准入和完整数据输出。
+
+普通客户端不上传或读取个人订阅关系，也不使用管理停采命令。8182 可以同时承载管理网页和供 Agent 使用的数据接口；按路由区分权限，不要求另起服务或端口，不把整个管理后台作为普通客户端权限开放。
 
 ### 待新增本地 API
 
@@ -158,7 +165,7 @@ Agent 有本地状态：关注列表、配置、Cookie、缓存、待确认申�
 
 | 需求 | 已有基础 | 仍需补齐 |
 |---|---|---|
-| 公共资料、版本与指标 | [storage.Catalog / Content / Metrics / Versions](../backend/internal/storage/dashboard.go)、[admin 页面](../backend/internal/admin/pages.go) | 公共 JSON 协议与本地关注列表按 ID 合并；不复用全局 Following 作为个人状态 |
+| 公共资料、版本与指标 | [storage.Catalog / Content / Metrics / Versions](../backend/internal/storage/dashboard.go)、[admin 页面](../backend/internal/admin/pages.go) | 复用现有 JSON，列表/详情/版本在原路径补 JSON；本地按 ID 合并，不复用全局 Following 作为个人状态 |
 | 公共目标与调度 | [Store.AddTarget / HasTarget](../backend/internal/storage/repo.go)、[调度器](../backend/internal/tracker/scheduler.go) | 有界申请、初始校验、并发去重、已有目标复用和停采权限 |
 | 管理端关注命令 | [admin 处理器](../backend/internal/admin/server.go) | 保持管理员权限；现有新增命令会触发 RunNow，普通重复申请不能直接照搬 |
 | 本地投稿发现 | [scanner.Service](../client/agent/internal/scanner/service.go)、[B站适配器](../client/agent/internal/bilibili/client.go) | 接入本地 UP 库、个人关注和公共采集申请 |
@@ -166,7 +173,7 @@ Agent 有本地状态：关注列表、配置、Cookie、缓存、待确认申�
 
 ## 实施顺序与验收
 
-1. 定义公共记录读取、目标状态和受限采集申请 API，复用服务器查询和调度，保留管理端权限。
+1. Agent 优先复用 8182 现有 JSON 与导入流程；列表、详情和版本补 JSON，状态补按 ID 查询，提交补公共准入与幂等边界，共用既有查询和调度。
 2. Agent 增加独立本地关注存储与两个个人库，远程响应按标识合并；添加关注与公共跟踪申请分状态显示，取消仅影响本地。
 3. 加入按需发现、申请队列对账和本地视频下载、文件验证及恢复。
 4. 后续扩展评论、弹幕、本地档案和备份；只有产生私有云端能力需求时再评估服务端账户。

@@ -47,6 +47,8 @@ Agent 内部分工：
 
 完整模块与 API 草案见 [远程协作设计](../../docs/client-server-architecture.md)。这些扩展尚未实现，下面仍是当前可调用的 10 个接口。
 
+远程读取和提交优先复用 8182 已有接口，缺少 JSON 的列表、详情和版本共用管理页的查询逻辑补输出；不另建查询服务，也不解析管理页 HTML，见 [8182 复用范围](../../docs/client-server-architecture.md#复用-8182-远程能力)。
+
 ## API 接口
 
 默认地址：`http://127.0.0.1:8183`。浏览器通过这些接口操作 Agent，实现在 [server.go](internal/httpapi/server.go)。
