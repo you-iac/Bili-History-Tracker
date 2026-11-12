@@ -36,4 +36,25 @@ Agent 内部分工：
 
 当前独立运行，不连接项目 `backend/`；同步、自动规则、下载和评论尚未实现。
 
+## API 接口
+
+默认地址：`http://127.0.0.1:8183`。浏览器通过这些接口操作 Agent，实现在 [server.go](internal/httpapi/server.go)。
+
+| 方法与路径 | 用途 / 参数 |
+|---|---|
+| `POST /api/session` | 传入 `{"token":"启动密钥"}`，建立本地会话并返回 CSRF token |
+| `GET /api/session` | 读取当前会话的 CSRF token |
+| `GET /api/config` | 查看 Cookie 配置状态和账号摘要，不返回 Cookie 原文 |
+| `PUT /api/config/cookie` | 传入 `{"cookie":"..."}`，验证并保存 B站 Cookie |
+| `POST /api/config/validate` | 验证已保存的 Cookie |
+| `DELETE /api/config/cookie` | 清除 Cookie，保留扫描结果 |
+| `POST /api/scan` | 传入 `{"creator_id":"123","resume":false}` 开始扫描；`resume:true` 继续上次扫描 |
+| `GET /api/scan?offset=0&limit=50` | 查询任务进度和分页结果，`limit` 为 1–100 |
+| `POST /api/scan/cancel` | 停止扫描，保留已获取结果 |
+| `GET /api/scan/export?format=txt` | 导出全部已获取 ID；`format=json` 导出任务及视频信息 |
+
+`POST /api/scan` 提交后立即返回，扫描在后台继续；网页定时调用 `GET /api/scan` 更新进度。
+
+建立会话使用 Agent 启动密钥，其余 API 需要本地会话；写操作还需同源 JSON 和 `X-CSRF-Token`。启动密钥与 B站 Cookie 分开使用，详细约定见 [本地 API 与会话](../../docs/client-discovery.md#本地-api-与会话)。
+
 启动见 [客户端说明](../README.md#当前实现与启动)，完整接口与边界见 [技术说明](../../docs/client-discovery.md)，模块与测试见 [架构导航](../../docs/architecture.md#module-navigation)。
