@@ -29,7 +29,7 @@ cd client
 go run ./agent/cmd/agent
 ```
 
-打开终端显示的完整本地链接（默认 `127.0.0.1:8183`）。[客户端说明](client/README.md#当前实现与启动) 包含构建、数据目录和使用方式；[技术说明](docs/client-discovery.md) 记录接口及验证边界。服务器同步、跟踪交接、自动规则、视频和评论下载仍待实施，见 [PLAN](PLAN.md)。
+打开终端显示的完整本地链接（默认 `127.0.0.1:8183`）。[客户端说明](client/README.md#当前实现与启动) 包含构建、数据目录和使用方式；[技术说明](docs/client-discovery.md) 记录当前接口及验证边界。下一步按 [远程协作设计](docs/client-server-architecture.md) 接入服务器关注 UP 库、视频库、历史与关注管理，并支持本地视频下载；长期跟踪留在服务器，Agent 只按需发现和执行本地任务。评论和弹幕后续实现，见 [PLAN](PLAN.md)。
 
 ## 观察台
 

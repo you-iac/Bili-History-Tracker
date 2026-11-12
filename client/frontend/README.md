@@ -12,4 +12,4 @@
 
 使用原生 HTML/CSS/JavaScript，无运行时外部依赖或 CDN。[assets.go](assets.go) 通过 `go:embed` 将资源编入 Agent；修改资源后重新运行或构建 Go 程序。在 `client/` 执行 `npm run lint` 和 `npm test` 检查前端，无需安装依赖；已安装 pnpm 时也可使用 `pnpm lint`、`pnpm test`。
 
-历史观测、自动规则和本地文件管理属于后续范围，完整页面规划见 [统一需求](../README.md#页面与操作)。
+下一步是远程关注 UP 库、视频库、历史浏览与本地视频下载，Agent 不做本地长期跟踪；评论和弹幕留待后续。页面与身份范围见 [统一需求](../README.md#页面与操作) 和 [远程协作设计](../../docs/client-server-architecture.md)。
