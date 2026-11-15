@@ -1,6 +1,7 @@
-// Package localstate 负责客户端固定目录下的关注库、服务器配置、扫描状态与 Cookie 持久化。
+// Package localstate 管理可切换工作目录中的关注库、服务器配置、扫描状态与 Cookie。
 // Windows Cookie 使用当前用户 DPAPI 保护；其他平台仅在进程内保留，绝不明文回退。
-// 写入先同步临时文件再原子替换，不接受 HTTP 调用方指定文件名。见 docs/client-discovery.md、docs/client-library.md。
+// 状态写入与目录迁移共用存储锁，先同步临时文件再原子替换；只迁移已知状态文件。
+// 初始目录保留启动指向，见 docs/client-workspace.md、docs/client-discovery.md。
 package localstate
 
 import (
@@ -9,20 +10,61 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sync"
 )
 
-type Store struct{ directory string }
+type Store struct {
+	mu        sync.RWMutex
+	directory string
+	anchor    string
+}
 
 func New(directory string) (*Store, error) {
+	directory, err := filepath.Abs(directory)
+	if err != nil {
+		return nil, err
+	}
 	if err := os.MkdirAll(directory, 0700); err != nil {
 		return nil, err
 	}
-	return &Store{directory: directory}, nil
+	anchor := directory
+	seen := map[string]bool{}
+	for range 8 {
+		canonical, e := filepath.EvalSymlinks(directory)
+		if e != nil {
+			return nil, e
+		}
+		if seen[canonical] {
+			return nil, errors.New("数据目录指向形成循环")
+		}
+		seen[canonical] = true
+		data, e := readLimited(filepath.Join(directory, "location.json"), 16<<10)
+		if errors.Is(e, os.ErrNotExist) {
+			return &Store{directory: canonical, anchor: anchor}, nil
+		}
+		if e != nil {
+			return nil, e
+		}
+		var location struct {
+			Directory string `json:"data_directory"`
+		}
+		if json.Unmarshal(data, &location) != nil || !filepath.IsAbs(location.Directory) {
+			return nil, errors.New("数据目录指向无效")
+		}
+		info, e := os.Stat(location.Directory)
+		if e != nil || !info.IsDir() {
+			return nil, errors.New("已配置的数据目录不可用，请恢复该目录后启动")
+		}
+		directory = location.Directory
+	}
+	return nil, errors.New("数据目录指向层级过多")
 }
 
 func (s *Store) PersistentCookie() bool { return persistentCookie }
 
 func (s *Store) LoadCookie() (string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	if !persistentCookie {
 		return "", nil
 	}
@@ -41,6 +83,8 @@ func (s *Store) LoadCookie() (string, error) {
 }
 
 func (s *Store) SaveCookie(cookie string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if !persistentCookie {
 		return nil
 	}
@@ -59,6 +103,8 @@ func (s *Store) SaveCookie(cookie string) error {
 }
 
 func (s *Store) LoadScan(target any) error {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	data, err := readLimited(filepath.Join(s.directory, "scan.json"), 64<<20)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil
@@ -70,6 +116,8 @@ func (s *Store) LoadScan(target any) error {
 }
 
 func (s *Store) SaveScan(value any) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	data, err := json.Marshal(value)
 	if err != nil {
 		return err
@@ -78,6 +126,8 @@ func (s *Store) SaveScan(value any) error {
 }
 
 func (s *Store) LoadLibrary(target any) error {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	data, err := readLimited(filepath.Join(s.directory, "library.json"), 64<<20)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil
@@ -88,6 +138,8 @@ func (s *Store) LoadLibrary(target any) error {
 	return json.Unmarshal(data, target)
 }
 func (s *Store) SaveLibrary(value any) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	data, err := json.Marshal(value)
 	if err != nil {
 		return err
@@ -112,7 +164,11 @@ func readLimited(filename string, limit int64) ([]byte, error) {
 }
 
 func (s *Store) write(name string, data []byte) error {
-	f, err := os.CreateTemp(s.directory, ".bht-*")
+	return writeAt(s.directory, name, data)
+}
+
+func writeAt(directory, name string, data []byte) error {
+	f, err := os.CreateTemp(directory, ".bht-*")
 	if err != nil {
 		return err
 	}
@@ -131,5 +187,5 @@ func (s *Store) write(name string, data []byte) error {
 	if err != nil {
 		return err
 	}
-	return os.Rename(temporary, filepath.Join(s.directory, name))
+	return os.Rename(temporary, filepath.Join(directory, name))
 }

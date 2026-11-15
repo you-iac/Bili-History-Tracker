@@ -1,6 +1,7 @@
 // app.js 只向同源 Agent 发起请求；Cookie 和连接密钥不写入浏览器存储。
 import {stateLabel, progress, publishedAt, rangeLabel} from './view.mjs';
 import {initLibrary} from './library.js';
+import {initNavigation} from './navigation.js';
 
 const $ = id => document.getElementById(id);
 let csrf = '', connected = false, online = false, config = null, job = null;
@@ -37,11 +38,14 @@ async function request(path, options = {}) {
   return response;
 }
 async function api(path, options) { return (await request(path, options)).json(); }
-const libraryUI = initLibrary({api,notify,onScan:id => {$('creator-input').value = id;$('scan-title').scrollIntoView({behavior:'smooth',block:'center'});$('creator-input').focus();}});
+let navigation;
+const libraryUI = initLibrary({api,notify,navigate:view=>navigation.navigate(view),onScan:id => {navigation.navigate('discovery');$('creator-input').value=id;setTimeout(()=>$('creator-input').focus(),0);}});
+navigation=initNavigation(view=>libraryUI.show(view).catch(error=>notify(error.message,true)));
 function buttons() {
 	libraryUI.setConnected(connected && online);
   const usable = connected && online && !busyAction;
   const running = job?.state === 'running' || job?.state === 'cancelling';
+  $('scan-nav-badge').hidden = !running;
   $('save-cookie').disabled = !usable || running;
   $('cookie-input').disabled = !usable || running;
   $('validate-cookie').disabled = !usable || running || !config?.configured;
@@ -115,6 +119,7 @@ async function refresh() {
     if (sequence !== refreshSequence) return;
     connection('Agent 已连接', true);
     renderConfig(configuration); renderResult(result);
+    libraryUI.tick().catch(()=>{});
   } catch (error) {
     if (sequence !== refreshSequence) return;
     connection(connected ? 'Agent 连接中断' : '等待连接', false);
@@ -175,5 +180,6 @@ $('copy-ids').addEventListener('click', () => action(async () => {
   await navigator.clipboard.writeText(text); notify('已复制当前全部视频 ID。');
 }));
 const token = new URLSearchParams(location.hash.slice(1)).get('token');
-if (location.hash) history.replaceState(null,'',location.pathname + location.search);
+if (token) history.replaceState(null,'',location.pathname + location.search + '#overview');
+navigation.update();
 connect(token).catch(error => {connection('等待连接',false);$('connect-card').hidden = false;notify(error.message,true);buttons();});

@@ -14,3 +14,16 @@ export function publishedAt(timestamp) {
 export function rangeLabel(offset, length, total) {
   return length > 0 ? `${offset + 1}–${offset + length} / 共 ${total.toLocaleString('zh-CN')} 条` : `共 ${total.toLocaleString('zh-CN')} 条视频 ID`;
 }
+// 路由白名单避免启动密钥或任意片段被当成页面名。
+export function viewForHash(hash) {
+  const view = String(hash || '').replace(/^#/,'');
+  return ['overview','creators','videos','discovery','settings'].includes(view) ? view : 'overview';
+}
+
+export function followState(follow) {
+  if (follow.pending_submission) return follow.last_error ? '待提交 · 后台将重试' : '正在申请服务器跟踪';
+  if (!follow.remote) return '服务器状态未查询';
+  if (follow.remote.tracking) return '服务器跟踪中';
+  if (follow.remote.status === 'paused') return '服务器已暂停';
+  return follow.remote.recorded ? '服务器已记录，未跟踪' : '服务器尚未记录';
+}

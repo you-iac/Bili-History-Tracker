@@ -57,6 +57,10 @@ func filter(r *http.Request) storage.CatalogFilter {
 }
 
 func (s *Server) overview(w http.ResponseWriter, r *http.Request) {
+	if wantsJSON(r) {
+		s.clientOverview(w, r)
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
 	defer cancel()
 	now := time.Now()

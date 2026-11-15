@@ -71,6 +71,62 @@ type Detail struct {
 }
 type Client struct{ http *http.Client }
 
+type Catalog struct {
+	Items []Item `json:"items"`
+	Page  int    `json:"page"`
+	Limit int    `json:"limit"`
+	Total int    `json:"total"`
+}
+type Update struct {
+	Kind string `json:"kind"`
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Seq  int64  `json:"seq"`
+	At   int64  `json:"at"`
+}
+type Overview struct {
+	Summary struct {
+		Creators int64 `json:"creators"`
+		Videos   int64 `json:"videos"`
+		Tracking int64 `json:"tracking"`
+		Updates  int64 `json:"updates"`
+	} `json:"summary"`
+	Creators  []Item    `json:"creators"`
+	Videos    []Item    `json:"videos"`
+	Updates   []Update  `json:"updates"`
+	FetchedAt time.Time `json:"fetched_at"`
+}
+
+// Catalog 只读服务器已记录的数据；id 是精确标识，q 是名称/标识搜索，不调用平台发现。
+func (c *Client) Catalog(ctx context.Context, base, kind, q, id string, page int) (Catalog, error) {
+	var result Catalog
+	path := "/creators"
+	if kind == "video" {
+		path = "/videos"
+	} else if kind != "creator" {
+		return result, &Error{Message: "搜索类型无效。", Status: 400}
+	}
+	query := url.Values{"q": {q}, "page": {strconv.Itoa(page)}}
+	if id != "" {
+		query.Set("id", id)
+		query.Del("q")
+	}
+	err := c.call(ctx, base, "GET", path+"?"+query.Encode(), nil, &result)
+	if err == nil && (result.Items == nil || result.Page < 1 || result.Limit < 1) {
+		err = &Error{Message: "服务器公开库格式不兼容，请更新 backend。", Status: 502}
+	}
+	return result, err
+}
+
+func (c *Client) Overview(ctx context.Context, base string) (Overview, error) {
+	var result Overview
+	err := c.call(ctx, base, "GET", "/", nil, &result)
+	if err == nil && result.FetchedAt.IsZero() {
+		err = &Error{Message: "服务器缺少公开总览接口，请更新 backend。", Status: 502}
+	}
+	return result, err
+}
+
 // New 使用独立客户端，不共享平台 CookieJar；禁止重定向。
 func New(transport http.RoundTripper) *Client {
 	return &Client{http: &http.Client{Transport: transport, Timeout: 22 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return errors.New("redirect refused") }}}

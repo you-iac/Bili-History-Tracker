@@ -1,5 +1,5 @@
 // library.go 将本地关注和远程读取接入已有会话/来源/CSRF 保护，不将平台 Cookie 传给服务器。
-// 本地关注与公共跟踪分别确认，见 docs/client-library.md。
+// 提供公开工作台、自动关注和受保护的目录设置；见 docs/client-library.md、docs/client-workspace.md。
 package httpapi
 
 import (
@@ -8,6 +8,20 @@ import (
 )
 
 func (s *Server) libraryRoutes() {
+	s.mux.HandleFunc("GET /api/settings", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, 200, s.store.DirectoryInfo()) })
+	s.mux.HandleFunc("PUT /api/settings/directory", func(w http.ResponseWriter, r *http.Request) {
+		var input struct {
+			Directory string `json:"data_directory"`
+		}
+		if !decode(w, r, &input) {
+			return
+		}
+		if err := s.store.SwitchDirectory(input.Directory); err != nil {
+			apiError(w, 400, "directory_error", err.Error())
+			return
+		}
+		writeJSON(w, 200, s.store.DirectoryInfo())
+	})
 	s.mux.HandleFunc("GET /api/remote/connection", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, map[string]string{"server_url": s.library.Connection()})
 	})
@@ -32,6 +46,29 @@ func (s *Server) libraryRoutes() {
 		writeJSON(w, 200, map[string]bool{"ok": true})
 	})
 	s.mux.HandleFunc("GET /api/follows", s.follows)
+	s.mux.HandleFunc("GET /api/overview", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, 200, s.library.Dashboard()) })
+	s.mux.HandleFunc("POST /api/overview/refresh", func(w http.ResponseWriter, r *http.Request) {
+		data, err := s.library.RefreshOverview(r.Context())
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		writeJSON(w, 200, data)
+	})
+	s.mux.HandleFunc("GET /api/remote/catalog", func(w http.ResponseWriter, r *http.Request) {
+		page, err := positivePage(r, "page")
+		q := r.URL.Query().Get("q")
+		if err != nil || len(q) > 300 {
+			apiError(w, 400, "invalid_input", "搜索条件或页码无效。")
+			return
+		}
+		data, err := s.library.Search(r.Context(), r.URL.Query().Get("kind"), q, page)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		writeJSON(w, 200, data)
+	})
 	s.mux.HandleFunc("POST /api/follows", func(w http.ResponseWriter, r *http.Request) {
 		var input struct {
 			Kind string `json:"kind"`
@@ -40,7 +77,7 @@ func (s *Server) libraryRoutes() {
 		if !decode(w, r, &input) {
 			return
 		}
-		f, err := s.library.Add(input.Kind, input.ID)
+		f, err := s.library.Follow(r.Context(), input.Kind, input.ID)
 		if err != nil {
 			writeError(w, err)
 			return
@@ -79,7 +116,7 @@ func (s *Server) follows(w http.ResponseWriter, r *http.Request) {
 		apiError(w, 400, "invalid_input", "关注类型或页码无效。")
 		return
 	}
-	writeJSON(w, 200, s.library.List(kind, r.URL.Query().Get("q"), page))
+	writeJSON(w, 200, s.library.ListFiltered(kind, r.URL.Query().Get("q"), page, r.URL.Query().Get("pending") == "1"))
 }
 func positivePage(r *http.Request, name string) (int, error) {
 	raw := r.URL.Query().Get(name)

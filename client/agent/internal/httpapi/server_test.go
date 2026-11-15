@@ -53,7 +53,7 @@ func setup(t *testing.T) *harness {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err := New(service, "127.0.0.1:8183", collection)
+	s, err := New(service, "127.0.0.1:8183", collection, store)
 	if err != nil {
 		t.Fatal(err)
 	}

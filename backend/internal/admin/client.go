@@ -27,6 +27,45 @@ func clientItem(i storage.ContentItem) map[string]any {
 	return map[string]any{"kind": i.Kind, "id": i.ID, "name": i.Name, "owner_id": i.OwnerID, "owner_name": i.OwnerName, "metric": i.Metric, "growth": i.Growth, "growth_from": i.GrowthFrom, "growth_to": i.GrowthTo, "seq": i.Seq, "observed_at": i.ObservedAt, "published_at": i.PublishedAt, "recorded": i.Recorded, "tracking": i.Following, "status": i.Status}
 }
 
+// clientOverview 只返回公开库统计和近期内容，不暴露日志、管理错误或私人数据。
+func (s *Server) clientOverview(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
+	defer cancel()
+	now := time.Now()
+	summary, err := s.reader.Summary(ctx, s.platform, now)
+	if err != nil {
+		writeJSON(w, 500, map[string]string{"error": "无法读取公开信息总览。"})
+		return
+	}
+	creators, err := s.reader.Catalog(ctx, s.platform, storage.CatalogFilter{Kind: "creator", Sort: "popular", Limit: 5, KnownOnly: true}, now)
+	if err != nil {
+		writeJSON(w, 500, map[string]string{"error": "无法读取公开UP列表。"})
+		return
+	}
+	videos, err := s.reader.Catalog(ctx, s.platform, storage.CatalogFilter{Kind: "video", Sort: "discovered", Limit: 5}, now)
+	if err != nil {
+		writeJSON(w, 500, map[string]string{"error": "无法读取公开视频列表。"})
+		return
+	}
+	versions, err := s.reader.Versions(ctx, s.platform, "", "", "", 7, 1, 8)
+	if err != nil {
+		writeJSON(w, 500, map[string]string{"error": "无法读取公开动态。"})
+		return
+	}
+	creatorItems, videoItems := []map[string]any{}, []map[string]any{}
+	for _, item := range creators.Items {
+		creatorItems = append(creatorItems, clientItem(item))
+	}
+	for _, item := range videos.Items {
+		videoItems = append(videoItems, clientItem(item))
+	}
+	updates := []map[string]any{}
+	for _, item := range versions.Items {
+		updates = append(updates, map[string]any{"kind": item.Kind, "id": item.ID, "name": item.Name, "seq": item.Seq, "at": item.At})
+	}
+	writeJSON(w, 200, map[string]any{"summary": map[string]int64{"creators": summary.Creators, "videos": summary.Videos, "tracking": summary.Following, "updates": summary.Updates}, "creators": creatorItems, "videos": videoItems, "updates": updates, "fetched_at": now.UTC()})
+}
+
 func (s *Server) clientLibrary(w http.ResponseWriter, r *http.Request, kind string) {
 	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
 	defer cancel()
