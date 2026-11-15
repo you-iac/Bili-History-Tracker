@@ -53,13 +53,14 @@ func run(address, directory string) error {
 		return fmt.Errorf("启动本地端口失败: %w", err)
 	}
 	defer listener.Close()
-	handler, err := httpapi.New(service, listener.Addr().String(), collection)
+	handler, err := httpapi.New(service, listener.Addr().String(), collection, store)
 	if err != nil {
 		return err
 	}
 	server := &http.Server{Handler: handler, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 20 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 32 << 10}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	go collection.RunPending(ctx)
 	fail := make(chan error, 1)
 	go func() { fail <- server.Serve(listener) }()
 	fmt.Printf("Bili History Tracker · 本地客户端\n请在浏览器打开以下完整链接（连接密钥仅本次启动有效）：\nhttp://%s/#token=%s\n", listener.Addr().String(), handler.BootstrapToken())
@@ -72,5 +73,6 @@ func run(address, directory string) error {
 	}
 	shutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+	stop()
 	return server.Shutdown(shutdown)
 }

@@ -49,10 +49,13 @@ func TestLibraryAPIWithoutPlatformCookie(t *testing.T) {
 	if !strings.Contains(r.Body.String(), "远程 UP") || !strings.Contains(r.Body.String(), `"tracking":true`) {
 		t.Fatal(r.Body.String())
 	}
+	if submitted.Load() != 2 {
+		t.Fatal("add should submit once and explicit retry once", submitted.Load())
+	}
 	if r = h.call("DELETE", "/api/follows/creator/123", "{}"); r.Code != 200 {
 		t.Fatal(r.Code)
 	}
-	if submitted.Load() != 1 {
+	if submitted.Load() != 2 {
 		t.Fatal("unfollow submitted remote action")
 	}
 	r = h.call("GET", "/api/follows", "")

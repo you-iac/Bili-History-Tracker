@@ -71,6 +71,64 @@ type Detail struct {
 }
 type Client struct{ http *http.Client }
 
+type Catalog struct {
+	Items []Item `json:"items"`
+	Page  int    `json:"page"`
+	Limit int    `json:"limit"`
+	Total int    `json:"total"`
+}
+
+// Overview 由Agent读取既有公开库接口聚合，不依赖新增服务器总览接口。
+// CatalogBased 区分旧版根接口缓存；旧缓存不继续展示。见 docs/client-workspace.md。
+type Overview struct {
+	Summary struct {
+		Creators int64 `json:"creators"`
+		Videos   int64 `json:"videos"`
+	} `json:"summary"`
+	Creators     []Item    `json:"creators"`
+	Videos       []Item    `json:"videos"`
+	FetchedAt    time.Time `json:"fetched_at"`
+	CatalogBased bool      `json:"catalog_based"`
+}
+
+// Catalog 只读服务器已记录的数据；id 是精确标识，q 是名称/标识搜索，不调用平台发现。
+func (c *Client) Catalog(ctx context.Context, base, kind, q, id string, page int) (Catalog, error) {
+	var result Catalog
+	path := "/creators"
+	if kind == "video" {
+		path = "/videos"
+	} else if kind != "creator" {
+		return result, &Error{Message: "搜索类型无效。", Status: 400}
+	}
+	query := url.Values{"q": {q}, "page": {strconv.Itoa(page)}}
+	if id != "" {
+		query.Set("id", id)
+		query.Del("q")
+	}
+	err := c.call(ctx, base, "GET", path+"?"+query.Encode(), nil, &result)
+	if err == nil && (result.Items == nil || result.Page < 1 || result.Limit < 1 || result.Total < 0) {
+		err = &Error{Message: "服务器公开库格式不兼容，请更新 backend。", Status: 502}
+	}
+	return result, err
+}
+
+// Overview 只读两种公开库的第一页与total，不抓取HTML或推算全局跟踪/版本统计。
+func (c *Client) Overview(ctx context.Context, base string) (Overview, error) {
+	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+	creators, err := c.Catalog(ctx, base, "creator", "", "", 1)
+	if err != nil {
+		return Overview{}, err
+	}
+	videos, err := c.Catalog(ctx, base, "video", "", "", 1)
+	if err != nil {
+		return Overview{}, err
+	}
+	result := Overview{Creators: creators.Items[:min(5, len(creators.Items))], Videos: videos.Items[:min(5, len(videos.Items))], FetchedAt: time.Now().UTC(), CatalogBased: true}
+	result.Summary.Creators, result.Summary.Videos = int64(creators.Total), int64(videos.Total)
+	return result, nil
+}
+
 // New 使用独立客户端，不共享平台 CookieJar；禁止重定向。
 func New(transport http.RoundTripper) *Client {
 	return &Client{http: &http.Client{Transport: transport, Timeout: 22 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return errors.New("redirect refused") }}}

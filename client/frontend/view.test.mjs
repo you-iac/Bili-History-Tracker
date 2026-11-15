@@ -1,7 +1,20 @@
 // view.test.mjs 验证未知总量、部分结果和北京时间边界，避免界面误报完成。
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {progress, publishedAt, rangeLabel, stateLabel} from './view.mjs';
+import {progress, publishedAt, rangeLabel, stateLabel, viewForHash, followState} from './view.mjs';
+
+test('侧栏路由可直接刷新，启动密钥和未知片段不成为页面', () => {
+  for (const view of ['overview','creators','videos','settings','discovery']) assert.equal(viewForHash(`#${view}`),view);
+  assert.equal(viewForHash('#token=private'),'overview');
+  assert.equal(viewForHash('#unknown'),'overview');
+});
+
+test('本地关注保存和服务器跟踪分别确认，失败明确进入重试', () => {
+  assert.equal(followState({pending_submission:true,last_error:'offline',remote:{tracking:true}}),'待提交 · 后台将重试');
+  assert.equal(followState({pending_submission:true}),'正在申请服务器跟踪');
+  assert.equal(followState({remote:{tracking:true}}),'服务器跟踪中');
+  assert.equal(followState({remote:{tracking:false,recorded:true}}),'服务器已记录，未跟踪');
+});
 
 test('只有明确完成时显示 100%，未知总量不伪造进度', () => {
   assert.equal(progress(130,120,'partial'),99);

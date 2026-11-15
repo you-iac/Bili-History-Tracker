@@ -1,6 +1,6 @@
 # 本地档案、数据管理与用户自选云盘
 
-状态：数据管理与云盘仍为需求设计。当前 Agent 已保存本地关注、服务器地址和公共缓存，以及扫描检查点/受保护 Cookie，并提供扫描导出；仍不等于完整档案管理或备份。现有能力见 [本地关注接入](client-library.md) 与 [客户端发现](client-discovery.md)，共同需求见 [客户端说明](../client/README.md)。
+状态：数据管理与云盘仍为需求设计。当前 Agent 已保存本地关注、服务器地址和公共缓存，以及扫描检查点/受保护 Cookie，并提供扫描导出和 [目录切换](client-workspace.md#工作目录)；仍不等于完整档案管理或备份。现有能力见 [本地关注接入](client-library.md) 与 [客户端发现](client-discovery.md)，共同需求见 [客户端说明](../client/README.md)。
 
 ## 数据归属与身份
 
