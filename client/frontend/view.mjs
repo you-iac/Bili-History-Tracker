@@ -15,9 +15,33 @@ export function rangeLabel(offset, length, total) {
   return length > 0 ? `${offset + 1}–${offset + length} / 共 ${total.toLocaleString('zh-CN')} 条` : `共 ${total.toLocaleString('zh-CN')} 条视频 ID`;
 }
 // 路由白名单避免启动密钥或任意片段被当成页面名。
-export function viewForHash(hash) {
-  const view = String(hash || '').replace(/^#/,'');
-  return ['overview','creators','videos','discovery','settings'].includes(view) ? view : 'overview';
+export function routeForHash(hash) {
+  const [path,query=''] = String(hash||'').replace(/^#/,'').split('?');
+  const [section,id,...rest] = path.split('/');
+  const scope = new URLSearchParams(query).get('scope') === 'public' ? 'public' : '';
+  const kind = section === 'creators' ? 'creator' : section === 'videos' ? 'video' : '';
+  const validID = kind === 'creator' ? /^[1-9]\d{0,19}$/.test(id||'') : /^BV[1-9A-HJ-NP-Za-km-z]{10}$/.test(id||'');
+  if(kind&&id&&validID&&!rest.length) return {view:'detail',kind,id,scope,section,hash:`#${section}/${id}${scope?'?scope=public':''}`};
+  if(!id&&!rest.length&&['overview','creators','videos','discovery','settings'].includes(section)) return {view:section,kind,scope,section,hash:`#${section}${kind&&scope?'?scope=public':''}`};
+  return {view:'overview',kind:'',scope:'',section:'overview',hash:'#overview'};
+}
+export function viewForHash(hash) {return routeForHash(hash).view;}
+export function detailHref(kind,id,scope='') {return routeForHash(`#${kind==='creator'?'creators':'videos'}/${id}${scope==='public'?'?scope=public':''}`).hash;}
+export function compactNumber(value) {
+  if(!Number.isFinite(value)) return '—';
+  if(Math.abs(value)>=1e8) return `${(value/1e8).toLocaleString('zh-CN',{maximumFractionDigits:1})}亿`;
+  if(Math.abs(value)>=1e4) return `${(value/1e4).toLocaleString('zh-CN',{maximumFractionDigits:1})}万`;
+  return value.toLocaleString('zh-CN');
+}
+export function signedNumber(value) {return Number.isFinite(value)?`${value>0?'+':''}${compactNumber(value)}`:'—';}
+export function utcDay(value) {return Number.isFinite(value)&&value>0?new Date(value).toISOString().slice(0,10):'—';}
+
+// 只比较稳定内容字段，播放/粉丝等计数不会被列为内容修改。
+export function snapshotChanges(kind,before,after) {
+  const creator=kind==='creator',a=creator?(before?.card||before||{}):(before||{}),b=creator?(after?.card||after||{}):(after||{});
+  const fields=creator?[['name','名称'],['sign','签名'],['face','头像']]:[['title','标题'],['desc','简介'],['pic','封面'],['copyright','版权类型'],['duration','时长（秒）'],['pages','分P信息'],['staff','联合创作']];
+  const value=(source,key)=>source[key] == null?'':typeof source[key]==='object'?JSON.stringify(source[key],null,2):String(source[key]);
+  return fields.flatMap(([key,label])=>{const old=value(a,key),next=value(b,key);return old===next?[]:[{key,label,before:old,after:next}];});
 }
 
 export function followState(follow) {

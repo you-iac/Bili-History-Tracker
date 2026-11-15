@@ -80,6 +80,14 @@ func TestOverviewDropsOldSourceAndKeepsCacheOnReadFailure(t *testing.T) {
 	if err != nil || s.Dashboard().Public != nil || s.Dashboard().Creators != 1 {
 		t.Fatal("old overview retained or local follow lost", err)
 	}
+	old.Overview.CatalogBased = true
+	if err = store.SaveLibrary(old); err != nil {
+		t.Fatal(err)
+	}
+	s, err = New(store, remote.New(nil))
+	if err != nil || s.Dashboard().Public != nil {
+		t.Fatal("old five-item preview retained without page metadata", err)
+	}
 	var fail atomic.Bool
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -106,6 +114,85 @@ func TestOverviewDropsOldSourceAndKeepsCacheOnReadFailure(t *testing.T) {
 	reopened, err := New(store, remote.New(nil))
 	if err != nil || reopened.Dashboard().Public == nil || !reopened.Dashboard().Public.CatalogBased {
 		t.Fatal("catalog cache not preserved on restart", err)
+	}
+}
+
+func TestDetailRejectsResponseFromPreviousServer(t *testing.T) {
+	store, _ := localstate.New(t.TempDir())
+	started, release := make(chan struct{}), make(chan struct{})
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		close(started)
+		select {
+		case <-release:
+		case <-r.Context().Done():
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"item":{"kind":"creator","id":"123"},"metrics":{"points":[]},"versions":[]}`))
+	}))
+	defer upstream.Close()
+	s, _ := New(store, remote.New(nil))
+	_ = s.Configure(upstream.URL)
+	_, _ = s.Add("creator", "123")
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		_, err := s.Detail(ctx, "creator", "123", 1, 0, "30")
+		done <- err
+	}()
+	select {
+	case <-started:
+	case <-ctx.Done():
+		t.Fatal("detail did not start")
+	}
+	if err := s.Configure("http://localhost:8182"); err != nil {
+		t.Fatal(err)
+	}
+	close(release)
+	if err := <-done; err == nil || s.Dashboard().Creators != 1 {
+		t.Fatal("old-server response accepted or private follow lost", err)
+	}
+}
+
+func TestDetailOfflineCacheMatchesOnlyDefaultRange(t *testing.T) {
+	store, _ := localstate.New(t.TempDir())
+	var fail atomic.Bool
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if fail.Load() {
+			w.WriteHeader(502)
+			w.Write([]byte(`{"error":"offline"}`))
+			return
+		}
+		if r.URL.Path == "/targets" || r.URL.Path == "/api/targets/status" {
+			w.Write([]byte(`{"kind":"creator","id":"123","recorded":true,"tracking":true}`))
+			return
+		}
+		w.Write([]byte(`{"item":{"kind":"creator","id":"123","name":"cached UP"},"metrics":{"points":[]},"versions":[],"version_page":1,"version_limit":10}`))
+	}))
+	defer upstream.Close()
+	s, _ := New(store, remote.New(nil))
+	_ = s.Configure(upstream.URL)
+	if _, err := s.Follow(context.Background(), "creator", "123"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Refresh(context.Background(), "creator", "123"); err != nil {
+		t.Fatal(err)
+	}
+	fail.Store(true)
+	view, err := s.Detail(context.Background(), "creator", "123", 1, 0, "30")
+	if err != nil || !view.Cached || view.ReadError == "" || view.LocalFollow == nil || view.Item.Name != "cached UP" {
+		t.Fatal(view, err)
+	}
+	for _, tc := range []struct {
+		days string
+		page int
+		seq  int64
+	}{{"7", 1, 0}, {"all", 1, 0}, {"30", 2, 0}, {"30", 1, 1}} {
+		if _, err = s.Detail(context.Background(), "creator", "123", tc.page, tc.seq, tc.days); err == nil {
+			t.Fatal("default cache used for a different range/page/snapshot", tc)
+		}
 	}
 }
 

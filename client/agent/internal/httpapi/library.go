@@ -1,5 +1,5 @@
 // library.go 将本地关注和远程读取接入已有会话/来源/CSRF 保护，不将平台 Cookie 传给服务器。
-// 提供公开工作台、自动关注和受保护的目录设置；见 docs/client-library.md、docs/client-workspace.md。
+// 提供公开工作台、自动关注和受保护的目录设置；见 docs/client-library.md、docs/client-workspace.md、docs/client-catalog.md。
 package httpapi
 
 import (
@@ -142,7 +142,7 @@ func (s *Server) libraryDetail(w http.ResponseWriter, r *http.Request) {
 		apiError(w, 400, "invalid_input", "版本或页码无效。")
 		return
 	}
-	detail, err := s.library.Detail(r.Context(), r.PathValue("kind"), r.PathValue("id"), page, seq)
+	detail, err := s.library.Detail(r.Context(), r.PathValue("kind"), r.PathValue("id"), page, seq, r.URL.Query().Get("days"))
 	if err != nil {
 		writeError(w, err)
 		return

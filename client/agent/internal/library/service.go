@@ -1,6 +1,6 @@
 // Package library 管理本地私人 UP/视频关注、服务器地址与最近读取的公共资料。
 // 写入成功才更新内存；网络操作在锁外执行，取消关注不会请求服务器停采。见 docs/client-library.md。
-// 自动关注、公开查询和退避队列见 docs/client-workspace.md。
+// 自动关注、公开查询和退避队列见 docs/client-workspace.md；独立详情与匹配缓存见 docs/client-catalog.md。
 package library
 
 import (
@@ -69,7 +69,7 @@ func New(store Storage, client *remote.Client) (*Service, error) {
 	if err := store.LoadLibrary(&s.state); err != nil {
 		return nil, errors.New("关注库无法读取，请先备份 library.json 后检查文件")
 	}
-	if s.state.Overview != nil && !s.state.Overview.CatalogBased {
+	if s.state.Overview != nil && (!s.state.Overview.CatalogBased || s.state.Overview.CreatorLimit < 1 || s.state.Overview.VideoLimit < 1) {
 		s.state.Overview = nil
 	}
 	base, err := remote.NormalizeBase(s.state.ServerURL)
@@ -422,10 +422,50 @@ func (s *Service) RefreshOverview(ctx context.Context) (Dashboard, error) {
 	s.mu.Unlock()
 	return s.Dashboard(), err
 }
-func (s *Service) Detail(ctx context.Context, kind, id string, page int, seq int64) (remote.Detail, error) {
+
+// DetailView 附带本地关注与来源，不将公共跟踪状态当作个人关注。
+type DetailView struct {
+	remote.Detail
+	LocalFollow *Follow `json:"local_follow,omitempty"`
+	ServerURL   string  `json:"server_url"`
+	Cached      bool    `json:"cached"`
+	ReadError   string  `json:"read_error,omitempty"`
+}
+
+// Detail 复用既有服务器详情；仅默认30日第一页可在断连时回退本地缓存。
+// 返回前重新核对服务器，取消关注/切服后不把旧请求写回或误标为仍关注。
+func (s *Service) Detail(ctx context.Context, kind, id string, page int, seq int64, days string) (DetailView, error) {
 	normalized, err := Normalize(kind, id)
 	if err != nil {
-		return remote.Detail{}, err
+		return DetailView{}, err
 	}
-	return s.client.Detail(ctx, s.Connection(), kind, normalized, page, seq)
+	base := s.Connection()
+	data, readErr := s.client.Detail(ctx, base, kind, normalized, page, seq, days)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if base != s.state.ServerURL {
+		return DetailView{}, &Error{Message: "服务器已切换，请重新读取详情。", Status: 409}
+	}
+	view := DetailView{Detail: data, ServerURL: base}
+	for _, f := range s.state.Follows {
+		if f.Kind == kind && f.ID == normalized {
+			copy := f
+			view.LocalFollow = &copy
+			break
+		}
+	}
+	if readErr != nil {
+		f := view.LocalFollow
+		if f != nil && f.Data != nil && f.ServerURL == base && page == 1 && seq == 0 && (days == "" || days == "30") {
+			view.Detail = *f.Data
+			f.Data = nil
+			view.Cached, view.ReadError = true, readErr.Error()
+			return view, nil
+		}
+		return DetailView{}, readErr
+	}
+	if view.LocalFollow != nil {
+		view.LocalFollow.Data = nil
+	}
+	return view, nil
 }

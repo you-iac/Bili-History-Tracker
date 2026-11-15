@@ -40,7 +40,7 @@ async function request(path, options = {}) {
 async function api(path, options) { return (await request(path, options)).json(); }
 let navigation;
 const libraryUI = initLibrary({api,notify,navigate:view=>navigation.navigate(view),onScan:id => {navigation.navigate('discovery');$('creator-input').value=id;setTimeout(()=>$('creator-input').focus(),0);}});
-navigation=initNavigation(view=>libraryUI.show(view).catch(error=>notify(error.message,true)));
+navigation=initNavigation((view,route)=>libraryUI.show(view,route).catch(error=>notify(error.message,true)));
 function buttons() {
 	libraryUI.setConnected(connected && online);
   const usable = connected && online && !busyAction;

@@ -39,7 +39,7 @@ Agent 是运行在本机的 Go 程序：提供网页、本地 UP/视频关注库
 
 实现与限制见 [关注库技术说明](../../docs/client-library.md)，整体目标见 [协作设计](../../docs/client-server-architecture.md)，私人数据规划见 [数据管理](../../docs/client-data-management.md)。
 
-浏览器侧栏包含总览、两个库、投稿发现和设置，工作台操作、队列和目录指向见 [工作台说明](../../docs/client-workspace.md)。
+浏览器侧栏包含总览、卡片库、独立详情、投稿发现和设置；详情趋势/版本与总览分页的数据来源见 [库与详情](../../docs/client-catalog.md)。工作台操作、队列和目录指向见 [工作台说明](../../docs/client-workspace.md)。
 
 ## API 接口
 
@@ -70,6 +70,6 @@ Agent 是运行在本机的 Go 程序：提供网页、本地 UP/视频关注库
 | `DELETE /api/follows/{kind}/{id}` | 仅取消本地关注，不停服务器采集 |
 | `POST /api/follows/{kind}/{id}/refresh` | 核对公共状态，读取并保存最近资料/版本/指标 |
 | `POST /api/follows/{kind}/{id}/submit` | 提交已保存目标到8182，服务器确认后返回 |
-| `GET /api/library/{kind}/{id}?page=1&seq=1` | 读取公开目标详情（无需先关注）、版本页与可选历史快照，不自动提交跟踪 |
+| `GET /api/library/{kind}/{id}?days=30&page=1&seq=1` | 读取公开详情、7/30/90/all趋势、版本页与快照；附带个人关注/来源和匹配的30日离线缓存状态，不自动提交跟踪 |
 
 扫描后台执行，网页关闭不取消；关注刷新/提交绑定当前请求，失败可显式重试；待提交申请由后台退避处理。完整行为见 [本地关注实现](../../docs/client-library.md)，原扫描协议见 [发现说明](../../docs/client-discovery.md#本地-api-与会话)。

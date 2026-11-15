@@ -1,5 +1,5 @@
 // Package remote 通过固定8182路径读取公共资料和申请跟踪，不转发本地 Cookie 或会话。
-// 限制响应大小、超时和重定向，不提供任意 URL 代理。见 docs/client-library.md。
+// 限制响应大小、超时和重定向，不提供任意 URL 代理。见 docs/client-library.md、docs/client-catalog.md。
 package remote
 
 import (
@@ -79,7 +79,7 @@ type Catalog struct {
 }
 
 // Overview 由Agent读取既有公开库接口聚合，不依赖新增服务器总览接口。
-// CatalogBased 区分旧版根接口缓存；旧缓存不继续展示。见 docs/client-workspace.md。
+// CatalogBased 区分旧版根接口缓存，分页长度识别旧五条预览；旧缓存不继续展示。见 docs/client-workspace.md。
 type Overview struct {
 	Summary struct {
 		Creators int64 `json:"creators"`
@@ -89,6 +89,8 @@ type Overview struct {
 	Videos       []Item    `json:"videos"`
 	FetchedAt    time.Time `json:"fetched_at"`
 	CatalogBased bool      `json:"catalog_based"`
+	CreatorLimit int       `json:"creator_limit"`
+	VideoLimit   int       `json:"video_limit"`
 }
 
 // Catalog 只读服务器已记录的数据；id 是精确标识，q 是名称/标识搜索，不调用平台发现。
@@ -124,7 +126,7 @@ func (c *Client) Overview(ctx context.Context, base string) (Overview, error) {
 	if err != nil {
 		return Overview{}, err
 	}
-	result := Overview{Creators: creators.Items[:min(5, len(creators.Items))], Videos: videos.Items[:min(5, len(videos.Items))], FetchedAt: time.Now().UTC(), CatalogBased: true}
+	result := Overview{Creators: creators.Items, Videos: videos.Items, FetchedAt: time.Now().UTC(), CatalogBased: true, CreatorLimit: creators.Limit, VideoLimit: videos.Limit}
 	result.Summary.Creators, result.Summary.Videos = int64(creators.Total), int64(videos.Total)
 	return result, nil
 }
@@ -219,9 +221,18 @@ func (c *Client) Status(ctx context.Context, base, kind, id string) (Status, err
 	}
 	return result, err
 }
-func (c *Client) Detail(ctx context.Context, base, kind, id string, page int, seq int64) (Detail, error) {
+
+// Detail 的时间范围仅允许服务器已有的7/30/90/all；省略时保留30日行为。
+func (c *Client) Detail(ctx context.Context, base, kind, id string, page int, seq int64, ranges ...string) (Detail, error) {
 	var result Detail
-	q := url.Values{"days": {"30"}, "page": {strconv.Itoa(page)}}
+	days := "30"
+	if len(ranges) > 0 && ranges[0] != "" {
+		days = ranges[0]
+	}
+	if days != "7" && days != "30" && days != "90" && days != "all" {
+		return result, &Error{Message: "时间范围无效。", Status: 400}
+	}
+	q := url.Values{"days": {days}, "page": {strconv.Itoa(page)}}
 	if seq > 0 {
 		q.Set("seq", strconv.FormatInt(seq, 10))
 	}

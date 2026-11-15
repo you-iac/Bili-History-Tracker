@@ -47,11 +47,11 @@ func TestOverviewUsesExistingCatalogsOnly(t *testing.T) {
 			if err != nil || !data.CatalogBased || data.FetchedAt.IsZero() || data.Creators == nil || data.Videos == nil {
 				t.Fatal(data, err)
 			}
-			want, items := int64(42), 5
+			want, items := int64(42), 10
 			if mode == "empty" {
 				want, items = 0, 0
 			}
-			if data.Summary.Creators != want || data.Summary.Videos != want || len(data.Creators) != items || len(data.Videos) != items {
+			if data.Summary.Creators != want || data.Summary.Videos != want || len(data.Creators) != items || len(data.Videos) != items || data.CreatorLimit != 18 || data.VideoLimit != 18 {
 				t.Fatal("totals or previews differ from catalogs", data)
 			}
 		})

@@ -1,7 +1,7 @@
 // view.test.mjs 验证未知总量、部分结果和北京时间边界，避免界面误报完成。
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {progress, publishedAt, rangeLabel, stateLabel, viewForHash, followState} from './view.mjs';
+import {progress, publishedAt, rangeLabel, stateLabel, viewForHash, followState, routeForHash, detailHref, compactNumber, snapshotChanges} from './view.mjs';
 
 test('侧栏路由可直接刷新，启动密钥和未知片段不成为页面', () => {
   for (const view of ['overview','creators','videos','settings','discovery']) assert.equal(viewForHash(`#${view}`),view);
@@ -14,6 +14,24 @@ test('本地关注保存和服务器跟踪分别确认，失败明确进入重�
   assert.equal(followState({pending_submission:true}),'正在申请服务器跟踪');
   assert.equal(followState({remote:{tracking:true}}),'服务器跟踪中');
   assert.equal(followState({remote:{tracking:false,recorded:true}}),'服务器已记录，未跟踪');
+});
+
+test('详情深链接保留目标和来源，非法标识不会被作为远程路径',()=>{
+  assert.deepEqual(routeForHash('#creators/593014440?scope=public'),{view:'detail',kind:'creator',id:'593014440',scope:'public',section:'creators',hash:'#creators/593014440?scope=public'});
+  assert.equal(detailHref('video','BV17x411w7KC'),'#videos/BV17x411w7KC');
+  assert.equal(viewForHash('#videos/BV17x411w7KC'),'detail');
+  assert.equal(routeForHash('#videos?scope=public').scope,'public');
+  for(const invalid of ['#creators/../../settings','#creators/%31','#videos/javascript:alert(1)','#creators/123/extra','#settings/123'])assert.equal(viewForHash(invalid),'overview');
+});
+
+test('卡片紧凑数字保留零和负数，未知不伪造成零',()=>{
+  assert.equal(compactNumber(null),'—');assert.equal(compactNumber(0),'0');assert.equal(compactNumber(228459),'22.8万');assert.equal(compactNumber(-136),'-136');
+});
+
+test('版本对比展示内容变化，不把计数变化列为改名或改简介',()=>{
+  assert.deepEqual(snapshotChanges('creator',{card:{name:'UP',sign:'旧'},follower:100},{card:{name:'UP',sign:'新'},follower:101}),[{key:'sign',label:'签名',before:'旧',after:'新'}]);
+  assert.deepEqual(snapshotChanges('video',{title:'同名',stat:{view:1}},{title:'同名',stat:{view:2}}),[]);
+  assert.equal(snapshotChanges('video',{title:'之前'},{title:'<script>之后</script>'})[0].after,'<script>之后</script>');
 });
 
 test('只有明确完成时显示 100%，未知总量不伪造进度', () => {
