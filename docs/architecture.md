@@ -36,6 +36,7 @@
 | Agent远程客户端 | 固定8182路径，JSON/超时/大小与重定向限制，无Cookie转发 | [client.go](../client/agent/internal/remote/client.go) | [client_test.go](../client/agent/internal/remote/client_test.go) |
 | 8182客户端接入 | 同路径JSON、精确状态、验证后提交，复用存储/采集 | [client.go](../backend/internal/admin/client.go)、[request.go](../backend/internal/tracker/request.go)、[target_lookup.go](../backend/internal/storage/target_lookup.go) | [client_test.go](../backend/internal/admin/client_test.go)、[request_test.go](../backend/internal/tracker/request_test.go) |
 | 公共准入与下载（规划） | 完整准入、总预算、公共搜索增强及本地下载 | [目标设计](client-server-architecture.md) | 见该文验收，当前尚未全部实现 |
+| Qt桌面客户端（规划） | 未来以C++ + Qt重构客户端，应用内整合界面与业务，保持现有功能与数据迁移 | [技术路线](../client/README.md#未来技术路线c--qt)、[实施计划](../PLAN.md#c--qt-一体化桌面客户端重构)；尚无Qt实现入口 | 计划中的功能对等、迁移、生命周期和安装验收；实现后补测试入口 |
 | 用户档案与数据管理（规划） | 本地管理、导入导出和备份恢复；未来直连用户自选云盘自动备份，公共服务器不托管私人数据 | [数据管理设计](client-data-management.md)，尚无实现入口；现有 [localstate](../client/agent/internal/localstate/store.go) 已保存 Cookie/扫描/关注/配置/缓存，完整档案与备份未实现 | 同文档“实施顺序与验收”，实现后补测试入口 |
 
 注释与技术文档分工：包注释和文件头说明模块职责、边界及文档位置；接口、关键方法和复杂逻辑附近解释输入约束、错误语义及设计原因；本文负责模块关系、执行链路、API、字段映射及扩展方式。普通赋值和显而易见的调用不需要逐行注释。
