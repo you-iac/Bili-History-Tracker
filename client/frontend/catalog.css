@@ -101,3 +101,13 @@
 @media(max-width:1050px){.detail-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.entity-grid{--card-min:270px}.detail-hero{padding:24px}.history-grid{grid-template-columns:minmax(240px,.8fr) minmax(0,1.2fr)}}
 @media(max-width:800px){.history-grid{grid-template-columns:1fr}.detail-hero{gap:17px}.detail-hero h2{font-size:19px}.entity-grid[data-size=large]{--card-min:340px}}
 @media(max-width:700px){.library-toolbar{padding:14px}.toolbar-actions{gap:9px;justify-content:flex-start}.density-picker{flex:1}.entity-grid{--card-min:280px;gap:16px}.entity-grid[data-size=large]{--card-min:340px}.entity-title{font-size:15px}.entity-foot{font-size:10px}.entity-grid[data-size=compact]{--card-pad:18px}.detail-navigation .button{font-size:10px;padding:8px 10px}.detail-hero{padding:21px;gap:14px;align-items:flex-start}.entity-avatar.large{width:53px;height:53px;font-size:25px}.detail-hero h2{font-size:17px}.detail-badges{gap:6px}.detail-badges .local-state{font-size:10px}.detail-buttons{gap:7px;margin-left:-67px;margin-top:20px}.detail-buttons .button{font-size:10px}.detail-hero p{font-size:10px}.detail-stats{gap:12px}.detail-stats>.card{padding:17px;gap:11px}.detail-stats strong{font-size:23px}.detail-stats span,.detail-stats small{font-size:10px}.trend-card{padding:19px 14px}.trend-card h2{font-size:14px}.range-picker select{font-size:10px;min-width:90px;padding:8px}.trend-card .panel-heading{gap:10px}.trend-card .panel-heading p{font-size:10px}.trend-chart{min-height:235px}.trend-chart svg{min-height:230px}.trend-tooltip{font-size:10px;padding:7px}.history-card,.snapshot-card{padding:20px}.overview-grid .compact-list{max-height:400px}.overview-pager{font-size:10px}.compact-item strong{font-size:11px}}
+
+/* 远程图片仅覆盖占位内容；失败后占位仍可见。 */
+.remote-image{position:relative;overflow:hidden;isolation:isolate}
+.remote-image>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:1;display:block}
+.entity-card .video-top{display:block;position:relative;margin-bottom:17px}
+.video-top>.entity-avatar{width:100%;height:auto;aspect-ratio:16/9;border-radius:9px;display:grid;font-size:38px}
+.video-top>.record-status{position:absolute;right:10px;top:10px;z-index:2;background:#fffffff0}
+.detail-hero>.detail-cover{width:250px;height:auto;aspect-ratio:16/9;border-radius:10px;flex:none}
+@media(max-width:1050px){.detail-hero>.detail-cover{width:210px}}
+@media(max-width:700px){.video-hero{flex-direction:column}.detail-hero>.detail-cover{width:100%;max-width:none}.video-hero .detail-hero-info{width:100%}.video-hero .detail-buttons{margin-left:0}}

@@ -1,15 +1,16 @@
-// cards.js 展示私人关注与公开记录，图形仅作占位；不发起逐项远程查询。见 docs/client-catalog.md。
+// cards.js 展示私人关注与公开记录，通过既有快照按需补图。见 docs/client-catalog.md。
 import {compactNumber,signedNumber,detailHref,followState} from './view.mjs';
 
 const statusNames={ok:'观测正常',running:'正在采集',pending:'等待采集',recovered:'已恢复',stale:'数据较旧',paused:'已暂停',unavailable:'暂不可用',not_recorded:'尚未记录'};
 export function cardStatus(item) {return item?statusNames[item.status]||(item.tracking?'服务器跟踪中':'未在公共跟踪'):'待获取资料';}
-export function renderCards({container,data,kind,publicMode,button,onAdd,onRefresh,onRetry,onRemove,onScan}) {
+export function renderCards({container,data,kind,publicMode,button,images,onAdd,onRefresh,onRetry,onRemove,onScan}) {
   const node=(tag,text,className)=>{const el=document.createElement(tag);if(text!=null)el.textContent=text;if(className)el.className=className;return el;};
   const fragment=document.createDocumentFragment();
   for(const follow of data.items) {
     const item=publicMode?follow:follow.data?.item,followed=publicMode?follow.followed:true;
     const href=detailHref(kind,follow.id,publicMode?'public':''),card=node('article',null,`entity-card ${kind}-card`);
     const top=node('div',null,'entity-top'),avatar=node('span',kind==='creator'?(item?.name||follow.id).slice(0,1):'▷',`entity-avatar ${kind==='video'?'video-placeholder':''}`);
+    if(kind==='video')top.classList.add('video-top');images.show(avatar,{kind,id:follow.id,seq:item?.seq||0});
     const status=node('span',cardStatus(item),'record-status');status.dataset.state=item?.status||'unknown';top.append(avatar,status);
     const title=node('a',item?.name||follow.id,'entity-title');title.href=href;
     const identity=node('p',`${kind==='creator'?'UID ':''}${follow.id}`,'entity-id');

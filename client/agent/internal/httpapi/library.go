@@ -8,6 +8,23 @@ import (
 )
 
 func (s *Server) libraryRoutes() {
+	s.mux.HandleFunc("GET /api/images/{kind}/{id}", func(w http.ResponseWriter, r *http.Request) {
+		seq := int64(0)
+		var err error
+		if raw := r.URL.Query().Get("seq"); raw != "" {
+			seq, err = strconv.ParseInt(raw, 10, 64)
+		}
+		if err != nil || seq < 0 {
+			apiError(w, 400, "invalid_input", "图片版本无效。")
+			return
+		}
+		result, err := s.library.Image(r.Context(), r.PathValue("kind"), r.PathValue("id"), seq)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		writeJSON(w, 200, result)
+	})
 	s.mux.HandleFunc("GET /api/settings", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, 200, s.store.DirectoryInfo()) })
 	s.mux.HandleFunc("PUT /api/settings/directory", func(w http.ResponseWriter, r *http.Request) {
 		var input struct {

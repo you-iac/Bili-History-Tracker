@@ -2,8 +2,9 @@
 import {compactNumber,signedNumber,utcDay,snapshotChanges,followState} from './view.mjs';
 import {renderTrend} from './trend.mjs';
 import {cardStatus} from './cards.js';
+import {snapshotImageURL} from './images.js';
 
-export function initDetail({api,notify,onAdd,onChanged,onScan}) {
+export function initDetail({api,notify,onAdd,onChanged,onScan,images}) {
   const $=id=>document.getElementById(id);
   const node=(tag,text,className)=>{const el=document.createElement(tag);if(text!=null)el.textContent=text;if(className)el.className=className;return el;};
   let route=null,usable=false,working=false,sequence=0,snapshotSequence=0,days='30',shownDays='30',page=1,selected=0,data=null,snapshotBusy=false;
@@ -18,7 +19,7 @@ export function initDetail({api,notify,onAdd,onChanged,onScan}) {
   function render(d){
     const creator=route.kind==='creator',item=d.item,local=d.local_follow;shownDays=days;
     $('detail-name').textContent=item.name||route.id;$('detail-identity').textContent=`${creator?'UID ':''}${route.id}${!creator&&item.owner_name?` · ${item.owner_name}`:''}`;
-    $('detail-avatar').textContent=creator?(item.name||route.id).slice(0,1):'▷';$('detail-record-status').textContent=cardStatus(item);$('detail-record-status').dataset.state=item.status||'unknown';
+    $('detail-avatar').textContent=creator?(item.name||route.id).slice(0,1):'▷';$('detail-avatar').classList.toggle('detail-cover',!creator);$('detail-avatar').closest('section').classList.toggle('video-hero',!creator);images.show($('detail-avatar'),{kind:route.kind,id:route.id,seq:item.seq});$('detail-record-status').textContent=cardStatus(item);$('detail-record-status').dataset.state=item.status||'unknown';
     $('detail-local-state').textContent=local?`已本地关注 · ${followState(local)}`:'尚未本地关注';
     $('detail-follow').textContent=local?(local.pending_submission?'重试提交':'已本地关注'):'关注并跟踪';$('detail-unfollow').hidden=!local;$('detail-scan').hidden=!creator;
     $('detail-source').textContent=`数据来自 ${d.server_url} · 最近观测 ${date(item.observed_at)}`;
@@ -48,6 +49,7 @@ export function initDetail({api,notify,onAdd,onChanged,onScan}) {
       let before=null,previousError='';
       if(seq>1){try{before=(await api(url(seq-1))).snapshot;}catch(error){previousError=error.message;}}
       if(token!==snapshotSequence||generation!==sequence)return;
+      if(seq===data?.item.seq){const cover=snapshotImageURL(route.kind,after.snapshot);if(cover)images.show($('detail-avatar'),{kind:route.kind,id:route.id,seq,url:cover});}
       selected=seq;markSelected();$('detail-snapshot-title').textContent=`v${seq} 的内容变化`;$('detail-snapshot').textContent=JSON.stringify(after.snapshot??{},null,2);
       const changes=snapshotChanges(route.kind,before,after.snapshot),fragment=document.createDocumentFragment();
       if(seq===1){$('detail-snapshot-note').textContent='首次记录作为后续对比基线；计数变化不生成内容版本。';}

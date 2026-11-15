@@ -2,6 +2,8 @@
 
 本文描述已实现的客户端首个功能。统一需求与启动见 [client/README.md](../client/README.md)，平台产品范围见 [PRD](PRD.md)，模块与测试索引见 [架构导航](architecture.md#module-navigation)。
 
+当前Agent默认自动打开网页并完成原有本地会话交换，启动参数和图片展示见 [启动与图片](client-launch-media.md)；本文的认证与扫描边界仍保持。
+
 本文的“不接入服务器、不建立关注”仅描述扫描模块边界；Agent 后续已加入独立的 [本地关注与服务器接入](client-library.md)，不改变 Cookie 扫描链路。
 
 ## 范围与调用关系

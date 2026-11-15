@@ -22,8 +22,8 @@ Agent 是运行在本机的 Go 程序：提供网页、本地 UP/视频关注库
 
 | 模块 | 职责 |
 |---|---|
-| [main](cmd/agent/main.go) | 组装并启动回环服务，默认8183 |
-| [httpapi](internal/httpapi/server.go)、[关注接口](internal/httpapi/library.go) | 网页与24个API，会话、来源、CSRF保护 |
+| [main](cmd/agent/main.go) | 组装回环服务并自动打开已认证网页，默认8183 |
+| [httpapi](internal/httpapi/server.go)、[关注接口](internal/httpapi/library.go) | 网页与25个API，会话、来源、CSRF保护 |
 | [library](internal/library/service.go) | 本地关注/公开搜索、总览缓存、自动提交与退避队列，见 [pending.go](internal/library/pending.go) |
 | [remote](internal/remote/client.go) | 按固定8182路径查询/提交，不转发平台 Cookie或本地会话 |
 | [scanner](internal/scanner/service.go)、[bilibili](internal/bilibili/client.go) | Cookie验证、投稿分页、取消与检查点恢复 |
@@ -31,7 +31,7 @@ Agent 是运行在本机的 Go 程序：提供网页、本地 UP/视频关注库
 
 关注先保存本地，再自动提交服务器；失败标为待提交并在Agent后台退避重试，不删除关注。取消只影响本地，服务器继续公共跟踪。资料按需读取并缓存，断网显示缓存时间与错误；Agent不运行周期跟踪。
 
-网页通过 [go:embed](../frontend/assets.go) 发布，无需前端开发服务。服务器提供既有8182库/详情JSON和目标提交接口时，在网页保存地址并测试，即可使用远程资料；本轮无需修改backend。Cookie仅是本地投稿发现的前置条件。
+网页通过 [go:embed](../frontend/assets.go) 发布，无需前端开发服务。服务器提供既有8182库/详情JSON和目标提交接口时，在网页保存地址并测试，即可使用远程资料；本轮无需修改backend。Cookie仅是本地投稿发现的前置条件。自动启动/认证及历史图片URL缓存见 [启动与图片](../../docs/client-launch-media.md)。
 
 ## 目标扩展（待实施）
 
@@ -63,6 +63,7 @@ Agent 是运行在本机的 Go 程序：提供网页、本地 UP/视频关注库
 | `GET /api/overview` | 本地关注/待提交数量、服务器地址与最近公开总览 |
 | `POST /api/overview/refresh` | 用既有UP/视频库接口聚合总数与首页列表并缓存 |
 | `GET /api/remote/catalog?kind=creator&q=&page=1` | 只读公开库搜索，按本地列表补个人关注标记 |
+| `GET /api/images/{kind}/{id}?seq=1` | 从既有快照解析头像/封面URL并按版本缓存；返回url/seq/available/cached，不代理图片文件 |
 | `GET /api/settings` | 活动/启动目录与状态文件占用 |
 | `PUT /api/settings/directory` | `data_directory` 绝对路径，复制到空目录并持久化切换 |
 | `GET /api/follows?kind=creator&page=1&q=` | 本地UP/视频关注，分页20条及分类总数 |

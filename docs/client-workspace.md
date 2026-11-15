@@ -1,6 +1,6 @@
 # 客户端工作台与关注操作
 
-状态：已实现。当前仍为 Go Agent + 浏览器，Qt 重构继续保留未来计划；本次提供侧栏工作台、公开搜索、关注自动提交与工作目录设置。卡片大小、独立详情、趋势/版本对比和总览分页见 [库与详情](client-catalog.md)。按当前约定只实现本地部分，backend已恢复到上一轮改动前；无法通过已有接口获得的能力暂缓。
+状态：已实现。当前仍为 Go Agent + 浏览器，Qt 重构继续保留未来计划；本次提供侧栏工作台、公开搜索、关注自动提交与工作目录设置。自动启动认证与头像/封面展示见 [启动与图片](client-launch-media.md)。卡片大小、独立详情、趋势/版本对比和总览分页见 [库与详情](client-catalog.md)。按当前约定只实现本地部分，backend已恢复到上一轮改动前；无法通过已有接口获得的能力暂缓。
 
 ## 页面与来源
 
@@ -33,7 +33,7 @@
 | `GET /creators`、`GET /videos` | 沿用既有 `q/id/page` 查询，Agent本地补个人关注标记，不写入跟踪；总览依次读取两库首页，以各自 `total` 作数量，返回完整首页与 `limit`，后续翻页复用同一库接口，不改变服务器默认排序 |
 | 详情、状态及提交 | 继续复用 [原接入协议](client-library.md#8182-复用协议)；详情允许查看尚未本地关注的公开对象 |
 
-本地新增 `GET /api/overview`（本地数量与最近总览）、`POST /api/overview/refresh`（聚合既有库接口）、`GET /api/remote/catalog?kind=creator&q=...&page=1`、`GET /api/settings` 和 `PUT /api/settings/directory`。当前共24个API，清单见 [Agent说明](../client/agent/README.md#api-接口)。详情可选已有时间范围，协议补充见 [详情说明](client-catalog.md#接口与边界)。所有本地接口继续检查会话、Host/Origin和写操作CSRF，不转发Cookie。
+本地新增 `GET /api/overview`（本地数量与最近总览）、`POST /api/overview/refresh`（聚合既有库接口）、`GET /api/remote/catalog?kind=creator&q=...&page=1`、`GET /api/settings` 和 `PUT /api/settings/directory`。当前共25个API，清单见 [Agent说明](../client/agent/README.md#api-接口)。详情可选已有时间范围，协议补充见 [详情说明](client-catalog.md#接口与边界)。所有本地接口继续检查会话、Host/Origin和写操作CSRF，不转发Cookie。
 
 Agent不请求服务器根路径JSON或解析管理员HTML，也不推算缺失的全局统计。两库读取共用20秒预算，任一失败则保留原缓存；两次读取不是服务器同一时刻的全局快照。总览持久化标记 `catalog_based`，旧版根接口及五条预览缓存不再展示，个人关注和其他缓存保留。总览与查询结果标明来源和时间，网络失败保留上次兼容总览与个人关注；初次未读取时显示未知，不用0冒充服务器统计。所有服务器文本以文本节点显示，不执行标题中的HTML。
 
@@ -50,6 +50,6 @@ Agent不请求服务器根路径JSON或解析管理员HTML，也不推算缺失�
 - 浏览器：[navigation.js](../client/frontend/navigation.js) 负责侧栏/路由，[library.js](../client/frontend/library.js) 负责工作台数据与操作，[app.js](../client/frontend/app.js) 保留会话和扫描。
 - Agent：[library.Service](../client/agent/internal/library/service.go)、[pending.go](../client/agent/internal/library/pending.go)、[remote.Client](../client/agent/internal/remote/client.go)、[目录迁移](../client/agent/internal/localstate/directory.go)；HTTP入口见 [library.go](../client/agent/internal/httpapi/library.go)。
 - 测试：[业务/队列测试](../client/agent/internal/library/workspace_test.go)、[目录测试](../client/agent/internal/localstate/directory_test.go)、[设置权限测试](../client/agent/internal/httpapi/settings_test.go)、[既有库聚合测试](../client/agent/internal/remote/client_test.go)、[前端状态/路由测试](../client/frontend/view.test.mjs)。
-- 原后端3个文件与 `7c8be78` 一致；既有库聚合测试覆盖空库、总数/完整分页与不截断、禁用根接口和任一库失败，业务测试覆盖旧缓存失效与重启保留。两个Go模块测试、Agent vet/构建、前端检查及12项Node测试通过。Edge真实Agent联调覆盖五个页面、公开搜索分页且不写入、未关注对象详情、自动关注、迁移后从原启动目录重启、断网缓存/待提交、手机导航及无横向溢出；原135条扫描、分页、复制导出和停止/继续回归通过。服务器/平台使用本地模拟数据，未使用真实Cookie或宣称已更新远端部署。
+- 原后端3个文件与 `7c8be78` 一致；既有库聚合测试覆盖空库、总数/完整分页与不截断、禁用根接口和任一库失败，业务测试覆盖旧缓存失效与重启保留。两个Go模块测试、Agent vet/构建、前端检查及15项Node测试通过。Edge真实Agent联调覆盖五个页面、公开搜索分页且不写入、未关注对象详情、自动关注、迁移后从原启动目录重启、断网缓存/待提交、手机导航及无横向溢出；原135条扫描、分页、复制导出和停止/继续回归通过。服务器/平台使用本地模拟数据，未使用真实Cookie或宣称已更新远端部署。
 
 本轮无需更新服务器，只需重启更新后的本地Agent。依赖服务器新增能力的全局跟踪/近期版本总览先不实现；搜索和提交复用此前已有接口。当前安全部署方式不变，继续按 [接入边界](client-library.md#本地-api-与边界) 使用可信服务或SSH隧道。

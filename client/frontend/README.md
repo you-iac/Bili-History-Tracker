@@ -1,6 +1,6 @@
 # 浏览器界面
 
-状态：已实现侧栏总览、可调大小卡片库、独立详情趋势/版本对比、总览分页、公开搜索、自动关注及设置页（服务器/目录/Cookie），保留投稿发现与导出。总览只读服务器既有UP/视频库，不展示需要新增后端接口的全局跟踪数和近期版本动态。本轮不改backend。共同需求见 [客户端说明](../README.md)，实现与验证见 [工作台说明](../../docs/client-workspace.md) 和 [关注接入](../../docs/client-library.md)。
+状态：已实现侧栏总览、可调大小卡片库、独立详情趋势/版本对比、总览分页、公开搜索、自动关注及设置页（服务器/目录/Cookie），保留投稿发现与导出；默认自动连接，头像/封面按需加载。总览只读服务器既有UP/视频库，不展示需要新增后端接口的全局跟踪数和近期版本动态。本轮不改backend。共同需求见 [客户端说明](../README.md)，实现与验证见 [工作台说明](../../docs/client-workspace.md) 和 [关注接入](../../docs/client-library.md)。
 
 主要职责：
 
@@ -10,11 +10,12 @@
 - [library.js](library.js)：总览、公开库搜索、自动关注、设置与分页总览；详情使用独立路由；文本使用 `textContent`，所有远程请求经 Agent。
 - [cards.js](cards.js)、[catalog.css](catalog.css)：响应式卡片与三档大小。
 - [detail.js](detail.js)、[trend.mjs](trend.mjs)：详情路由、UTC真实日采样与版本对比，见 [库与详情](../../docs/client-catalog.md) 及 [趋势测试](trend.test.mjs)。
+- [images.js](images.js)：可见图片懒加载、白名单URL及失败占位，见 [启动与图片](../../docs/client-launch-media.md) 与 [地址测试](images.test.mjs)。
 - [view.mjs](view.mjs)：状态、进度与北京时间显示，未知总量不伪造完成；[view.test.mjs](view.test.mjs) 覆盖关键边界。
-- 通过同源本地 HTTP API 向 [Agent](../agent/README.md) 提交配置和任务操作，读取校验结果与持久化状态；远端服务器和平台请求由 Agent 执行。
+- 通过同源本地 HTTP API 向 [Agent](../agent/README.md) 提交配置和任务操作，读取校验结果与持久化状态；远端业务数据和平台查询由 Agent 执行，图片由浏览器加载。
 - 显示服务器离线、Agent 断连、凭据失效和任务失败等状态，刷新或关闭页面不取消 Agent 已接收的任务。
 
-使用原生 HTML/CSS/JavaScript，无运行时外部依赖或 CDN。[assets.go](assets.go) 通过 `go:embed` 将资源编入 Agent；修改资源后重新运行或构建 Go 程序。在 `client/` 执行 `npm run lint` 和 `npm test` 检查前端，无需安装依赖；已安装 pnpm 时也可使用 `pnpm lint`、`pnpm test`。
+使用原生 HTML/CSS/JavaScript，界面代码无第三方脚本/样式依赖；图片直连白名单B站CDN。[assets.go](assets.go) 通过 `go:embed` 将资源编入 Agent；修改资源后重新运行或构建 Go 程序。在 `client/` 执行 `npm run lint` 和 `npm test` 检查前端，无需安装依赖；已安装 pnpm 时也可使用 `pnpm lint`、`pnpm test`。
 
 当前库关注自动提交并由Agent后台重试，公开搜索本身不提交，取消不全局停采；扫描结果可逐项关注，UP 可跳转原扫描入口。下载、评论/弹幕和完整数据管理仍待实现，规划见 [共同需求](../README.md#页面与操作) 和 [协作设计](../../docs/client-server-architecture.md)。
 

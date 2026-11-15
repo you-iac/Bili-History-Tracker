@@ -1,10 +1,12 @@
-// library.js 编排公开总览、本地库/公开搜索、自动关注与设置；所有请求经本地Agent。
+// library.js 编排公开总览、本地库/公开搜索、自动关注与设置；业务请求经本地Agent，图片直连白名单CDN。
 import {detailHref,routeForHash} from './view.mjs';
 import {renderCards} from './cards.js';
 import {initDetail} from './detail.js';
+import {initImages} from './images.js';
 
 export function initLibrary({api,notify,onScan,navigate}) {
   const $ = id => document.getElementById(id);
+  const images=initImages({api});
   const views = {creator:{page:1,q:'',scope:'local',pending:false},video:{page:1,q:'',scope:'local',pending:false}};
   let usable=false,agentOnline=false,ready=false,busy=false,server='',kind='creator',current='overview',result={items:[],page:1,total:0,limit:20};
   let lastLocalLoad=0;
@@ -29,7 +31,7 @@ export function initLibrary({api,notify,onScan,navigate}) {
     for(const [k,name] of [['creator','creators'],['video','videos']]){const p=overviewPages[k];$('overview-'+name+'-previous').disabled=!usable||busy||p.busy||p.page<=1;$('overview-'+name+'-next').disabled=!usable||busy||p.busy||!server||p.page*p.limit>=p.total;}
   }
   function counts(value) {
-    const oldPending=dashboard?.pending;dashboard=value;server=value.server_url;
+    const oldPending=dashboard?.pending;dashboard=value;server=value.server_url;images.setSource(server);
     $('creator-library-count').textContent=value.creators;$('video-library-count').textContent=value.videos;
     $('local-creators').textContent=value.creators;$('local-videos').textContent=value.videos;$('local-pending').textContent=value.pending;
     controls();return oldPending!==undefined&&oldPending!==value.pending;
@@ -37,7 +39,7 @@ export function initLibrary({api,notify,onScan,navigate}) {
   async function localDashboard() {const data=await api('/api/overview');counts(data);return data;}
   function compact(items,container,empty) {
     const rows=document.createDocumentFragment();
-    for(const item of items||[]) {const row=node('div',null,'compact-item');const info=node('div',null,'compact-info');info.append(node('strong',item.name||item.id),node('span',`${item.kind==='creator'?'粉丝':'播放'} ${number(item.metric)} · ${item.id}`));row.append(node('span',(item.name||item.id).slice(0,1),'avatar'),info);const link=node('a','查看 →','text-button');link.href=detailHref(item.kind,item.id,'public');row.append(link);rows.append(row);}
+    for(const item of items||[]) {const row=node('div',null,'compact-item');const info=node('div',null,'compact-info');info.append(node('strong',item.name||item.id),node('span',`${item.kind==='creator'?'粉丝':'播放'} ${number(item.metric)} · ${item.id}`));const avatar=node('span',(item.name||item.id).slice(0,1),'avatar');images.show(avatar,{kind:item.kind,id:item.id,seq:item.seq});row.append(avatar,info);const link=node('a','查看 →','text-button');link.href=detailHref(item.kind,item.id,'public');row.append(link);rows.append(row);}
     if(!items?.length)rows.append(node('p',empty,'empty-copy'));$(container).replaceChildren(rows);
   }
   function renderOverview(value) {
@@ -66,7 +68,7 @@ export function initLibrary({api,notify,onScan,navigate}) {
     $('library-source').textContent=publicMode?'来源：服务器公开库，不代表 B站全站搜索。未收录的目标可按 UID/BV 添加。':'来源：本地关注；服务器状态和本地关注分别保存。';
     $('refresh-library').textContent=publicMode?'↻ 刷新搜索结果':'↻ 刷新本页资料';
   }
-  function renderRows(data,publicMode) {renderCards({container:$('follow-rows'),data,kind,publicMode,button,onAdd:add,onRefresh:async f=>{await post(path(f)+'/refresh');await load();},onRetry:async f=>{await submit(f);await reload();},onRemove:async f=>{await api(path(f),{method:'DELETE',body:'{}'});await reload();notify('已取消本地关注，服务器公共采集和历史保留。');},onScan});}
+  function renderRows(data,publicMode) {renderCards({container:$('follow-rows'),data,kind,publicMode,button,images,onAdd:add,onRefresh:async f=>{await post(path(f)+'/refresh');await load();},onRetry:async f=>{await submit(f);await reload();},onRemove:async f=>{await api(path(f),{method:'DELETE',body:'{}'});await reload();notify('已取消本地关注，服务器公共采集和历史保留。');},onScan});}
   async function load() {
     if(!usable)return;
     const state=views[kind],requestedKind=kind,publicMode=state.scope==='public',sequence=++loadSequence;
@@ -140,7 +142,7 @@ export function initLibrary({api,notify,onScan,navigate}) {
   }));
   $('overview-refresh').addEventListener('click',()=>run(refreshOverview));
   for(const [k,name] of [['creator','creators'],['video','videos']]){for(const [direction,delta] of [['previous',-1],['next',1]])$('overview-'+name+'-'+direction).addEventListener('click',()=>overviewPage(k,overviewPages[k].page+delta));}
-  const detail=initDetail({api,notify,onAdd:add,onChanged:localDashboard,onScan});
+  const detail=initDetail({api,notify,onAdd:add,onChanged:localDashboard,onScan,images});
   let size='standard';try{const saved=localStorage.getItem('bht.card-size');if(['compact','standard','large'].includes(saved))size=saved;}catch{}
   $('card-size').value=size;$('follow-rows').dataset.size=size;
   $('card-size').addEventListener('change',()=>{size=$('card-size').value;$('follow-rows').dataset.size=size;try{localStorage.setItem('bht.card-size',size);}catch{}});

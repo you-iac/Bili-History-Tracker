@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "lint": "node --check frontend/app.js && node --check frontend/library.js && node --check frontend/navigation.js && node --check frontend/view.mjs && node --check frontend/cards.js && node --check frontend/detail.js && node --check frontend/trend.mjs",
-    "test": "node --test frontend/view.test.mjs frontend/trend.test.mjs"
+    "lint": "node --check frontend/app.js && node --check frontend/library.js && node --check frontend/navigation.js && node --check frontend/view.mjs && node --check frontend/cards.js && node --check frontend/detail.js && node --check frontend/trend.mjs && node --check frontend/images.js",
+    "test": "node --test frontend/view.test.mjs frontend/trend.test.mjs frontend/images.test.mjs"
   }
 }

@@ -1,6 +1,6 @@
 // Package library 管理本地私人 UP/视频关注、服务器地址与最近读取的公共资料。
 // 写入成功才更新内存；网络操作在锁外执行，取消关注不会请求服务器停采。见 docs/client-library.md。
-// 自动关注、公开查询和退避队列见 docs/client-workspace.md；独立详情与匹配缓存见 docs/client-catalog.md。
+// 自动关注、公开查询和退避队列见 docs/client-workspace.md；独立详情与匹配缓存见 docs/client-catalog.md；图片地址缓存见 docs/client-launch-media.md。
 package library
 
 import (
@@ -42,10 +42,11 @@ type Follow struct {
 	NextAttempt *time.Time     `json:"next_attempt_at,omitempty"`
 }
 type state struct {
-	Version   int              `json:"version"`
-	ServerURL string           `json:"server_url"`
-	Follows   []Follow         `json:"follows"`
-	Overview  *remote.Overview `json:"overview,omitempty"`
+	Images    map[string]ImageRecord `json:"images,omitempty"`
+	Version   int                    `json:"version"`
+	ServerURL string                 `json:"server_url"`
+	Follows   []Follow               `json:"follows"`
+	Overview  *remote.Overview       `json:"overview,omitempty"`
 }
 type Page struct {
 	Items    []Follow `json:"items"`
@@ -56,16 +57,19 @@ type Page struct {
 	Videos   int      `json:"videos"`
 }
 type Service struct {
-	mu       sync.Mutex
-	store    Storage
-	client   *remote.Client
-	state    state
-	inFlight map[string]bool
-	wake     chan struct{}
+	imageCalls  map[string]*imageCall
+	imageErrors map[string]imageFailure
+	imageSlots  chan struct{}
+	mu          sync.Mutex
+	store       Storage
+	client      *remote.Client
+	state       state
+	inFlight    map[string]bool
+	wake        chan struct{}
 }
 
 func New(store Storage, client *remote.Client) (*Service, error) {
-	s := &Service{store: store, client: client, state: state{Version: 1, Follows: []Follow{}}, inFlight: map[string]bool{}, wake: make(chan struct{}, 1)}
+	s := &Service{store: store, client: client, state: state{Version: 1, Follows: []Follow{}}, inFlight: map[string]bool{}, wake: make(chan struct{}, 1), imageCalls: map[string]*imageCall{}, imageErrors: map[string]imageFailure{}, imageSlots: make(chan struct{}, 4)}
 	if err := store.LoadLibrary(&s.state); err != nil {
 		return nil, errors.New("关注库无法读取，请先备份 library.json 后检查文件")
 	}
@@ -145,6 +149,7 @@ func (s *Service) Configure(input string) error {
 	next := s.copyState()
 	next.ServerURL = base
 	next.Overview = nil
+	next.Images = nil
 	for i := range next.Follows {
 		next.Follows[i].Status = nil
 		next.Follows[i].Data = nil
@@ -157,6 +162,7 @@ func (s *Service) Configure(input string) error {
 	}
 	err = s.save(next)
 	if err == nil {
+		clear(s.imageErrors)
 		select {
 		case s.wake <- struct{}{}:
 		default:
@@ -445,6 +451,9 @@ func (s *Service) Detail(ctx context.Context, kind, id string, page int, seq int
 	defer s.mu.Unlock()
 	if base != s.state.ServerURL {
 		return DetailView{}, &Error{Message: "服务器已切换，请重新读取详情。", Status: 409}
+	}
+	if readErr == nil {
+		s.rememberSnapshotLocked(kind, normalized, data.SnapshotSeq, data.Snapshot)
 	}
 	view := DetailView{Detail: data, ServerURL: base}
 	for _, f := range s.state.Follows {

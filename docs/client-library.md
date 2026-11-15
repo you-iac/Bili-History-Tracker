@@ -60,7 +60,7 @@ UP 占位作者行不等于已有成功资料观测，`recorded` 对 UP 要求�
 
 ## 本地 API 与边界
 
-完整24个路由见 [Agent API](../client/agent/README.md#api-接口)。新增连接配置、测试、本地关注增删、资料刷新、公共提交与详情读取；继续使用原会话、Host/Origin、同源 JSON 和 CSRF 校验。
+完整25个路由见 [Agent API](../client/agent/README.md#api-接口)。新增连接配置、测试、本地关注增删、资料刷新、公共提交与详情读取；继续使用原会话、Host/Origin、同源 JSON 和 CSRF 校验。
 
 `remote.Client` 不共享平台客户端或 CookieJar，不跟随重定向，响应限制8MiB且要求 JSON；连接超时22秒，刷新总预算20秒。遇到旧服务器 HTML 或不兼容结构时明确提示升级 backend，不把管理网页当 API 解析。
 
