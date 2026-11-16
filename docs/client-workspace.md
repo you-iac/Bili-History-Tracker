@@ -2,6 +2,64 @@
 
 状态：已实现。当前仍为 Go Agent + 浏览器，Qt 重构继续保留未来计划；本次提供侧栏工作台、公开搜索、关注自动提交与工作目录设置。
 
+已知问题：2026-11-16 用户反馈本地 Agent 启动后页面交互仍无响应；已确认运行中服务的模块 MIME 异常，尚未修复，见下方[故障记录](#issue-agent-ui-unresponsive)。本文末尾的历史验证记录不代表本次环境已通过验收。
+
+## issue-agent-ui-unresponsive
+
+### 问题记录与范围
+
+- 记录时间：2026-11-16 10:14（Asia/Shanghai）；状态：待修复。
+- 用户反馈：“本地 Agent 启动了，浏览器卡死，没反应”，并要求先记录问题和分析，不改代码。
+- 截图地址为 `http://127.0.0.1:8183/#settings`，正文仍显示信息总览，公开统计为占位符，浏览器标签仍为初始标题“Bili History Tracker · 个人工作台”。截图中的公开列表文案也与初始 HTML 一致。
+- 截图证明路由片段与页面内容不一致；不能单凭截图确认主线程阻塞、浏览器进程死锁或 Agent 业务服务完全失效。也不能把初始显示的 0 当作真实本地关注数量。
+- 本次仅阅读源码、对运行中 Agent 发起静态资源 HEAD/GET 请求并更新文档；未修改业务/测试代码、注册表、配置和数据，未建立 API 会话、重启 Agent 或运行修复后的浏览器验收。
+
+### 当前响应证据
+
+2026-11-16 10:15（Asia/Shanghai）直接请求 `127.0.0.1:8183`，绕过代理，得到：
+
+| 资源 | 方法 | 状态 | Content-Type |
+|---|---|---|---|
+| `/` | HEAD | 200 | `text/html; charset=utf-8` |
+| `/app.js` | HEAD | 200 | `application/javascript` |
+| `/library.js` | HEAD | 200 | `application/javascript` |
+| `/navigation.js` | HEAD | 200 | `application/javascript` |
+| `/view.mjs` | HEAD、GET | 200 | `text/plain; charset=utf-8` |
+
+以上响应均包含 `Cache-Control: no-store`、`X-Content-Type-Options: nosniff` 和 CSP；`/view.mjs` 的 GET 响应长度为 1752 字节。因此当前服务可响应静态资源，但 HTTP 200 不代表 JavaScript 模块可被浏览器执行。已确认错误 MIME；尚未取得受影响浏览器控制台的实际拒绝信息，也未核对运行二进制与当前源码的构建对应关系。
+
+### 原因分析
+
+首要原因线索是模块以纯文本类型提供。浏览器模块加载要求 JavaScript MIME，`text/plain` 不满足要求；入口及其依赖的模块加载失败，会使入口初始化无法执行。此机制足以解释现有现象，但是否还有其他独立问题，需要在纠正资源响应后复测。
+
+当前源码执行链路为：
+
+```text
+index.html 加载 app.js（type="module"）
+  -> 加载 view.mjs、library.js、navigation.js
+  -> initLibrary 绑定工作台控件
+  -> initNavigation 绑定侧栏和 hashchange
+  -> navigation.update() 应用当前路由
+  -> connect(token) 建立/恢复会话并读取业务数据
+```
+
+代码依据：
+
+- [index.html](../client/frontend/index.html) 默认展示信息总览，其他页面带 `hidden`；侧栏使用普通 `href="#settings"` 等锚点。即使脚本未执行，链接仍可能改变地址片段，而不能完成应用页面切换。
+- [app.js](../client/frontend/app.js) 顶层导入 `view.mjs`、`library.js` 和 `navigation.js`；后两者也依赖 `view.mjs`。导航绑定和首次 `navigation.update()` 均发生在 `connect(token)` 调用之前。缺少连接密钥或业务请求失败，通常应显示连接提示，不足以单独解释导航完全未初始化。
+- [navigation.js](../client/frontend/navigation.js) 的 `initNavigation` / `update` 会切换 `[data-page]`、设置当前导航并修改标签标题。截图标题与默认内容未改变，符合入口初始化没有完成的表现。
+- [assets.go](../client/frontend/assets.go) 显式内嵌 `view.mjs`，当前 HTTP 响应也不是 404；[server.go](../client/agent/internal/httpapi/server.go) 的 `New` 使用 `http.FileServerFS(frontend.Files)`，未为模块扩展名显式指定 MIME，`ServeHTTP` 设置 `nosniff` 与 CSP。
+
+MIME 异常的具体来源仍待核实。本机可读的 Go 标准库 `mime/type_windows.go` 显示 Windows MIME 初始化会读取注册表扩展名的 `Content Type`，且对 `.js` 的 `text/plain` 有专门规避，但该分支不包含 `.mjs`。这支持将系统扩展名映射作为检查方向，不能据此断言当前注册表已有错误配置，或运行 Agent 一定由该工具链构建。
+
+其他候选原因包括资源版本不一致、模块解析/导入错误，以及 `initLibrary` 在导航初始化之前发生 DOM 访问异常。若后续浏览器仍不响应，应以控制台首条错误继续定位。当前不以重配 Cookie、远端服务器或迁移 Qt 作为此故障的已证实解决方案。
+
+### 测试缺口与后续验证
+
+[server_test.go](../client/agent/internal/httpapi/server_test.go) 的 `TestStaticAssetsAndInvalidInputs` 对静态资源仅检查状态码和 CSP 是否存在，未断言 JavaScript MIME，清单也未包含 `library.js`、`navigation.js`。[package.json](../client/package.json) 的 lint 仅检查语法，test 运行 [view.test.mjs](../client/frontend/view.test.mjs) 的纯函数测试；其中路由用例检查 `viewForHash`，并未在真实浏览器中加载模块和点击侧栏。因此这些检查即使通过，也不能排除此类部署响应问题。
+
+后续应先采集受影响标签的控制台首条错误、模块 Network 响应及实际构建版本，再考虑在静态资源层固定模块 MIME；不能通过删除 `nosniff` 或放宽 CSP 掩盖问题。补充静态资源 MIME 回归及 Windows 浏览器启动、直接访问设置、五页导航、会话缺失和远端不可达验收，并评估启动失败时的可见提示。详细待办与完成条件见 [工作台无响应计划](../PLANs/2026-11-16-agent-ui-unresponsive.md)。本次未运行测试套件，未宣称问题已修复。
+
 ## 页面与来源
 
 | 侧栏 | 内容与操作 |
