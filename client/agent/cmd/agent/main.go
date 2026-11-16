@@ -62,6 +62,11 @@ func run(ctx context.Context, address, directory string, automatic bool, launch 
 		return err
 	}
 	server := &http.Server{Handler: handler, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 20 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 32 << 10}
+<<<<<<< HEAD
+=======
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+>>>>>>> 692d77faa8f4b746bca16c153c39ad9b81cc6282
 	go collection.RunPending(ctx)
 	fail := make(chan error, 1)
 	go func() { fail <- server.Serve(listener) }()
@@ -75,5 +80,6 @@ func run(ctx context.Context, address, directory string, automatic bool, launch 
 	}
 	shutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+	stop()
 	return server.Shutdown(shutdown)
 }

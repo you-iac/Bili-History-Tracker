@@ -1,6 +1,10 @@
 // Package library 管理本地私人 UP/视频关注、服务器地址与最近读取的公共资料。
 // 写入成功才更新内存；网络操作在锁外执行，取消关注不会请求服务器停采。见 docs/client-library.md。
+<<<<<<< HEAD
 // 自动关注、公开查询和退避队列见 docs/client-workspace.md；独立详情与匹配缓存见 docs/client-catalog.md；图片地址缓存见 docs/client-launch-media.md。
+=======
+// 自动关注、公开查询和退避队列见 docs/client-workspace.md。
+>>>>>>> 692d77faa8f4b746bca16c153c39ad9b81cc6282
 package library
 
 import (
@@ -42,11 +46,18 @@ type Follow struct {
 	NextAttempt *time.Time     `json:"next_attempt_at,omitempty"`
 }
 type state struct {
+<<<<<<< HEAD
 	Images    map[string]ImageRecord `json:"images,omitempty"`
 	Version   int                    `json:"version"`
 	ServerURL string                 `json:"server_url"`
 	Follows   []Follow               `json:"follows"`
 	Overview  *remote.Overview       `json:"overview,omitempty"`
+=======
+	Version   int              `json:"version"`
+	ServerURL string           `json:"server_url"`
+	Follows   []Follow         `json:"follows"`
+	Overview  *remote.Overview `json:"overview,omitempty"`
+>>>>>>> 692d77faa8f4b746bca16c153c39ad9b81cc6282
 }
 type Page struct {
 	Items    []Follow `json:"items"`
@@ -57,6 +68,7 @@ type Page struct {
 	Videos   int      `json:"videos"`
 }
 type Service struct {
+<<<<<<< HEAD
 	imageCalls  map[string]*imageCall
 	imageErrors map[string]imageFailure
 	imageSlots  chan struct{}
@@ -70,6 +82,18 @@ type Service struct {
 
 func New(store Storage, client *remote.Client) (*Service, error) {
 	s := &Service{store: store, client: client, state: state{Version: 1, Follows: []Follow{}}, inFlight: map[string]bool{}, wake: make(chan struct{}, 1), imageCalls: map[string]*imageCall{}, imageErrors: map[string]imageFailure{}, imageSlots: make(chan struct{}, 4)}
+=======
+	mu       sync.Mutex
+	store    Storage
+	client   *remote.Client
+	state    state
+	inFlight map[string]bool
+	wake     chan struct{}
+}
+
+func New(store Storage, client *remote.Client) (*Service, error) {
+	s := &Service{store: store, client: client, state: state{Version: 1, Follows: []Follow{}}, inFlight: map[string]bool{}, wake: make(chan struct{}, 1)}
+>>>>>>> 692d77faa8f4b746bca16c153c39ad9b81cc6282
 	if err := store.LoadLibrary(&s.state); err != nil {
 		return nil, errors.New("关注库无法读取，请先备份 library.json 后检查文件")
 	}
@@ -149,7 +173,10 @@ func (s *Service) Configure(input string) error {
 	next := s.copyState()
 	next.ServerURL = base
 	next.Overview = nil
+<<<<<<< HEAD
 	next.Images = nil
+=======
+>>>>>>> 692d77faa8f4b746bca16c153c39ad9b81cc6282
 	for i := range next.Follows {
 		next.Follows[i].Status = nil
 		next.Follows[i].Data = nil
@@ -162,7 +189,10 @@ func (s *Service) Configure(input string) error {
 	}
 	err = s.save(next)
 	if err == nil {
+<<<<<<< HEAD
 		clear(s.imageErrors)
+=======
+>>>>>>> 692d77faa8f4b746bca16c153c39ad9b81cc6282
 		select {
 		case s.wake <- struct{}{}:
 		default:
@@ -333,9 +363,110 @@ func (s *Service) Submit(ctx context.Context, kind, id string) (Follow, error) {
 // HTTP 调用方不能通过可选参数绕过提交；本地存储失败仍返回错误。
 func (s *Service) Follow(ctx context.Context, kind, input string) (Follow, error) {
 	f, err := s.Add(kind, input)
+<<<<<<< HEAD
+=======
 	if err != nil {
 		return f, err
 	}
+	ctx, cancel := context.WithTimeout(ctx, 22*time.Second)
+	defer cancel()
+	updated, err := s.Submit(ctx, f.Kind, f.ID)
+	if err == nil {
+		return updated, nil
+	}
+	var local *Error
+	if errors.As(err, &local) && local.Status != 409 {
+		return f, err
+	}
+	f, _, readErr := s.find(f.Kind, f.ID)
+	return f, readErr
+}
+
+type PublicItem struct {
+	remote.Item
+	Followed bool `json:"followed"`
+}
+type PublicPage struct {
+	Items []PublicItem `json:"items"`
+	Page  int          `json:"page"`
+	Limit int          `json:"limit"`
+	Total int          `json:"total"`
+}
+
+func (s *Service) Search(ctx context.Context, kind, q string, page int) (PublicPage, error) {
+	id := ""
+	if normalized, err := Normalize(kind, q); err == nil {
+		id = normalized
+	}
+	base := s.Connection()
+	data, err := s.client.Catalog(ctx, base, kind, q, id, page)
+	if err != nil {
+		return PublicPage{}, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if base != s.state.ServerURL {
+		return PublicPage{}, &Error{Message: "服务器已切换，请重新搜索。", Status: 409}
+	}
+	followed := map[string]bool{}
+	for _, f := range s.state.Follows {
+		followed[f.Kind+":"+f.ID] = true
+	}
+	result := PublicPage{Items: []PublicItem{}, Page: data.Page, Limit: data.Limit, Total: data.Total}
+	for _, item := range data.Items {
+		result.Items = append(result.Items, PublicItem{Item: item, Followed: followed[item.Kind+":"+item.ID]})
+	}
+	return result, nil
+}
+
+type Dashboard struct {
+	Creators  int              `json:"creators"`
+	Videos    int              `json:"videos"`
+	Pending   int              `json:"pending"`
+	ServerURL string           `json:"server_url"`
+	Public    *remote.Overview `json:"public,omitempty"`
+}
+
+func (s *Service) Dashboard() Dashboard {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	d := Dashboard{ServerURL: s.state.ServerURL, Public: s.state.Overview}
+	for _, f := range s.state.Follows {
+		if f.Kind == "creator" {
+			d.Creators++
+		} else {
+			d.Videos++
+		}
+		if f.Pending {
+			d.Pending++
+		}
+	}
+	return d
+}
+func (s *Service) RefreshOverview(ctx context.Context) (Dashboard, error) {
+	base := s.Connection()
+	data, err := s.client.Overview(ctx, base)
+	if err != nil {
+		return s.Dashboard(), err
+	}
+	s.mu.Lock()
+	if base != s.state.ServerURL {
+		s.mu.Unlock()
+		return Dashboard{}, &Error{Message: "服务器已切换，请刷新总览。", Status: 409}
+	}
+	next := s.copyState()
+	next.Overview = &data
+	err = s.save(next)
+	s.mu.Unlock()
+	return s.Dashboard(), err
+}
+func (s *Service) Detail(ctx context.Context, kind, id string, page int, seq int64) (remote.Detail, error) {
+	normalized, err := Normalize(kind, id)
+>>>>>>> 692d77faa8f4b746bca16c153c39ad9b81cc6282
+	if err != nil {
+		return f, err
+	}
+<<<<<<< HEAD
 	ctx, cancel := context.WithTimeout(ctx, 22*time.Second)
 	defer cancel()
 	updated, err := s.Submit(ctx, f.Kind, f.ID)
@@ -477,4 +608,7 @@ func (s *Service) Detail(ctx context.Context, kind, id string, page int, seq int
 		view.LocalFollow.Data = nil
 	}
 	return view, nil
+=======
+	return s.client.Detail(ctx, s.Connection(), kind, normalized, page, seq)
+>>>>>>> 692d77faa8f4b746bca16c153c39ad9b81cc6282
 }

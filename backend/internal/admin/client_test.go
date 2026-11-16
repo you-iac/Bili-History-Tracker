@@ -6,12 +6,48 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
+
+func TestClientOverviewPublicContract(t *testing.T) {
+	for _, populated := range []bool{false, true} {
+		s, store, q := dashboardServer(t)
+		if populated {
+			seedDashboard(t, store)
+		}
+		r := httptest.NewRequest("GET", "/", nil)
+		r.Header.Set("Accept", "application/json")
+		w := httptest.NewRecorder()
+		s.Handler().ServeHTTP(w, r)
+		var data struct {
+			Summary   map[string]int64  `json:"summary"`
+			Creators  []json.RawMessage `json:"creators"`
+			Videos    []json.RawMessage `json:"videos"`
+			Updates   []json.RawMessage `json:"updates"`
+			FetchedAt time.Time         `json:"fetched_at"`
+		}
+		if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &data) != nil || data.FetchedAt.IsZero() || data.Creators == nil || data.Videos == nil || data.Updates == nil {
+			t.Fatalf("invalid overview: %d %s", w.Code, w.Body.String())
+		}
+		want := int64(0)
+		if populated {
+			want = 1
+		}
+		if data.Summary["creators"] != want || data.Summary["videos"] != want || data.Summary["tracking"] != 2*want || len(data.Creators) != int(want) || len(data.Videos) != int(want) {
+			t.Fatal("overview does not match public records", w.Body.String())
+		}
+		var fields map[string]json.RawMessage
+		_ = json.Unmarshal(w.Body.Bytes(), &fields)
+		if len(fields) != 5 || q.calls.Load() != 0 {
+			t.Fatal("overview exposed extra fields or queried upstream", w.Body.String())
+		}
+	}
+}
 
 func TestClientJSONReadsAndExactStatus(t *testing.T) {
 	s, store, q := dashboardServer(t)
 	seedDashboard(t, store)
-	for _, path := range []string{"/videos", "/creators", "/detail/video/BV17x411w7KC", "/detail/video/BV17x411w7KC?seq=1", "/detail/creator/12345"} {
+	for _, path := range []string{"/", "/videos", "/creators", "/creators?q=12345", "/detail/video/BV17x411w7KC", "/detail/video/BV17x411w7KC?seq=1", "/detail/creator/12345"} {
 		r := httptest.NewRequest("GET", path, nil)
 		r.Header.Set("Accept", "application/json")
 		w := httptest.NewRecorder()

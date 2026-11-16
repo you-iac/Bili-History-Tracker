@@ -126,7 +126,7 @@
 
 `source.Video.Raw` 携带快照，不进入 HTTP JSON。过滤规则和版本仅由适配器内部管理，不放进 `source.Video`，不经过 tracker 传递，不写入 JSON 或数据库。`storage` 不负责裁剪，只在新版本行保存收到的 payload。作者资料和投稿发现不采用视频裁剪规则。
 
-0003 迁移删除 0002 曾引入的 `snapshot_version`，保留迁移历史，不改变 payload、指纹或内容序号。读取快照无需根据过滤版本分支，旧的完整 data 和新的裁剪 data 都直接按 JSON 处理。过滤规则变化本身不触发新内容版本；已有目标内容未变时，详情仍可能显示历史完整快照。历史裁剪和空间回收需另行安排。实施摘要见 [计划归档](../PLAN.md#已完成计划)，前后字段图例见下方对照。
+0003 迁移删除 0002 曾引入的 `snapshot_version`，保留迁移历史，不改变 payload、指纹或内容序号。读取快照无需根据过滤版本分支，旧的完整 data 和新的裁剪 data 都直接按 JSON 处理。过滤规则变化本身不触发新内容版本；已有目标内容未变时，详情仍可能显示历史完整快照。历史裁剪和空间回收需另行安排。实施摘要见 [快照裁剪计划](../PLANs/2026-11-07-video-snapshot.md)，前后字段图例见下方对照。
 
 `payload` 是“事实层”，可以宽；`content_hash` 是“判断层”，必须窄。两者分离后，播放量、点赞、审核状态都能在快照里保留，但不会触发新版本。
 
@@ -880,7 +880,7 @@ PRAGMA auto_vacuum = INCREMENTAL;   -- 建库时设置，删采样数据后回�
 ## 与当前代码如何衔接
 
 - [http.go](../backend/internal/provider/bilibili/http.go) 的 `get()` 返回原始 data 和解析结果；[bilibili.go](../backend/internal/provider/bilibili/bilibili.go) 在身份校验后调用 `videoSnapshot()`，只返回裁剪后的 `Video.Raw`，不传递过滤规则版本；`CreatorProfile.Raw` 则保留完整作者 data。
-- 存档范围由 B站适配器决定；指纹投影目前仍在 `storage/fingerprint.go`，移至适配器是 [PLAN.md](../PLAN.md) 中的另一项待实施计划，本次不改变算法。压缩尚未实现。
+- 存档范围由 B站适配器决定；指纹投影目前仍在 `storage/fingerprint.go`，移至适配器是 [指纹解耦计划](../PLANs/2026-11-07-data-fingerprint.md) 中的另一项待实施计划，本次不改变算法。压缩尚未实现。
 - 已实现的持久化链路为：admin/调度器 → tracker → 查询服务/Provider → 成功观测及快照 → 投影指纹 → 存储事务。事务在网络请求之后开启。
 - 本项目 HTTP API 继续返回当前结构，不向调用方暴露版本表或采样表。
 - 采样任务需要独立的调度入口，第一期可复用 `GetVideo`/`GetCreator`，但只读取计数并写入 `metric_samples`，不触发版本写入。

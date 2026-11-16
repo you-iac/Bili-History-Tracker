@@ -28,18 +28,30 @@
 | 看板查询 | 概览统计、内容库分页、日指标、版本动态与快照读取；只读本地，不返回整份 payload | [dashboard.go](../backend/internal/storage/dashboard.go) 的 `Catalog`、`Summary`、`Metrics`、`Versions`、`ReadSnapshot` | [dashboard_test.go](../backend/internal/storage/dashboard_test.go) |
 | 客户端启动 | 组装扫描、本地关注和远程接入，只监听回环 | [main.go](../client/agent/cmd/agent/main.go)、[Agent说明](../client/agent/README.md) | [关注接入验证](client-library.md#验证) |
 | 浏览器界面 | 本地关注、远程资料、Cookie/扫描/导出，同源无外部依赖 | [assets.go](../client/frontend/assets.go)、[app.js](../client/frontend/app.js)、[library.js](../client/frontend/library.js) | [view.test.mjs](../client/frontend/view.test.mjs)、[接入验证](client-library.md#验证) |
+<<<<<<< HEAD
 | 卡片、独立详情与趋势 | 自适应密度、详情深链接、UTC真实采样与版本对比；总览复用既有库分页，不截断五条，不补后端字段 | [cards.js](../client/frontend/cards.js)、[detail.js](../client/frontend/detail.js)、[trend.mjs](../client/frontend/trend.mjs)、[catalog.css](../client/frontend/catalog.css)，见 [数据来源与接口](client-catalog.md) | [趋势测试](../client/frontend/trend.test.mjs)、[路由/对比测试](../client/frontend/view.test.mjs)、[HTTP详情测试](../client/agent/internal/httpapi/details_test.go) |
 | 自动打开与图片地址 | 默认浏览器启动后自动会话；图片URL按版本缓存、可见懒加载并直连白名单CDN，不改后端 | [startup.go](../client/agent/cmd/agent/startup.go)、[Windows](../client/agent/cmd/agent/browser_windows.go)/[其他系统](../client/agent/cmd/agent/browser_other.go)、[images.go](../client/agent/internal/library/images.go)、[image.go](../client/agent/internal/remote/image.go)、[images.js](../client/frontend/images.js)，见 [启动与图片](client-launch-media.md) | [启动测试](../client/agent/cmd/agent/startup_test.go)、[缓存测试](../client/agent/internal/library/images_test.go)、[HTTP测试](../client/agent/internal/httpapi/images_test.go)、[地址测试](../client/frontend/images.test.mjs) |
 | 客户端本地 API | 会话、Host/Origin/CSRF、扫描与关注/远程/工作台25个API | [server.go](../client/agent/internal/httpapi/server.go)、[library.go](../client/agent/internal/httpapi/library.go) | [server_test.go](../client/agent/internal/httpapi/server_test.go)、[library_test.go](../client/agent/internal/httpapi/library_test.go) |
+=======
+| 客户端本地 API | 会话、Host/Origin/CSRF、扫描与关注/远程/工作台24个API | [server.go](../client/agent/internal/httpapi/server.go)、[library.go](../client/agent/internal/httpapi/library.go) | [server_test.go](../client/agent/internal/httpapi/server_test.go)、[library_test.go](../client/agent/internal/httpapi/library_test.go) |
+>>>>>>> 692d77faa8f4b746bca16c153c39ad9b81cc6282
 | 本地平台适配器 | Cookie 登录验证、WBI 签名、全部可见投稿分页，无 120 条截断或合集回退 | [client.go](../client/agent/internal/bilibili/client.go) 的 `Login`、`Videos`、[wbi.go](../client/agent/internal/bilibili/wbi.go) | [client_test.go](../client/agent/internal/bilibili/client_test.go) |
 | 本地扫描任务 | 后台逐页去重、完整性判断、取消与恢复，网页关闭不取消任务 | [service.go](../client/agent/internal/scanner/service.go) 的 `Service`、`Start`、`Close` | [service_test.go](../client/agent/internal/scanner/service_test.go) |
 | 客户端持久化 | Cookie保护、扫描和关注库/配置/缓存原子写入 | [store.go](../client/agent/internal/localstate/store.go)、[protect_windows.go](../client/agent/internal/localstate/protect_windows.go) | [store_test.go](../client/agent/internal/localstate/store_test.go)、[关注测试](../client/agent/internal/library/service_test.go) |
 | 本地关注库 | 本地库/公开搜索、总览缓存、统一自动提交与失败保留，取消不全局停采 | [service.go](../client/agent/internal/library/service.go)，[接入说明](client-library.md) | [service_test.go](../client/agent/internal/library/service_test.go) |
+<<<<<<< HEAD
 | 工作台与后台队列 | 侧栏白名单路由、既有库接口聚合总览/公开搜索、待提交退避，目录迁移受会话保护；本轮不改后端 | [navigation.js](../client/frontend/navigation.js)、[pending.go](../client/agent/internal/library/pending.go)、[directory.go](../client/agent/internal/localstate/directory.go)，见 [工作台说明](client-workspace.md) | [队列测试](../client/agent/internal/library/workspace_test.go)、[目录测试](../client/agent/internal/localstate/directory_test.go)、[设置测试](../client/agent/internal/httpapi/settings_test.go) |
 | Agent远程客户端 | 固定8182路径，JSON/超时/大小与重定向限制，无Cookie转发 | [client.go](../client/agent/internal/remote/client.go) | [client_test.go](../client/agent/internal/remote/client_test.go) |
 | 8182客户端接入 | 同路径JSON、精确状态、验证后提交，复用存储/采集 | [client.go](../backend/internal/admin/client.go)、[request.go](../backend/internal/tracker/request.go)、[target_lookup.go](../backend/internal/storage/target_lookup.go) | [client_test.go](../backend/internal/admin/client_test.go)、[request_test.go](../backend/internal/tracker/request_test.go) |
 | 公共准入与下载（规划） | 完整准入、总预算、公共搜索增强及本地下载 | [目标设计](client-server-architecture.md) | 见该文验收，当前尚未全部实现 |
 | Qt桌面客户端（规划） | 未来以C++ + Qt重构客户端，应用内整合界面与业务，保持现有功能与数据迁移 | [技术路线](../client/README.md#未来技术路线c--qt)、[实施计划](../PLAN.md#c--qt-一体化桌面客户端重构)；尚无Qt实现入口 | 计划中的功能对等、迁移、生命周期和安装验收；实现后补测试入口 |
+=======
+| 工作台与后台队列 | 侧栏白名单路由、总览/公开搜索、待提交退避，目录迁移受会话保护 | [navigation.js](../client/frontend/navigation.js)、[pending.go](../client/agent/internal/library/pending.go)、[directory.go](../client/agent/internal/localstate/directory.go)，见 [工作台说明](client-workspace.md) | [队列测试](../client/agent/internal/library/workspace_test.go)、[目录测试](../client/agent/internal/localstate/directory_test.go)、[设置测试](../client/agent/internal/httpapi/settings_test.go) |
+| Agent远程客户端 | 固定8182路径，JSON/超时/大小与重定向限制，无Cookie转发 | [client.go](../client/agent/internal/remote/client.go) | [client_test.go](../client/agent/internal/remote/client_test.go) |
+| 8182客户端接入 | 同路径JSON、精确状态、验证后提交，复用存储/采集 | [client.go](../backend/internal/admin/client.go)、[request.go](../backend/internal/tracker/request.go)、[target_lookup.go](../backend/internal/storage/target_lookup.go) | [client_test.go](../backend/internal/admin/client_test.go)、[request_test.go](../backend/internal/tracker/request_test.go) |
+| 公共准入与下载（规划） | 完整准入、总预算、公共搜索增强及本地下载 | [目标设计](client-server-architecture.md) | 见该文验收，当前尚未全部实现 |
+| Qt桌面客户端（规划） | 未来以C++ + Qt重构客户端，应用内整合界面与业务，保持现有功能与数据迁移 | [技术路线](../client/README.md#未来技术路线c--qt)、[实施计划](../PLANs/2026-11-15-qt-client.md)；尚无Qt实现入口 | 计划中的功能对等、迁移、生命周期和安装验收；实现后补测试入口 |
+>>>>>>> 692d77faa8f4b746bca16c153c39ad9b81cc6282
 | 用户档案与数据管理（规划） | 本地管理、导入导出和备份恢复；未来直连用户自选云盘自动备份，公共服务器不托管私人数据 | [数据管理设计](client-data-management.md)，尚无实现入口；现有 [localstate](../client/agent/internal/localstate/store.go) 已保存状态并可迁移目录，完整档案与备份未实现 | 同文档“实施顺序与验收”，实现后补测试入口 |
 
 注释与技术文档分工：包注释和文件头说明模块职责、边界及文档位置；接口、关键方法和复杂逻辑附近解释输入约束、错误语义及设计原因；本文负责模块关系、执行链路、API、字段映射及扩展方式。普通赋值和显而易见的调用不需要逐行注释。
@@ -404,7 +416,7 @@ Provider 先从 B站返回的 `data` 中读取字段，再构造 `source.Video`�
 
 已有 schema 2 数据库由 0003 迁移删除 `snapshot_version`；schema 1 和新数据库按 0001 → 0002 → 0003 顺序升级。保留已执行的迁移历史，最终视频版本表只有内容快照及相关观测、指纹信息。
 
-裁剪不改变现有指纹，内容相同时不新增版本、不重写旧快照。只有首次保存或真实内容变化后才保存新格式，因此已有目标的详情可能暂时仍含合集数据。历史裁剪和空间回收需单独安排。字段图例见 [裁剪前后对照](database.md#视频快照裁剪前后对照)，采样体积对比见 [存储成本与压缩](database.md#存储成本与压缩)，实施摘要见 [计划归档](../PLAN.md#已完成计划)，存储契约见 [数据库设计](database.md#payload-保存什么)。
+裁剪不改变现有指纹，内容相同时不新增版本、不重写旧快照。只有首次保存或真实内容变化后才保存新格式，因此已有目标的详情可能暂时仍含合集数据。历史裁剪和空间回收需单独安排。字段图例见 [裁剪前后对照](database.md#视频快照裁剪前后对照)，采样体积对比见 [存储成本与压缩](database.md#存储成本与压缩)，实施摘要见 [快照裁剪计划](../PLANs/2026-11-07-video-snapshot.md)，存储契约见 [数据库设计](database.md#payload-保存什么)。
 
 ### 查询 API 的字段映射
 

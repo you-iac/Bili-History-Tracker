@@ -1,5 +1,9 @@
 // library.go 将本地关注和远程读取接入已有会话/来源/CSRF 保护，不将平台 Cookie 传给服务器。
+<<<<<<< HEAD
 // 提供公开工作台、自动关注和受保护的目录设置；见 docs/client-library.md、docs/client-workspace.md、docs/client-catalog.md。
+=======
+// 提供公开工作台、自动关注和受保护的目录设置；见 docs/client-library.md、docs/client-workspace.md。
+>>>>>>> 692d77faa8f4b746bca16c153c39ad9b81cc6282
 package httpapi
 
 import (
@@ -8,6 +12,7 @@ import (
 )
 
 func (s *Server) libraryRoutes() {
+<<<<<<< HEAD
 	s.mux.HandleFunc("GET /api/images/{kind}/{id}", func(w http.ResponseWriter, r *http.Request) {
 		seq := int64(0)
 		var err error
@@ -25,6 +30,8 @@ func (s *Server) libraryRoutes() {
 		}
 		writeJSON(w, 200, result)
 	})
+=======
+>>>>>>> 692d77faa8f4b746bca16c153c39ad9b81cc6282
 	s.mux.HandleFunc("GET /api/settings", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, 200, s.store.DirectoryInfo()) })
 	s.mux.HandleFunc("PUT /api/settings/directory", func(w http.ResponseWriter, r *http.Request) {
 		var input struct {

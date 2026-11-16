@@ -1,7 +1,11 @@
 // view.test.mjs 验证未知总量、部分结果和北京时间边界，避免界面误报完成。
 import test from 'node:test';
 import assert from 'node:assert/strict';
+<<<<<<< HEAD
 import {progress, publishedAt, rangeLabel, stateLabel, viewForHash, followState, routeForHash, detailHref, compactNumber, snapshotChanges} from './view.mjs';
+=======
+import {progress, publishedAt, rangeLabel, stateLabel, viewForHash, followState} from './view.mjs';
+>>>>>>> 692d77faa8f4b746bca16c153c39ad9b81cc6282
 
 test('侧栏路由可直接刷新，启动密钥和未知片段不成为页面', () => {
   for (const view of ['overview','creators','videos','settings','discovery']) assert.equal(viewForHash(`#${view}`),view);
@@ -15,6 +19,7 @@ test('本地关注保存和服务器跟踪分别确认，失败明确进入重�
   assert.equal(followState({remote:{tracking:true}}),'服务器跟踪中');
   assert.equal(followState({remote:{tracking:false,recorded:true}}),'服务器已记录，未跟踪');
 });
+<<<<<<< HEAD
 
 test('详情深链接保留目标和来源，非法标识不会被作为远程路径',()=>{
   assert.deepEqual(routeForHash('#creators/593014440?scope=public'),{view:'detail',kind:'creator',id:'593014440',scope:'public',section:'creators',hash:'#creators/593014440?scope=public'});
@@ -33,6 +38,8 @@ test('版本对比展示内容变化，不把计数变化列为改名或改简�
   assert.deepEqual(snapshotChanges('video',{title:'同名',stat:{view:1}},{title:'同名',stat:{view:2}}),[]);
   assert.equal(snapshotChanges('video',{title:'之前'},{title:'<script>之后</script>'})[0].after,'<script>之后</script>');
 });
+=======
+>>>>>>> 692d77faa8f4b746bca16c153c39ad9b81cc6282
 
 test('只有明确完成时显示 100%，未知总量不伪造进度', () => {
   assert.equal(progress(130,120,'partial'),99);

@@ -1,16 +1,24 @@
 # 浏览器界面
 
+<<<<<<< HEAD
 状态：已实现侧栏总览、可调大小卡片库、独立详情趋势/版本对比、总览分页、公开搜索、自动关注及设置页（服务器/目录/Cookie），保留投稿发现与导出；默认自动连接，头像/封面按需加载。总览只读服务器既有UP/视频库，不展示需要新增后端接口的全局跟踪数和近期版本动态。本轮不改backend。共同需求见 [客户端说明](../README.md)，实现与验证见 [工作台说明](../../docs/client-workspace.md) 和 [关注接入](../../docs/client-library.md)。
+=======
+状态：已实现侧栏总览、UP/视频库、公开搜索、自动关注及设置页（服务器/目录/Cookie），保留投稿发现与导出。共同需求见 [客户端说明](../README.md)，实现与验证见 [工作台说明](../../docs/client-workspace.md) 和 [关注接入](../../docs/client-library.md)。
+>>>>>>> 692d77faa8f4b746bca16c153c39ad9b81cc6282
 
 主要职责：
 
 - [index.html](index.html) 与 [app.css](app.css)：账号配置、扫描进度、结果列表和响应式布局，不提供尚未实现功能的入口。
 - [app.js](app.js)：同源会话交换、Cookie 提交与清除、扫描轮询、取消/继续、分页和导出；敏感值不写入浏览器存储。
 - [navigation.js](navigation.js)：白名单路由、侧栏与移动导航；页面切换不终止后台任务。
+<<<<<<< HEAD
 - [library.js](library.js)：总览、公开库搜索、自动关注、设置与分页总览；详情使用独立路由；文本使用 `textContent`，所有远程请求经 Agent。
 - [cards.js](cards.js)、[catalog.css](catalog.css)：响应式卡片与三档大小。
 - [detail.js](detail.js)、[trend.mjs](trend.mjs)：详情路由、UTC真实日采样与版本对比，见 [库与详情](../../docs/client-catalog.md) 及 [趋势测试](trend.test.mjs)。
 - [images.js](images.js)：可见图片懒加载、白名单URL及失败占位，见 [启动与图片](../../docs/client-launch-media.md) 与 [地址测试](images.test.mjs)。
+=======
+- [library.js](library.js)：总览、公开库搜索、自动关注、设置与历史弹窗；文本使用 `textContent`，所有远程请求经 Agent。
+>>>>>>> 692d77faa8f4b746bca16c153c39ad9b81cc6282
 - [view.mjs](view.mjs)：状态、进度与北京时间显示，未知总量不伪造完成；[view.test.mjs](view.test.mjs) 覆盖关键边界。
 - 通过同源本地 HTTP API 向 [Agent](../agent/README.md) 提交配置和任务操作，读取校验结果与持久化状态；远端业务数据和平台查询由 Agent 执行，图片由浏览器加载。
 - 显示服务器离线、Agent 断连、凭据失效和任务失败等状态，刷新或关闭页面不取消 Agent 已接收的任务。

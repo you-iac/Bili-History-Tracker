@@ -1,5 +1,9 @@
 // navigation.js 仅管理工作台导航和移动侧栏；业务数据与任务独立于当前页面。
+<<<<<<< HEAD
 import {routeForHash} from './view.mjs';
+=======
+import {viewForHash} from './view.mjs';
+>>>>>>> 692d77faa8f4b746bca16c153c39ad9b81cc6282
 
 const titles = {
   overview:['信息总览','连接公开历史，整理自己的关注。'],
@@ -18,6 +22,7 @@ export function initNavigation(onChange) {
     toggle.setAttribute('aria-expanded',String(open));sidebar.inert = mobile.matches && !open;
   }
   function update() {
+<<<<<<< HEAD
     const route = routeForHash(location.hash), view = route.view;
     document.querySelectorAll('[data-page]').forEach(el => {el.hidden = el.dataset.page !== (view === 'creators' || view === 'videos' ? 'library' : view);});
     document.querySelectorAll('[data-view]').forEach(el => {if(el.dataset.view === route.section)el.setAttribute('aria-current','page');else el.removeAttribute('aria-current');});
@@ -30,6 +35,19 @@ export function initNavigation(onChange) {
   }
   function navigate(view) {
     const hash = routeForHash(view.startsWith('#')?view:`#${view}`).hash;
+=======
+    const view = viewForHash(location.hash);
+    document.querySelectorAll('[data-page]').forEach(el => {el.hidden = el.dataset.page !== (view === 'creators' || view === 'videos' ? 'library' : view);});
+    document.querySelectorAll('[data-view]').forEach(el => {if(el.dataset.view === view)el.setAttribute('aria-current','page');else el.removeAttribute('aria-current');});
+    document.getElementById('page-title').textContent = titles[view][0];
+    document.getElementById('page-subtitle').textContent = titles[view][1];
+    document.getElementById('breadcrumb-current').textContent = titles[view][0];
+    document.title = `${titles[view][0]} · Bili History Tracker`;
+    menu(false);window.scrollTo(0,0);onChange(view);
+  }
+  function navigate(view) {
+    const hash = `#${viewForHash(`#${view}`)}`;
+>>>>>>> 692d77faa8f4b746bca16c153c39ad9b81cc6282
     if(location.hash === hash)update();else location.hash = hash;
   }
   document.querySelectorAll('[data-view]').forEach(el => el.addEventListener('click',event => {
@@ -42,5 +60,9 @@ export function initNavigation(onChange) {
   document.addEventListener('keydown',event => {if(event.key === 'Escape')menu(false);});
   mobile.addEventListener('change',() => menu(false));
   window.addEventListener('hashchange',update);menu(false);
+<<<<<<< HEAD
   return {navigate,update,current:() => routeForHash(location.hash)};
+=======
+  return {navigate,update,current:() => viewForHash(location.hash)};
+>>>>>>> 692d77faa8f4b746bca16c153c39ad9b81cc6282
 }

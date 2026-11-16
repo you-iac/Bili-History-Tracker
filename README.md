@@ -29,7 +29,11 @@ cd client
 go run ./agent/cmd/agent
 ```
 
+<<<<<<< HEAD
 默认自动打开浏览器并完成本地认证（地址 `127.0.0.1:8183`）；`-open-browser=false` 可改为手动链接。头像与封面按需读取历史URL，见 [启动与图片](docs/client-launch-media.md)。已支持侧栏工作台、卡片大小调节、独立详情趋势与版本对比、总览完整分页（见 [数据来源说明](docs/client-catalog.md)）、服务器公开搜索、本地关注自动提交、资料/指标/版本、设置与数据目录迁移，见 [工作台说明](docs/client-workspace.md)，关注与缓存重启保留，取消不影响公共采集。本轮不修改backend，复用其既有8182接口；操作见 [客户端说明](client/README.md#当前实现与启动)，协议和验证见 [关注接入](docs/client-library.md)。下载、完整数据管理和云盘仍在 [PLAN](PLAN.md) 中。
+=======
+打开终端显示的完整本地链接（默认 `127.0.0.1:8183`）。已支持侧栏工作台、服务器公开搜索、本地关注自动提交、资料/指标/版本、设置与数据目录迁移，见 [工作台说明](docs/client-workspace.md)，关注与缓存重启保留，取消不影响公共采集。远程 backend 需一起更新；操作见 [客户端说明](client/README.md#当前实现与启动)，协议和验证见 [关注接入](docs/client-library.md)。下载、完整数据管理和云盘仍在 [客户端计划](PLANs/2026-11-10-client-agent.md) 中。
+>>>>>>> 692d77faa8f4b746bca16c153c39ad9b81cc6282
 
 ## 观察台
 
