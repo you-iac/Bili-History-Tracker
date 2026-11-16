@@ -38,7 +38,7 @@ go run ./agent/cmd/agent -open-browser=false
 browser -- HTTPS image URL --> Bilibili image CDN
 ```
 
-本地新增 `GET /api/images/{kind}/{id}?seq=1`，`kind`为 `creator/video`，标识按既有UID/BV规则校验。返回 `url`、`seq`、`available`、`cached`，不返回整份快照，也不代理图片文件。所有请求沿用原本地会话和来源检查。当前本地共25个API，清单见 [Agent说明](../client/agent/README.md#api-接口)。
+本地新增 `GET /api/images/{kind}/{id}?seq=1`，`kind`为 `creator/video`，标识按既有UID/BV规则校验。返回 `url`、`seq`、`available`、`cached`，不返回整份快照，也不代理图片文件。所有请求沿用原本地会话和来源检查。当前本地共27个API，清单见 [Agent说明](../client/agent/README.md#api-接口)。
 
 已知版本通常只需一次既有详情请求；`seq=0`先读取当前版本，再读取对应快照。选中详情快照也会预热该版本的图片地址缓存。读取仅针对服务器已保存记录，不触发平台采集或公共跟踪。
 

@@ -1,5 +1,6 @@
 // Package remote 通过固定8182路径读取公共资料和申请跟踪，不转发本地 Cookie 或会话。
-// 限制响应大小、超时和重定向，不提供任意 URL 代理。见 docs/client-library.md、docs/client-catalog.md。
+// 限制响应大小、超时和重定向，不提供任意 URL 代理。目录透传白名单排序和 UP 归属。
+// 见 docs/client-library.md、docs/client-catalog.md。
 package remote
 
 import (
@@ -24,21 +25,25 @@ type Error struct {
 func (e *Error) Error() string { return e.Message }
 
 type Item struct {
-	Kind        string `json:"kind"`
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	OwnerID     string `json:"owner_id"`
-	OwnerName   string `json:"owner_name"`
-	Metric      *int64 `json:"metric"`
-	Growth      *int64 `json:"growth"`
-	GrowthFrom  int64  `json:"growth_from"`
-	GrowthTo    int64  `json:"growth_to"`
-	Seq         int64  `json:"seq"`
-	ObservedAt  int64  `json:"observed_at"`
-	PublishedAt int64  `json:"published_at"`
-	Recorded    bool   `json:"recorded"`
-	Tracking    bool   `json:"tracking"`
-	Status      string `json:"status"`
+	Kind         string `json:"kind"`
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	OwnerID      string `json:"owner_id"`
+	OwnerName    string `json:"owner_name"`
+	Metric       *int64 `json:"metric"`
+	Growth       *int64 `json:"growth"`
+	VideoViews   *int64 `json:"video_views"`
+	RecentVideos *int64 `json:"recent_videos"`
+	VideoCount   *int64 `json:"video_count"`
+	Cover        string `json:"cover,omitempty"`
+	GrowthFrom   int64  `json:"growth_from"`
+	GrowthTo     int64  `json:"growth_to"`
+	Seq          int64  `json:"seq"`
+	ObservedAt   int64  `json:"observed_at"`
+	PublishedAt  int64  `json:"published_at"`
+	Recorded     bool   `json:"recorded"`
+	Tracking     bool   `json:"tracking"`
+	Status       string `json:"status"`
 }
 type Status struct {
 	Kind     string `json:"kind"`
@@ -77,24 +82,18 @@ type Catalog struct {
 	Limit int    `json:"limit"`
 	Total int    `json:"total"`
 }
-<<<<<<< HEAD
+
+// CatalogOptions 仅选择已有公开记录的顺序和 UP 归属；不触发平台采集。
+type CatalogOptions struct {
+	Sort, OwnerID string
+}
 
 // Overview 由Agent读取既有公开库接口聚合，不依赖新增服务器总览接口。
 // CatalogBased 区分旧版根接口缓存，分页长度识别旧五条预览；旧缓存不继续展示。见 docs/client-workspace.md。
-=======
-type Update struct {
-	Kind string `json:"kind"`
-	ID   string `json:"id"`
-	Name string `json:"name"`
-	Seq  int64  `json:"seq"`
-	At   int64  `json:"at"`
-}
->>>>>>> 692d77faa8f4b746bca16c153c39ad9b81cc6282
 type Overview struct {
 	Summary struct {
 		Creators int64 `json:"creators"`
 		Videos   int64 `json:"videos"`
-<<<<<<< HEAD
 	} `json:"summary"`
 	Creators     []Item    `json:"creators"`
 	Videos       []Item    `json:"videos"`
@@ -102,19 +101,10 @@ type Overview struct {
 	CatalogBased bool      `json:"catalog_based"`
 	CreatorLimit int       `json:"creator_limit"`
 	VideoLimit   int       `json:"video_limit"`
-=======
-		Tracking int64 `json:"tracking"`
-		Updates  int64 `json:"updates"`
-	} `json:"summary"`
-	Creators  []Item    `json:"creators"`
-	Videos    []Item    `json:"videos"`
-	Updates   []Update  `json:"updates"`
-	FetchedAt time.Time `json:"fetched_at"`
->>>>>>> 692d77faa8f4b746bca16c153c39ad9b81cc6282
 }
 
 // Catalog 只读服务器已记录的数据；id 是精确标识，q 是名称/标识搜索，不调用平台发现。
-func (c *Client) Catalog(ctx context.Context, base, kind, q, id string, page int) (Catalog, error) {
+func (c *Client) Catalog(ctx context.Context, base, kind, q, id string, page int, options ...CatalogOptions) (Catalog, error) {
 	var result Catalog
 	path := "/creators"
 	if kind == "video" {
@@ -123,22 +113,23 @@ func (c *Client) Catalog(ctx context.Context, base, kind, q, id string, page int
 		return result, &Error{Message: "搜索类型无效。", Status: 400}
 	}
 	query := url.Values{"q": {q}, "page": {strconv.Itoa(page)}}
+	if len(options) > 0 {
+		query.Set("sort", options[0].Sort)
+		if options[0].OwnerID != "" {
+			query.Set("owner", options[0].OwnerID)
+		}
+	}
 	if id != "" {
 		query.Set("id", id)
 		query.Del("q")
 	}
 	err := c.call(ctx, base, "GET", path+"?"+query.Encode(), nil, &result)
-<<<<<<< HEAD
 	if err == nil && (result.Items == nil || result.Page < 1 || result.Limit < 1 || result.Total < 0) {
-=======
-	if err == nil && (result.Items == nil || result.Page < 1 || result.Limit < 1) {
->>>>>>> 692d77faa8f4b746bca16c153c39ad9b81cc6282
 		err = &Error{Message: "服务器公开库格式不兼容，请更新 backend。", Status: 502}
 	}
 	return result, err
 }
 
-<<<<<<< HEAD
 // Overview 只读两种公开库的第一页与total，不抓取HTML或推算全局跟踪/版本统计。
 func (c *Client) Overview(ctx context.Context, base string) (Overview, error) {
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
@@ -154,15 +145,6 @@ func (c *Client) Overview(ctx context.Context, base string) (Overview, error) {
 	result := Overview{Creators: creators.Items, Videos: videos.Items, FetchedAt: time.Now().UTC(), CatalogBased: true, CreatorLimit: creators.Limit, VideoLimit: videos.Limit}
 	result.Summary.Creators, result.Summary.Videos = int64(creators.Total), int64(videos.Total)
 	return result, nil
-=======
-func (c *Client) Overview(ctx context.Context, base string) (Overview, error) {
-	var result Overview
-	err := c.call(ctx, base, "GET", "/", nil, &result)
-	if err == nil && result.FetchedAt.IsZero() {
-		err = &Error{Message: "服务器缺少公开总览接口，请更新 backend。", Status: 502}
-	}
-	return result, err
->>>>>>> 692d77faa8f4b746bca16c153c39ad9b81cc6282
 }
 
 // New 使用独立客户端，不共享平台 CookieJar；禁止重定向。

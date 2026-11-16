@@ -1,11 +1,13 @@
 // detail.js 编排独立详情、真实趋势与稳定字段版本对比；复用Agent既有详情路径。见 docs/client-catalog.md。
-import {compactNumber,signedNumber,utcDay,snapshotChanges,followState} from './view.mjs';
+import {compactNumber,signedNumber,utcDay,snapshotChanges,followState,publishedAt} from './view.mjs';
 import {renderTrend} from './trend.mjs';
 import {cardStatus} from './cards.js';
 import {snapshotImageURL} from './images.js';
+import {initCreatorVideos} from './creator-videos.js';
 
-export function initDetail({api,notify,onAdd,onChanged,onScan,images}) {
+export function initDetail({api,notify,onAdd,onChanged,onScan,onSyncSummaries,images}) {
   const $=id=>document.getElementById(id);
+  const videos=initCreatorVideos({api,notify,onAdd,onChanged,onSyncSummaries,images});
   const node=(tag,text,className)=>{const el=document.createElement(tag);if(text!=null)el.textContent=text;if(className)el.className=className;return el;};
   let route=null,usable=false,working=false,sequence=0,snapshotSequence=0,days='30',shownDays='30',page=1,selected=0,data=null,snapshotBusy=false;
   const date=value=>value?new Date(value).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'}):'尚无成功观测';
@@ -25,7 +27,7 @@ export function initDetail({api,notify,onAdd,onChanged,onScan,images}) {
     $('detail-source').textContent=`数据来自 ${d.server_url} · 最近观测 ${date(item.observed_at)}`;
     $('detail-external').href=creator?`https://space.bilibili.com/${route.id}`:`https://www.bilibili.com/video/${route.id}`;
     $('detail-metric-label').textContent=creator?'最新粉丝数':'最新播放量';$('detail-latest').textContent=compactNumber(item.metric);$('detail-latest').title=item.metric?.toLocaleString('zh-CN')||'未知';
-    $('detail-total-versions').textContent=compactNumber(d.version_total??item.seq);$('detail-published').textContent=creator?(local?'已关注':'未关注'):(item.published_at?new Date(item.published_at*1000).toLocaleDateString('zh-CN',{timeZone:'Asia/Shanghai'}):'未知');
+    $('detail-total-versions').textContent=compactNumber(d.version_total??item.seq);$('detail-published').textContent=creator?(local?'已关注':'未关注'):publishedAt(item.published_at);
     $('detail-fourth-label').textContent=creator?'个人关注状态':'视频发布时间';
     $('detail-chart-title').textContent=creator?'粉丝数变化':'播放量变化';
     const model=renderTrend($('detail-chart'),d.metrics?.points,creator?'粉丝数变化':'播放量变化');
@@ -36,7 +38,7 @@ export function initDetail({api,notify,onAdd,onChanged,onScan,images}) {
     const versions=document.createDocumentFragment();for(const version of d.versions||[]){const button=node('button',null,'version-button');button.type='button';button.dataset.seq=version.seq;button.append(node('strong',`v${version.seq} · ${version.seq===1?'首次记录':'内容更新'}`),node('span',date(version.at)),node('small',version.name||''));button.addEventListener('click',()=>selectSnapshot(version.seq));versions.append(button);}
     if(!d.versions?.length)versions.append(node('p','尚无可查看的完整内容版本。','empty-copy'));$('detail-versions').replaceChildren(versions);
     $('detail-version-page').textContent=`第 ${page} / ${Math.max(1,Math.ceil((d.version_total||0)/(d.version_limit||10)))} 页 · ${d.version_total||0} 个版本`;
-    $('detail-error').hidden=!d.cached;if(d.cached)$('detail-error').textContent=`服务器暂不可达，当前为本地缓存（最近核对 ${date(local?.updated_at)}）。${d.read_error||''}`;
+    $('detail-error').hidden=!d.cached&&!d.cache_error;if(d.cache_error)$('detail-error').textContent='资料已读取，本地缓存保存失败：'+d.cache_error;if(d.cached)$('detail-error').textContent=`服务器暂不可达，当前为本地缓存（最近核对 ${date(local?.updated_at)}）。${d.read_error||''}`;
     $('detail-body').hidden=false;markSelected();controls();
   }
   function markSelected(){for(const button of $('detail-versions').querySelectorAll('button'))button.setAttribute('aria-pressed',String(Number(button.dataset.seq)===selected));}
@@ -72,13 +74,14 @@ export function initDetail({api,notify,onAdd,onChanged,onScan,images}) {
   $('detail-refresh').addEventListener('click',()=>load());
   $('detail-follow').addEventListener('click',()=>act(()=>onAdd(route.kind,route.id)));
   $('detail-unfollow').addEventListener('click',()=>act(async()=>{await api(`/api/follows/${route.kind}/${route.id}`,{method:'DELETE',body:'{}'});notify('已取消本地关注，服务器公共采集继续。');}));
-  $('detail-scan').addEventListener('click',()=>{if(route)onScan(route.id);});
+  $('detail-scan').addEventListener('click',()=>{if(route?.kind==='creator')videos.start();});
   $('detail-previous').addEventListener('click',()=>{page--;load();});$('detail-next').addEventListener('click',()=>{page++;load();});
   let chartWidth=0;
   new ResizeObserver(()=>{const width=$('detail-chart').clientWidth;if(width&&width!==chartWidth){chartWidth=width;if(route&&data)renderTrend($('detail-chart'),data.metrics?.points,route.kind==='creator'?'粉丝数变化':'播放量变化');}}).observe($('detail-chart'));
   return {
-    setConnected(value){usable=value;controls();},
-    leave(){sequence++;snapshotSequence++;snapshotBusy=false;working=false;route=null;},
-    async show(next){sequence++;snapshotSequence++;snapshotBusy=false;working=false;route=next;days='30';page=1;selected=0;data=null;$('detail-days').value=days;$('detail-body').hidden=true;$('detail-loading').hidden=true;$('detail-error').hidden=usable;if(!usable)$('detail-error').textContent='等待连接本地 Agent，连接后可刷新资料。';$('detail-changes').replaceChildren();$('detail-snapshot').textContent='';$('detail-snapshot-title').textContent='内容变化';$('detail-snapshot-note').textContent='选择版本查看变化。';$('detail-back').href=`#${route.section}${route.scope==='public'?'?scope=public':''}`;controls();await load();}
+    setConnected(value){usable=value;videos.setConnected(value);controls();},
+    tick(){return videos.tick();},
+    leave(){sequence++;snapshotSequence++;snapshotBusy=false;working=false;route=null;videos.leave();},
+    async show(next){sequence++;snapshotSequence++;snapshotBusy=false;working=false;route=next;videos.show(route.kind==='creator'?route.id:'');days='30';page=1;selected=0;data=null;$('detail-days').value=days;$('detail-body').hidden=true;$('detail-loading').hidden=true;$('detail-error').hidden=usable;if(!usable)$('detail-error').textContent='等待连接本地 Agent，连接后可刷新资料。';$('detail-changes').replaceChildren();$('detail-snapshot').textContent='';$('detail-snapshot-title').textContent='内容变化';$('detail-snapshot-note').textContent='选择版本查看变化。';$('detail-back').href=`#${route.section}${route.scope==='public'?'?scope=public':''}`;controls();await load();}
   };
 }

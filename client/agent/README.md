@@ -22,13 +22,8 @@ Agent 是运行在本机的 Go 程序：提供网页、本地 UP/视频关注库
 
 | 模块 | 职责 |
 |---|---|
-<<<<<<< HEAD
 | [main](cmd/agent/main.go) | 组装回环服务并自动打开已认证网页，默认8183 |
-| [httpapi](internal/httpapi/server.go)、[关注接口](internal/httpapi/library.go) | 网页与25个API，会话、来源、CSRF保护 |
-=======
-| [main](cmd/agent/main.go) | 组装并启动回环服务，默认8183 |
-| [httpapi](internal/httpapi/server.go)、[关注接口](internal/httpapi/library.go) | 网页与24个API，会话、来源、CSRF保护 |
->>>>>>> 692d77faa8f4b746bca16c153c39ad9b81cc6282
+| [httpapi](internal/httpapi/server.go)、[关注接口](internal/httpapi/library.go) | 网页与27个API，会话、来源、CSRF保护 |
 | [library](internal/library/service.go) | 本地关注/公开搜索、总览缓存、自动提交与退避队列，见 [pending.go](internal/library/pending.go) |
 | [remote](internal/remote/client.go) | 按固定8182路径查询/提交，不转发平台 Cookie或本地会话 |
 | [scanner](internal/scanner/service.go)、[bilibili](internal/bilibili/client.go) | Cookie验证、投稿分页、取消与检查点恢复 |
@@ -44,11 +39,7 @@ Agent 是运行在本机的 Go 程序：提供网页、本地 UP/视频关注库
 
 实现与限制见 [关注库技术说明](../../docs/client-library.md)，整体目标见 [协作设计](../../docs/client-server-architecture.md)，私人数据规划见 [数据管理](../../docs/client-data-management.md)。
 
-<<<<<<< HEAD
 浏览器侧栏包含总览、卡片库、独立详情、投稿发现和设置；详情趋势/版本与总览分页的数据来源见 [库与详情](../../docs/client-catalog.md)。工作台操作、队列和目录指向见 [工作台说明](../../docs/client-workspace.md)。
-=======
-浏览器侧栏包含总览、两个库、投稿发现和设置，工作台操作、队列和目录指向见 [工作台说明](../../docs/client-workspace.md)。
->>>>>>> 692d77faa8f4b746bca16c153c39ad9b81cc6282
 
 ## API 接口
 
@@ -70,25 +61,18 @@ Agent 是运行在本机的 Go 程序：提供网页、本地 UP/视频关注库
 | `PUT /api/remote/connection` | `{"server_url":"http://...:8182"}`，空字符串断开；切服清缓存保留关注 |
 | `POST /api/remote/test` | 测试已保存服务器的JSON能力 |
 | `GET /api/overview` | 本地关注/待提交数量、服务器地址与最近公开总览 |
-<<<<<<< HEAD
 | `POST /api/overview/refresh` | 用既有UP/视频库接口聚合总数与首页列表并缓存 |
-| `GET /api/remote/catalog?kind=creator&q=&page=1` | 只读公开库搜索，按本地列表补个人关注标记 |
+| `GET /api/remote/catalog?kind=creator&q=&sort=published&page=1` | 名称/链接搜索，透传排序和可选 owner，补个人关注标记 |
+| `GET /api/creator-videos/{UID}?scope=followed或discovered&sort=published&page=1` | UP 详情的关注/未关注投稿，支持 q 搜索和分页前排序，只读不启动扫描 |
 | `GET /api/images/{kind}/{id}?seq=1` | 从既有快照解析头像/封面URL并按版本缓存；返回url/seq/available/cached，不代理图片文件 |
-=======
-| `POST /api/overview/refresh` | 读取并缓存服务器公开总览 |
-| `GET /api/remote/catalog?kind=creator&q=&page=1` | 只读公开库搜索，按本地列表补个人关注标记 |
->>>>>>> 692d77faa8f4b746bca16c153c39ad9b81cc6282
 | `GET /api/settings` | 活动/启动目录与状态文件占用 |
 | `PUT /api/settings/directory` | `data_directory` 绝对路径，复制到空目录并持久化切换 |
-| `GET /api/follows?kind=creator&page=1&q=` | 本地UP/视频关注，分页20条及分类总数 |
+| `POST /api/follows/refresh?kind=creator或video` | 只读公开目录，回填本地关注摘要，独立于提交状态；请求需 CSRF |
+| `GET /api/follows?kind=creator&page=1&q=&sort=published` | 本地关注，链接搜索及分页前排序，可选 owner 筛选视频归属 |
 | `POST /api/follows` | `{"kind":"creator或video","id":"UID/BV/标准链接"}` 保存本地关注并自动提交；失败返回待提交状态 |
 | `DELETE /api/follows/{kind}/{id}` | 仅取消本地关注，不停服务器采集 |
 | `POST /api/follows/{kind}/{id}/refresh` | 核对公共状态，读取并保存最近资料/版本/指标 |
 | `POST /api/follows/{kind}/{id}/submit` | 提交已保存目标到8182，服务器确认后返回 |
-<<<<<<< HEAD
 | `GET /api/library/{kind}/{id}?days=30&page=1&seq=1` | 读取公开详情、7/30/90/all趋势、版本页与快照；附带个人关注/来源和匹配的30日离线缓存状态，不自动提交跟踪 |
-=======
-| `GET /api/library/{kind}/{id}?page=1&seq=1` | 读取公开目标详情（无需先关注）、版本页与可选历史快照，不自动提交跟踪 |
->>>>>>> 692d77faa8f4b746bca16c153c39ad9b81cc6282
 
 扫描后台执行，网页关闭不取消；关注刷新/提交绑定当前请求，失败可显式重试；待提交申请由后台退避处理。完整行为见 [本地关注实现](../../docs/client-library.md)，原扫描协议见 [发现说明](../../docs/client-discovery.md#本地-api-与会话)。

@@ -88,6 +88,10 @@ func New(service *scanner.Service, address string, collection *library.Service, 
 			http.NotFound(w, r)
 			return
 		}
+		// Windows 的 MIME 映射可能把 .mjs 识别为 text/plain，nosniff 会阻止整个模块树。
+		if strings.HasSuffix(r.URL.Path, ".js") || strings.HasSuffix(r.URL.Path, ".mjs") {
+			w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+		}
 		static.ServeHTTP(w, r)
 	})
 	return s, nil

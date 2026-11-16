@@ -27,21 +27,12 @@ func TestAutomaticFollowPublicSearchAndOverview(t *testing.T) {
 			posts.Add(1)
 			json.NewEncoder(w).Encode(remote.Status{Kind: "creator", ID: "123", Tracking: true, State: "tracking"})
 		case "/creators":
-<<<<<<< HEAD
 			if r.URL.Query().Get("id") != "123" && (r.URL.Query().Get("q") != "" || r.URL.Query().Get("page") != "1") {
 				t.Error("UID was not exact search", r.URL.RawQuery)
 			}
 			json.NewEncoder(w).Encode(remote.Catalog{Items: []remote.Item{{Kind: "creator", ID: "123", Name: "public", Tracking: true}}, Page: 1, Limit: 18, Total: 1})
 		case "/videos":
 			json.NewEncoder(w).Encode(remote.Catalog{Items: []remote.Item{}, Page: 1, Limit: 18})
-=======
-			if r.URL.Query().Get("id") != "123" {
-				t.Error("UID was not exact search", r.URL.RawQuery)
-			}
-			json.NewEncoder(w).Encode(remote.Catalog{Items: []remote.Item{{Kind: "creator", ID: "123", Name: "public", Tracking: true}}, Page: 1, Limit: 18, Total: 1})
-		case "/":
-			json.NewEncoder(w).Encode(remote.Overview{FetchedAt: time.Now().UTC()})
->>>>>>> 692d77faa8f4b746bca16c153c39ad9b81cc6282
 		default:
 			http.NotFound(w, r)
 		}
@@ -65,11 +56,7 @@ func TestAutomaticFollowPublicSearchAndOverview(t *testing.T) {
 		t.Fatal("personal follow missing", err)
 	}
 	d, err := s.RefreshOverview(context.Background())
-<<<<<<< HEAD
 	if err != nil || d.Public == nil || !d.Public.CatalogBased || d.Public.Summary.Creators != 1 || d.Creators != 1 || posts.Load() != 1 {
-=======
-	if err != nil || d.Public == nil || d.Creators != 1 {
->>>>>>> 692d77faa8f4b746bca16c153c39ad9b81cc6282
 		t.Fatal(d, err)
 	}
 	if err = s.Configure("http://localhost:8182"); err != nil {
@@ -80,7 +67,6 @@ func TestAutomaticFollowPublicSearchAndOverview(t *testing.T) {
 	}
 }
 
-<<<<<<< HEAD
 func TestOverviewDropsOldSourceAndKeepsCacheOnReadFailure(t *testing.T) {
 	store, err := localstate.New(t.TempDir())
 	if err != nil {
@@ -210,8 +196,6 @@ func TestDetailOfflineCacheMatchesOnlyDefaultRange(t *testing.T) {
 	}
 }
 
-=======
->>>>>>> 692d77faa8f4b746bca16c153c39ad9b81cc6282
 func TestFollowQueuesOfflineAndBackgroundRecovers(t *testing.T) {
 	store, _ := localstate.New(t.TempDir())
 	var ready atomic.Bool

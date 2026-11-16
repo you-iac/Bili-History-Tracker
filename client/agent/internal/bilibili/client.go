@@ -35,11 +35,13 @@ type Account struct {
 	Name string `json:"name"`
 }
 
-// Video 只保留标识、标题和发布时间；不推断服务器跟踪状态。
+// Video 保留投稿卡片资料；播放量缺失时为 nil，不推断服务器跟踪状态。
 type Video struct {
 	ID          string `json:"id"`
 	Title       string `json:"title"`
 	PublishedAt int64  `json:"published_at"`
+	Cover       string `json:"cover,omitempty"`
+	Views       *int64 `json:"views,omitempty"`
 }
 type Page struct {
 	Videos []Video
@@ -144,6 +146,8 @@ func (c *Client) Videos(ctx context.Context, cookie, uid string, page int, keys 
 				ID      string `json:"bvid"`
 				Title   string `json:"title"`
 				Created int64  `json:"created"`
+				Cover   string `json:"pic"`
+				Views   *int64 `json:"play"`
 			} `json:"vlist"`
 		} `json:"list"`
 		Page *struct {
@@ -167,7 +171,10 @@ func (c *Client) Videos(ctx context.Context, cookie, uid string, page int, keys 
 		if !bvidPattern.MatchString(v.ID) || v.Created < 0 {
 			return Page{}, invalid
 		}
-		result.Videos = append(result.Videos, Video{ID: v.ID, Title: v.Title, PublishedAt: v.Created})
+		if v.Views != nil && *v.Views < 0 {
+			v.Views = nil
+		}
+		result.Videos = append(result.Videos, Video{ID: v.ID, Title: v.Title, PublishedAt: v.Created, Cover: v.Cover, Views: v.Views})
 	}
 	return result, nil
 }

@@ -1,18 +1,27 @@
 // library.go 将本地关注和远程读取接入已有会话/来源/CSRF 保护，不将平台 Cookie 传给服务器。
-<<<<<<< HEAD
 // 提供公开工作台、自动关注和受保护的目录设置；见 docs/client-library.md、docs/client-workspace.md、docs/client-catalog.md。
-=======
-// 提供公开工作台、自动关注和受保护的目录设置；见 docs/client-library.md、docs/client-workspace.md。
->>>>>>> 692d77faa8f4b746bca16c153c39ad9b81cc6282
 package httpapi
 
 import (
+	"math"
 	"net/http"
 	"strconv"
+
+	"bili-history-tracker/client/agent/internal/bilibili"
+	"bili-history-tracker/client/agent/internal/library"
+	"bili-history-tracker/client/agent/internal/remote"
 )
 
 func (s *Server) libraryRoutes() {
-<<<<<<< HEAD
+	s.mux.HandleFunc("POST /api/follows/refresh", func(w http.ResponseWriter, r *http.Request) {
+		count, err := s.library.SyncSummaries(r.Context(), r.URL.Query().Get("kind"))
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		writeJSON(w, 200, map[string]int{"synced": count})
+	})
+	s.mux.HandleFunc("GET /api/creator-videos/{id}", s.creatorVideos)
 	s.mux.HandleFunc("GET /api/images/{kind}/{id}", func(w http.ResponseWriter, r *http.Request) {
 		seq := int64(0)
 		var err error
@@ -30,8 +39,6 @@ func (s *Server) libraryRoutes() {
 		}
 		writeJSON(w, 200, result)
 	})
-=======
->>>>>>> 692d77faa8f4b746bca16c153c39ad9b81cc6282
 	s.mux.HandleFunc("GET /api/settings", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, 200, s.store.DirectoryInfo()) })
 	s.mux.HandleFunc("PUT /api/settings/directory", func(w http.ResponseWriter, r *http.Request) {
 		var input struct {
@@ -82,11 +89,17 @@ func (s *Server) libraryRoutes() {
 	s.mux.HandleFunc("GET /api/remote/catalog", func(w http.ResponseWriter, r *http.Request) {
 		page, err := positivePage(r, "page")
 		q := r.URL.Query().Get("q")
-		if err != nil || len(q) > 300 {
+		q, queryErr := library.SearchQuery(r.URL.Query().Get("kind"), q)
+		order := r.URL.Query().Get("sort")
+		owner := r.URL.Query().Get("owner")
+		if owner != "" && queryErr == nil {
+			_, queryErr = library.Normalize("creator", owner)
+		}
+		if err != nil || queryErr != nil || len(q) > 300 || !library.ValidSort(order) {
 			apiError(w, 400, "invalid_input", "搜索条件或页码无效。")
 			return
 		}
-		data, err := s.library.Search(r.Context(), r.URL.Query().Get("kind"), q, page)
+		data, err := s.library.Search(r.Context(), r.URL.Query().Get("kind"), q, page, remote.CatalogOptions{Sort: order, OwnerID: owner})
 		if err != nil {
 			writeError(w, err)
 			return
@@ -101,10 +114,34 @@ func (s *Server) libraryRoutes() {
 		if !decode(w, r, &input) {
 			return
 		}
+		// 网络提交期间可能切换扫描任务，关注来源必须取用户发起操作时的上下文。
+		var discovery *bilibili.Video
+		owner := ""
+		if input.Kind == "video" {
+			id, _ := library.Normalize("video", input.ID)
+			result := s.service.Result(0, math.MaxInt)
+			if result.Job != nil {
+				for _, v := range result.Videos {
+					if v.ID == id {
+						copy := v
+						discovery = &copy
+						owner = result.Job.CreatorID
+						break
+					}
+				}
+			}
+		}
 		f, err := s.library.Follow(r.Context(), input.Kind, input.ID)
 		if err != nil {
 			writeError(w, err)
 			return
+		}
+		if discovery != nil {
+			f, err = s.library.RememberDiscovery(f.ID, owner, *discovery)
+			if err != nil {
+				writeError(w, err)
+				return
+			}
 		}
 		writeJSON(w, 200, f)
 	})
@@ -136,11 +173,41 @@ func (s *Server) libraryRoutes() {
 func (s *Server) follows(w http.ResponseWriter, r *http.Request) {
 	kind := r.URL.Query().Get("kind")
 	page, err := positivePage(r, "page")
-	if err != nil || (kind != "" && kind != "creator" && kind != "video") {
+	q, queryErr := library.SearchQuery(kind, r.URL.Query().Get("q"))
+	order, owner := r.URL.Query().Get("sort"), r.URL.Query().Get("owner")
+	if owner != "" && queryErr == nil {
+		_, queryErr = library.Normalize("creator", owner)
+	}
+	if err != nil || queryErr != nil || len(q) > 300 || !library.ValidSort(order) || (kind != "" && kind != "creator" && kind != "video") {
 		apiError(w, 400, "invalid_input", "关注类型或页码无效。")
 		return
 	}
-	writeJSON(w, 200, s.library.ListFiltered(kind, r.URL.Query().Get("q"), page, r.URL.Query().Get("pending") == "1"))
+	writeJSON(w, 200, s.library.ListCatalog(kind, q, page, r.URL.Query().Get("pending") == "1", order, owner))
+}
+
+// creatorVideos 只组合已有扫描结果和本地关注；获取/停止仍由显式扫描操作触发。
+func (s *Server) creatorVideos(w http.ResponseWriter, r *http.Request) {
+	id, err := library.Normalize("creator", r.PathValue("id"))
+	page, pageErr := positivePage(r, "page")
+	q, queryErr := library.SearchQuery("video", r.URL.Query().Get("q"))
+	order, scope := r.URL.Query().Get("sort"), r.URL.Query().Get("scope")
+	if err != nil || pageErr != nil || queryErr != nil || len(q) > 300 || !library.ValidSort(order) || (scope != "followed" && scope != "discovered") {
+		apiError(w, 400, "invalid_input", "UP 投稿查询条件无效。")
+		return
+	}
+	result := s.service.Result(0, math.MaxInt)
+	elsewhere := result.Job != nil && result.Job.CreatorID != id && (result.Job.State == "running" || result.Job.State == "cancelling")
+	if result.Job == nil || result.Job.CreatorID != id {
+		result.Job = nil
+		result.Videos = nil
+	}
+	var data any
+	if scope == "followed" {
+		data = s.library.ListCatalog("video", q, page, false, order, id, result.Videos)
+	} else {
+		data = s.library.ScanCatalog(result.Videos, id, q, order, page)
+	}
+	writeJSON(w, 200, map[string]any{"catalog": data, "job": result.Job, "configured": s.service.Config().Configured, "busy_elsewhere": elsewhere})
 }
 func positivePage(r *http.Request, name string) (int, error) {
 	raw := r.URL.Query().Get(name)

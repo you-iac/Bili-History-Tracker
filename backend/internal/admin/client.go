@@ -24,7 +24,7 @@ func clientItem(i storage.ContentItem) map[string]any {
 	if i.Kind == "creator" && i.Seq == 0 {
 		i.Recorded = false
 	}
-	return map[string]any{"kind": i.Kind, "id": i.ID, "name": i.Name, "owner_id": i.OwnerID, "owner_name": i.OwnerName, "metric": i.Metric, "growth": i.Growth, "growth_from": i.GrowthFrom, "growth_to": i.GrowthTo, "seq": i.Seq, "observed_at": i.ObservedAt, "published_at": i.PublishedAt, "recorded": i.Recorded, "tracking": i.Following, "status": i.Status}
+	return map[string]any{"kind": i.Kind, "id": i.ID, "name": i.Name, "owner_id": i.OwnerID, "owner_name": i.OwnerName, "metric": i.Metric, "growth": i.Growth, "growth_from": i.GrowthFrom, "growth_to": i.GrowthTo, "seq": i.Seq, "observed_at": i.ObservedAt, "published_at": i.PublishedAt, "recorded": i.Recorded, "tracking": i.Following, "status": i.Status, "video_count": i.VideoCount, "video_views": i.VideoViews, "recent_videos": i.RecentVideos}
 }
 
 // clientOverview 只返回公开库统计和近期内容，不暴露日志、管理错误或私人数据。
@@ -72,6 +72,7 @@ func (s *Server) clientLibrary(w http.ResponseWriter, r *http.Request, kind stri
 	f := filter(r)
 	f.Kind = kind
 	f.ID = r.URL.Query().Get("id")
+	f.OwnerID = r.URL.Query().Get("owner")
 	page, err := s.reader.Catalog(ctx, s.platform, f, time.Now())
 	if err != nil {
 		writeJSON(w, 500, map[string]string{"error": "无法读取服务器资料。"})

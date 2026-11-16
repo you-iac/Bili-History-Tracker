@@ -71,11 +71,14 @@ func TestSignedRequestAndCollaborationVideo(t *testing.T) {
 		if q.Get("pn") != "5" || q.Get("ps") != "30" || q.Get("mid") != "123" || len(q.Get("w_rid")) != 32 || q.Get("wts") == "" {
 			t.Errorf("wrong signed parameters: %v", q)
 		}
-		return response(`{"code":0,"data":{"page":{"pn":5,"ps":30,"count":121},"list":{"vlist":[{"bvid":"BV1xx411c7mD","title":"合作视频","mid":999,"created":1700000000}]}}}`, 200), nil
+		return response(`{"code":0,"data":{"page":{"pn":5,"ps":30,"count":121},"list":{"vlist":[{"bvid":"BV1xx411c7mD","title":"合作视频","mid":999,"created":1700000000,"play":0,"pic":"//i0.hdslb.com/test.jpg"}]}}}`, 200), nil
 	})})
 	page, err := client.Videos(context.Background(), "SESSDATA=fake", "123", 5, keys)
 	if err != nil || len(page.Videos) != 1 || page.Total != 121 {
 		t.Fatal(page, err)
+	}
+	if page.Videos[0].Views == nil || *page.Videos[0].Views != 0 || page.Videos[0].Cover != "//i0.hdslb.com/test.jpg" {
+		t.Fatal("card metadata or zero views lost", page.Videos[0])
 	}
 }
 func TestRejectsAnonymousAndMalformedResponses(t *testing.T) {

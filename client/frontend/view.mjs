@@ -9,13 +9,13 @@ export function progress(count, total, state) {
 }
 export function publishedAt(timestamp) {
   if (!Number.isFinite(timestamp) || timestamp <= 0) return '—';
-  return new Intl.DateTimeFormat('zh-CN', {timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(timestamp * 1000));
+  // 平台扫描返回秒，既有服务器目录返回毫秒；兼容已保存的两类资料。
+  return new Intl.DateTimeFormat('zh-CN', {timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(timestamp < 1e12 ? timestamp * 1000 : timestamp));
 }
 export function rangeLabel(offset, length, total) {
   return length > 0 ? `${offset + 1}–${offset + length} / 共 ${total.toLocaleString('zh-CN')} 条` : `共 ${total.toLocaleString('zh-CN')} 条视频 ID`;
 }
 // 路由白名单避免启动密钥或任意片段被当成页面名。
-<<<<<<< HEAD
 export function routeForHash(hash) {
   const [path,query=''] = String(hash||'').replace(/^#/,'').split('?');
   const [section,id,...rest] = path.split('/');
@@ -43,11 +43,6 @@ export function snapshotChanges(kind,before,after) {
   const fields=creator?[['name','名称'],['sign','签名'],['face','头像']]:[['title','标题'],['desc','简介'],['pic','封面'],['copyright','版权类型'],['duration','时长（秒）'],['pages','分P信息'],['staff','联合创作']];
   const value=(source,key)=>source[key] == null?'':typeof source[key]==='object'?JSON.stringify(source[key],null,2):String(source[key]);
   return fields.flatMap(([key,label])=>{const old=value(a,key),next=value(b,key);return old===next?[]:[{key,label,before:old,after:next}];});
-=======
-export function viewForHash(hash) {
-  const view = String(hash || '').replace(/^#/,'');
-  return ['overview','creators','videos','discovery','settings'].includes(view) ? view : 'overview';
->>>>>>> 692d77faa8f4b746bca16c153c39ad9b81cc6282
 }
 
 export function followState(follow) {

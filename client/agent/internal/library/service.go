@@ -1,10 +1,7 @@
 // Package library 管理本地私人 UP/视频关注、服务器地址与最近读取的公共资料。
 // 写入成功才更新内存；网络操作在锁外执行，取消关注不会请求服务器停采。见 docs/client-library.md。
-<<<<<<< HEAD
+// 摘要同步独立于关注提交，范围匹配的详情才可作为离线缓存。
 // 自动关注、公开查询和退避队列见 docs/client-workspace.md；独立详情与匹配缓存见 docs/client-catalog.md；图片地址缓存见 docs/client-launch-media.md。
-=======
-// 自动关注、公开查询和退避队列见 docs/client-workspace.md。
->>>>>>> 692d77faa8f4b746bca16c153c39ad9b81cc6282
 package library
 
 import (
@@ -12,7 +9,6 @@ import (
 	"errors"
 	"net/url"
 	"regexp"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -33,31 +29,28 @@ type Storage interface {
 	SaveLibrary(any) error
 }
 type Follow struct {
-	Kind        string         `json:"kind"`
-	ID          string         `json:"id"`
-	AddedAt     time.Time      `json:"added_at"`
-	Status      *remote.Status `json:"remote,omitempty"`
-	Data        *remote.Detail `json:"data,omitempty"`
-	ServerURL   string         `json:"server_url,omitempty"`
-	UpdatedAt   *time.Time     `json:"updated_at,omitempty"`
-	LastError   string         `json:"last_error,omitempty"`
-	Pending     bool           `json:"pending_submission"`
-	Attempts    int            `json:"submission_attempts,omitempty"`
-	NextAttempt *time.Time     `json:"next_attempt_at,omitempty"`
+	Summary          *remote.Item    `json:"summary,omitempty"`
+	SummaryAt        *time.Time      `json:"summary_at,omitempty"`
+	DiscoveryOwnerID string          `json:"discovery_creator_id,omitempty"`
+	Discovery        *bilibili.Video `json:"discovery,omitempty"`
+	Kind             string          `json:"kind"`
+	ID               string          `json:"id"`
+	AddedAt          time.Time       `json:"added_at"`
+	Status           *remote.Status  `json:"remote,omitempty"`
+	Data             *remote.Detail  `json:"data,omitempty"`
+	ServerURL        string          `json:"server_url,omitempty"`
+	UpdatedAt        *time.Time      `json:"updated_at,omitempty"`
+	LastError        string          `json:"last_error,omitempty"`
+	Pending          bool            `json:"pending_submission"`
+	Attempts         int             `json:"submission_attempts,omitempty"`
+	NextAttempt      *time.Time      `json:"next_attempt_at,omitempty"`
 }
 type state struct {
-<<<<<<< HEAD
 	Images    map[string]ImageRecord `json:"images,omitempty"`
 	Version   int                    `json:"version"`
 	ServerURL string                 `json:"server_url"`
 	Follows   []Follow               `json:"follows"`
 	Overview  *remote.Overview       `json:"overview,omitempty"`
-=======
-	Version   int              `json:"version"`
-	ServerURL string           `json:"server_url"`
-	Follows   []Follow         `json:"follows"`
-	Overview  *remote.Overview `json:"overview,omitempty"`
->>>>>>> 692d77faa8f4b746bca16c153c39ad9b81cc6282
 }
 type Page struct {
 	Items    []Follow `json:"items"`
@@ -68,32 +61,21 @@ type Page struct {
 	Videos   int      `json:"videos"`
 }
 type Service struct {
-<<<<<<< HEAD
-	imageCalls  map[string]*imageCall
-	imageErrors map[string]imageFailure
-	imageSlots  chan struct{}
-	mu          sync.Mutex
-	store       Storage
-	client      *remote.Client
-	state       state
-	inFlight    map[string]bool
-	wake        chan struct{}
+	summaryCalls map[string]*summaryCall
+	serverEpoch  uint64
+	imageCalls   map[string]*imageCall
+	imageErrors  map[string]imageFailure
+	imageSlots   chan struct{}
+	mu           sync.Mutex
+	store        Storage
+	client       *remote.Client
+	state        state
+	inFlight     map[string]bool
+	wake         chan struct{}
 }
 
 func New(store Storage, client *remote.Client) (*Service, error) {
-	s := &Service{store: store, client: client, state: state{Version: 1, Follows: []Follow{}}, inFlight: map[string]bool{}, wake: make(chan struct{}, 1), imageCalls: map[string]*imageCall{}, imageErrors: map[string]imageFailure{}, imageSlots: make(chan struct{}, 4)}
-=======
-	mu       sync.Mutex
-	store    Storage
-	client   *remote.Client
-	state    state
-	inFlight map[string]bool
-	wake     chan struct{}
-}
-
-func New(store Storage, client *remote.Client) (*Service, error) {
-	s := &Service{store: store, client: client, state: state{Version: 1, Follows: []Follow{}}, inFlight: map[string]bool{}, wake: make(chan struct{}, 1)}
->>>>>>> 692d77faa8f4b746bca16c153c39ad9b81cc6282
+	s := &Service{store: store, client: client, state: state{Version: 1, Follows: []Follow{}}, inFlight: map[string]bool{}, wake: make(chan struct{}, 1), imageCalls: map[string]*imageCall{}, imageErrors: map[string]imageFailure{}, imageSlots: make(chan struct{}, 4), summaryCalls: map[string]*summaryCall{}}
 	if err := store.LoadLibrary(&s.state); err != nil {
 		return nil, errors.New("关注库无法读取，请先备份 library.json 后检查文件")
 	}
@@ -173,11 +155,10 @@ func (s *Service) Configure(input string) error {
 	next := s.copyState()
 	next.ServerURL = base
 	next.Overview = nil
-<<<<<<< HEAD
 	next.Images = nil
-=======
->>>>>>> 692d77faa8f4b746bca16c153c39ad9b81cc6282
 	for i := range next.Follows {
+		next.Follows[i].Summary = nil
+		next.Follows[i].SummaryAt = nil
 		next.Follows[i].Status = nil
 		next.Follows[i].Data = nil
 		next.Follows[i].ServerURL = ""
@@ -189,10 +170,8 @@ func (s *Service) Configure(input string) error {
 	}
 	err = s.save(next)
 	if err == nil {
-<<<<<<< HEAD
+		s.serverEpoch++
 		clear(s.imageErrors)
-=======
->>>>>>> 692d77faa8f4b746bca16c153c39ad9b81cc6282
 		select {
 		case s.wake <- struct{}{}:
 		default:
@@ -238,31 +217,7 @@ func (s *Service) List(kind, q string, page int) Page {
 }
 
 func (s *Service) ListFiltered(kind, q string, page int, pendingOnly bool) Page {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	result := Page{Items: []Follow{}, Page: max(1, page), Limit: 20}
-	q = strings.ToLower(strings.TrimSpace(q))
-	items := []Follow{}
-	for _, f := range s.state.Follows {
-		if f.Kind == "creator" {
-			result.Creators++
-		} else {
-			result.Videos++
-		}
-		name := ""
-		if f.Data != nil {
-			name = f.Data.Item.Name
-		}
-		if (!pendingOnly || f.Pending) && (kind == "" || f.Kind == kind) && (q == "" || strings.Contains(strings.ToLower(f.ID+" "+name), q)) {
-			items = append(items, f)
-		}
-	}
-	sort.Slice(items, func(i, j int) bool { return items[i].AddedAt.After(items[j].AddedAt) })
-	result.Total = len(items)
-	result.Page = min(result.Page, max(1, (len(items)+19)/20))
-	start := (result.Page - 1) * 20
-	result.Items = append(result.Items, items[start:min(start+20, len(items))]...)
-	return result
+	return s.ListCatalog(kind, q, page, pendingOnly, "", "")
 }
 func (s *Service) find(kind, id string) (Follow, string, error) {
 	s.mu.Lock()
@@ -312,6 +267,11 @@ func (s *Service) Refresh(ctx context.Context, kind, id string) (Follow, error) 
 		now := time.Now().UTC()
 		v.Status = &status
 		v.Data = detail
+		if detail != nil {
+			item := detail.Item
+			v.Summary = &item
+			v.SummaryAt = &now
+		}
 		v.ServerURL = base
 		v.UpdatedAt = &now
 		v.LastError = ""
@@ -363,8 +323,6 @@ func (s *Service) Submit(ctx context.Context, kind, id string) (Follow, error) {
 // HTTP 调用方不能通过可选参数绕过提交；本地存储失败仍返回错误。
 func (s *Service) Follow(ctx context.Context, kind, input string) (Follow, error) {
 	f, err := s.Add(kind, input)
-<<<<<<< HEAD
-=======
 	if err != nil {
 		return f, err
 	}
@@ -393,112 +351,13 @@ type PublicPage struct {
 	Total int          `json:"total"`
 }
 
-func (s *Service) Search(ctx context.Context, kind, q string, page int) (PublicPage, error) {
+func (s *Service) Search(ctx context.Context, kind, q string, page int, options ...remote.CatalogOptions) (PublicPage, error) {
 	id := ""
 	if normalized, err := Normalize(kind, q); err == nil {
 		id = normalized
 	}
 	base := s.Connection()
-	data, err := s.client.Catalog(ctx, base, kind, q, id, page)
-	if err != nil {
-		return PublicPage{}, err
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if base != s.state.ServerURL {
-		return PublicPage{}, &Error{Message: "服务器已切换，请重新搜索。", Status: 409}
-	}
-	followed := map[string]bool{}
-	for _, f := range s.state.Follows {
-		followed[f.Kind+":"+f.ID] = true
-	}
-	result := PublicPage{Items: []PublicItem{}, Page: data.Page, Limit: data.Limit, Total: data.Total}
-	for _, item := range data.Items {
-		result.Items = append(result.Items, PublicItem{Item: item, Followed: followed[item.Kind+":"+item.ID]})
-	}
-	return result, nil
-}
-
-type Dashboard struct {
-	Creators  int              `json:"creators"`
-	Videos    int              `json:"videos"`
-	Pending   int              `json:"pending"`
-	ServerURL string           `json:"server_url"`
-	Public    *remote.Overview `json:"public,omitempty"`
-}
-
-func (s *Service) Dashboard() Dashboard {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	d := Dashboard{ServerURL: s.state.ServerURL, Public: s.state.Overview}
-	for _, f := range s.state.Follows {
-		if f.Kind == "creator" {
-			d.Creators++
-		} else {
-			d.Videos++
-		}
-		if f.Pending {
-			d.Pending++
-		}
-	}
-	return d
-}
-func (s *Service) RefreshOverview(ctx context.Context) (Dashboard, error) {
-	base := s.Connection()
-	data, err := s.client.Overview(ctx, base)
-	if err != nil {
-		return s.Dashboard(), err
-	}
-	s.mu.Lock()
-	if base != s.state.ServerURL {
-		s.mu.Unlock()
-		return Dashboard{}, &Error{Message: "服务器已切换，请刷新总览。", Status: 409}
-	}
-	next := s.copyState()
-	next.Overview = &data
-	err = s.save(next)
-	s.mu.Unlock()
-	return s.Dashboard(), err
-}
-func (s *Service) Detail(ctx context.Context, kind, id string, page int, seq int64) (remote.Detail, error) {
-	normalized, err := Normalize(kind, id)
->>>>>>> 692d77faa8f4b746bca16c153c39ad9b81cc6282
-	if err != nil {
-		return f, err
-	}
-<<<<<<< HEAD
-	ctx, cancel := context.WithTimeout(ctx, 22*time.Second)
-	defer cancel()
-	updated, err := s.Submit(ctx, f.Kind, f.ID)
-	if err == nil {
-		return updated, nil
-	}
-	var local *Error
-	if errors.As(err, &local) && local.Status != 409 {
-		return f, err
-	}
-	f, _, readErr := s.find(f.Kind, f.ID)
-	return f, readErr
-}
-
-type PublicItem struct {
-	remote.Item
-	Followed bool `json:"followed"`
-}
-type PublicPage struct {
-	Items []PublicItem `json:"items"`
-	Page  int          `json:"page"`
-	Limit int          `json:"limit"`
-	Total int          `json:"total"`
-}
-
-func (s *Service) Search(ctx context.Context, kind, q string, page int) (PublicPage, error) {
-	id := ""
-	if normalized, err := Normalize(kind, q); err == nil {
-		id = normalized
-	}
-	base := s.Connection()
-	data, err := s.client.Catalog(ctx, base, kind, q, id, page)
+	data, err := s.client.Catalog(ctx, base, kind, q, id, page, options...)
 	if err != nil {
 		return PublicPage{}, err
 	}
@@ -567,6 +426,7 @@ type DetailView struct {
 	ServerURL   string  `json:"server_url"`
 	Cached      bool    `json:"cached"`
 	ReadError   string  `json:"read_error,omitempty"`
+	CacheError  string  `json:"cache_error,omitempty"`
 }
 
 // Detail 复用既有服务器详情；仅默认30日第一页可在断连时回退本地缓存。
@@ -576,17 +436,46 @@ func (s *Service) Detail(ctx context.Context, kind, id string, page int, seq int
 	if err != nil {
 		return DetailView{}, err
 	}
-	base := s.Connection()
+	s.mu.Lock()
+	base, epoch := s.state.ServerURL, s.serverEpoch
+	var original *Follow
+	for _, f := range s.state.Follows {
+		if f.Kind == kind && f.ID == normalized {
+			copy := f
+			original = &copy
+			break
+		}
+	}
+	s.mu.Unlock()
 	data, readErr := s.client.Detail(ctx, base, kind, normalized, page, seq, days)
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if base != s.state.ServerURL {
+	if base != s.state.ServerURL || epoch != s.serverEpoch {
 		return DetailView{}, &Error{Message: "服务器已切换，请重新读取详情。", Status: 409}
 	}
+	view := DetailView{Detail: data, ServerURL: base}
 	if readErr == nil {
+		if original != nil {
+			next := s.copyState()
+			for index, f := range next.Follows {
+				if f.Kind == kind && f.ID == normalized && f.AddedAt.Equal(original.AddedAt) {
+					now := time.Now().UTC()
+					if setSummary(&next.Follows[index], data.Item, base, now) {
+						if page == 1 && seq == 0 && (days == "" || days == "30") {
+							copy := data
+							next.Follows[index].Data = &copy
+							next.Follows[index].UpdatedAt = &now
+						}
+						if err := s.save(next); err != nil {
+							view.CacheError = err.Error()
+						}
+					}
+					break
+				}
+			}
+		}
 		s.rememberSnapshotLocked(kind, normalized, data.SnapshotSeq, data.Snapshot)
 	}
-	view := DetailView{Detail: data, ServerURL: base}
 	for _, f := range s.state.Follows {
 		if f.Kind == kind && f.ID == normalized {
 			copy := f
@@ -608,7 +497,4 @@ func (s *Service) Detail(ctx context.Context, kind, id string, page int, seq int
 		view.LocalFollow.Data = nil
 	}
 	return view, nil
-=======
-	return s.client.Detail(ctx, s.Connection(), kind, normalized, page, seq)
->>>>>>> 692d77faa8f4b746bca16c153c39ad9b81cc6282
 }
