@@ -6,9 +6,9 @@
 
 ## 使用
 
-1. 连接已提供库/详情JSON和目标提交的8182服务。新增公开库排序与 UP 聚合统计需同步更新 backend；缺失字段保留未知，见 [目录口径](client-catalog.md)。
+1. 连接已提供库/详情JSON和目标提交的8181公共服务。新增公开库排序与 UP 聚合统计需同步更新 backend；缺失字段保留未知，见 [目录口径](client-catalog.md)。
 2. 按 [客户端启动说明](../client/README.md#当前实现与启动) 启动 Agent，打开终端完整链接。
-3. 在侧栏“设置”填写服务器基地址，如 `http://127.0.0.1:18182`（SSH隧道），保存并测试。
+3. 在侧栏“设置”填写服务器基地址，如 `http://127.0.0.1:18181`（SSH隧道），保存并测试。
 4. 在UP主库/视频库浏览本地关注，切到服务器公开库可搜索未关注目标，或直接按UID/BV/标准链接添加；所有新增关注自动申请跟踪，没有关闭提交的选项。
 5. 在两个库中搜索、翻页，手动刷新资料、提交跟踪、查看详情与版本。UP 的“获取全部视频”填入现有扫描框，配置 Cookie 后显式开始扫描；扫描结果可逐项关注视频。
 6. 本地取消只删除私人列表项，不请求服务器停止跟踪；关闭 Agent 后服务器继续采集。
@@ -29,11 +29,11 @@
                    | HTTP(S): read / submit
                    v
 +--------------------------------------+
-| 8182: storage reader / tracker       |
+| 8181: storage reader / tracker       |
 +--------------------------------------+
 ```
 
-箭头为运行请求，结果原路返回。`library` 使用 `localstate` 写本地文件，`remote` 只调用固定服务器路径；`scanner` 继续使用独立的 B站 Cookie 链路，不把 Cookie 或本地会话发给8182。
+箭头为运行请求，结果原路返回。`library` 使用 `localstate` 写本地文件，`remote` 只调用固定服务器路径；`scanner` 继续使用独立的 B站 Cookie 链路，不把 Cookie 或本地会话发给公共服务器。
 
 | 数据 | 位置与行为 |
 |---|---|
@@ -44,15 +44,17 @@
 
 更换服务器清除旧公共缓存，保留私人关注；正在返回的旧服务器请求不能写入新配置。删除后的关注不会因未完成刷新自动重建。网络错误保留最近成功数据并显示失败原因、核对时间和实际观测时间。
 
-## 8182 复用协议
+## 8181 公共协议
+
+协议已从8182迁至8181，字段与单目标应答兼容；旧管理端口不保留Agent别名。限流、批量与迁移见[公共接口](public-api.md)。
 
 | 路径 | 当前行为 |
 |---|---|
-| `GET /creators`、`GET /videos` | `Accept: application/json` 返回 `items/page/limit/total`，共用原 `Catalog`；支持精确 `id`，默认 HTML 保留 |
-| `GET /detail/{type}/{id}` | 同一 `Accept` 返回 `item/metrics/versions/version_page/version_total/version_limit`；`days=7/30/90/all`、版本 `page` 和 `seq` 均校验，指定 `seq` 返回元数据 `snapshot` |
-| `GET /api/targets/status?kind=...&id=...` | 精确返回 `recorded/tracking/status`，未知目标也是明确状态；不带这两个参数时保留旧管理页分页数组 |
-| `POST /targets`，JSON `{"type":"creator或video","id":"..."}` | 新增客户端提交分支；同步验证并保存首次观测后建立跟踪，返回 `kind/id/tracking/status`。原表单管理命令保留原行为 |
-| 原指标和批量导入接口 | 继续可用；本期 Agent 单个提交无需先知道视频作者，服务器读取真实作者 |
+| `GET /creators`、`GET /videos` | 直接返回JSON `items/page/limit/total`，共用原`Catalog`；支持精确`id`、排序及UP归属，不提供HTML |
+| `GET /detail/{type}/{id}` | 直接返回JSON `item/metrics/versions/version_page/version_total/version_limit`；`days=7/30/90/all`、版本 `page` 和 `seq` 均校验，指定 `seq` 返回元数据 `snapshot` |
+| `GET /api/targets/status?kind=...&id=...` | 精确返回 `recorded/tracking/status`，未知目标也是明确状态；缺少参数返回400，管理页状态数组不在此提供 |
+| `POST /targets`，JSON `{"type":"creator或video","id":"..."}` | 只接受客户端JSON；同步验证并保存首次观测后建立跟踪，返回`kind/id/tracking/status`。有界批量使用`targets`数组，管理表单不接受 |
+| 指标与批量申请 | `GET /api/metrics/{type}/{id}`读取指标；`POST /targets`可批量处理前N项。后台导入仅在8182内部，Agent单个提交无需先知道作者 |
 
 `RequestTarget` 已跟踪时直接返回 `existing`，不查询上游或改间隔。新目标使用默认3小时间隔，查询成功后保存观测和公共目标，失败不生成跟踪成功状态。并发中的同一目标返回409供刷新/重试；本进程采集并发达到16时新申请返回429。最终插入也按目标唯一键去重，不覆盖其他请求建立的调度。禁用的目标返回409；已有记录但没有调度目标时允许重新验证后申请跟踪，当前没有持久化拒绝名单。
 
@@ -64,7 +66,7 @@ UP 占位作者行不等于已有成功资料观测，`recorded` 对 UP 要求�
 
 `remote.Client` 不共享平台客户端或 CookieJar，不跟随重定向，响应限制8MiB且要求 JSON；连接超时22秒，刷新总预算20秒。遇到旧服务器 HTML 或不兼容结构时明确提示升级 backend，不把管理网页当 API 解析。
 
-当前8182仍沿用现有可信管理服务部署方式；本期没有新增服务器账号、安装凭据发放、管理路由鉴权、总目标预算或公网匿名写入体系。JSON 来源检查不等于身份认证。Agent 只使用查询与申请路径，本地取消不调用全局管理命令；完整公共准入仍保留在 [实施计划](../PLANs/2026-11-10-client-agent.md)。
+8182只用于本机管理；8181通过独立publicapi限定路由、统一限流和有界批量申请，本次不增加访问令牌、账号、设备注册或长期目标预算。JSON来源检查不等于身份认证。Agent只查询和申请，本地取消不调用全局管理命令；更完整准入仍见[既有计划](../PLANs/2026-11-10-client-agent.md)。
 
 ## 验证
 

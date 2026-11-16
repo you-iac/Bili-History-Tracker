@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -86,6 +87,8 @@ func TestBaseAndServerCompatibility(t *testing.T) {
 			defer server.Close()
 			if _, err := New(nil).Status(context.Background(), server.URL, "video", "BV17x411w7KC"); err == nil {
 				t.Fatal("incompatible response accepted")
+			} else if mode == "html" && !strings.Contains(err.Error(), "8181") {
+				t.Fatal("wrong management port has no migration hint", err)
 			}
 		})
 	}

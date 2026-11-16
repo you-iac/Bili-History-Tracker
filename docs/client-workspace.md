@@ -18,7 +18,7 @@
 
 ## 自动提交与重试
 
-`POST /api/follows` 统一调用 `library.Service.Follow`：先保存本地关注，再请求8182 `POST /targets`；没有“只本地关注不提交”的界面开关。手动输入、公开搜索结果和扫描结果使用同一路径。
+`POST /api/follows` 统一调用 `library.Service.Follow`：先保存本地关注，再请求8181 `POST /targets`；没有“只本地关注不提交”的界面开关。手动输入、公开搜索结果和扫描结果使用同一路径。
 
 远程未配置、断连、拒绝或忙时仍保留本地关注，响应明确返回 `pending_submission` 与 `last_error`，不能将本地保存成功当作服务器跟踪成功。已确认返回 `remote.tracking=true` 并清除待提交状态；取消只删除本地项，不发送全局停采命令。
 
@@ -31,7 +31,7 @@
 | 服务器路径 | 复用方式 |
 |---|---|
 | `GET /creators`、`GET /videos` | 沿用既有 `q/id/page` 查询，Agent本地补个人关注标记，不写入跟踪；总览依次读取两库首页，以各自 `total` 作数量，返回完整首页与 `limit`，后续翻页复用同一库接口，不改变服务器默认排序 |
-| 详情、状态及提交 | 继续复用 [原接入协议](client-library.md#8182-复用协议)；详情允许查看尚未本地关注的公开对象 |
+| 详情、状态及提交 | 继续复用 [原接入协议](client-library.md#8181-公共协议)；详情允许查看尚未本地关注的公开对象 |
 
 本地新增 `GET /api/overview`（本地数量与最近总览）、`POST /api/overview/refresh`（聚合既有库接口）、`GET /api/remote/catalog?kind=creator&q=...&page=1`、`GET /api/settings` 和 `PUT /api/settings/directory`。当前共27个API，清单见 [Agent说明](../client/agent/README.md#api-接口)。详情可选已有时间范围，协议补充见 [详情说明](client-catalog.md#本地接口与边界)。所有本地接口继续检查会话、Host/Origin和写操作CSRF，不转发Cookie。
 

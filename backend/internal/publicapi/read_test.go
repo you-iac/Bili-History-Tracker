@@ -1,5 +1,5 @@
-// client_test.go 验证8182同路径 JSON、精确状态及客户端提交，不通过只读请求采集。
-package admin
+// read_test.go 验证8181公共 JSON、精确状态及兼容单目标应答，读取不调用上游。
+package publicapi
 
 import (
 	"encoding/json"

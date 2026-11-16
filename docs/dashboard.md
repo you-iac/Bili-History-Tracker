@@ -32,7 +32,7 @@
 | `GET /manage` | 关注管理 | `Catalog`（OnlyTargets） |
 | `GET /logs` | 采集记录 | 内存日志 `Recent(500)` |
 | `GET /detail/{video\|creator}/{id}` | 对象详情 | `Content`、`ReadSnapshot`、`Metrics`、`Versions`、`Catalog`（作者视频） |
-| `GET /api/metrics/{type}/{id}?days=` | 趋势 JSON | `Metrics` |
+| `GET /manage/metrics/{type}/{id}?days=` | 趋势 JSON | `Metrics` |
 | `GET /api/targets/status` | 关注状态 JSON | `Catalog` + 在途状态 |
 | `GET /assets/*` | 样式与脚本 | `go:embed` |
 | `POST /targets` | 添加关注 | `AddTarget` + `RunNow` |
@@ -113,7 +113,7 @@
 
 ## JSON 接口
 
-`GET /api/metrics/{type}/{id}?days=7|30|90|all`：
+`GET /manage/metrics/{type}/{id}?days=7|30|90|all`：
 
 ```json
 {"points":[{"at":1793836800000,"value":16271}],"truncated":false}

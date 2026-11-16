@@ -1,6 +1,6 @@
 # cmd/server 入口
 
-唯一组装点：读环境变量、创建对象、启动两个服务和一个调度器。
+唯一组装点：读环境变量、创建对象、启动两个服务和一个调度器。8181通过`publicapi.New`组装Agent协议及原实时API，共用全局限额；8182只提供本地管理。配置、批量与应答见[公共接口说明](../../../docs/public-api.md)。
 
 > 与 [main.go](main.go) 的包注释保持一致；架构总览见 [docs/architecture.md](../../../docs/architecture.md)。
 
@@ -32,7 +32,7 @@
   │                                                                                             │
   │                                                                                             │
   │         ┌────────────────────────────┐              ┌────────────────────────────┐          │
-  │         │ admin.New                  │              │ httpapi.New                │          │
+  │         │ admin.New                  │              │ publicapi.New              │          │
   └────────►│ HTML 后台  :8182           │              │ JSON API  :8181            │◄─────────┘
             └────────────────────────────┘              └────────────────────────────┘
 
@@ -51,6 +51,8 @@
 |---|---|
 | `BHT_ADDR` | `127.0.0.1:8181` |
 | `BHT_ADMIN_ADDR` | `127.0.0.1:8182` |
+| `BHT_API_RPS` | `20`（1至10000） |
+| `BHT_API_BATCH_MAX` | `10`（1至100） |
 | `BHT_DB` | `data/bht.db` |
 | `BHT_QUERY_LOG` | 数据库同目录 `query.log` |
 | `BHT_BILI_COOKIE` | 空 |

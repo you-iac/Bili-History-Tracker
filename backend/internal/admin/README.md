@@ -1,6 +1,6 @@
 # admin 模块
 
-8182 观察台：信息看板、对象详情、关注管理与采集记录。服务端渲染；页面只读本地数据库，只有命令会异步触发采集。
+8182本机观察台：信息看板、对象详情、关注管理与采集记录。Agent协议已移至8181，原`/api/*`不再提供，页面不因Accept请求头改为客户端JSON。服务端渲染；页面只读本地数据库，只有命令会异步触发采集。
 
 > 与 [doc.go](doc.go) 的包注释保持一致；页面职责和状态口径见 [观察台](../../../docs/dashboard.md)，架构总览见 [docs/architecture.md](../../../docs/architecture.md)。
 
@@ -32,8 +32,8 @@
 | `GET /manage` | 关注管理：添加、间隔、立即刷新、停止关注 |
 | `GET /logs` | 采集记录：内存最近 500 条，可筛选分页 |
 | `GET /detail/{type}/{id}` | 对象详情：指标、版本时间线、字段对比、业务快照 |
-| `GET /api/metrics/{type}/{id}` | 趋势 JSON（7/30/90/全部） |
-| `GET /api/targets/status` | 当前关注状态 JSON |
+| `GET /manage/metrics/{type}/{id}` | 趋势 JSON（7/30/90/全部） |
+| `GET /manage/targets/status` | 当前关注状态 JSON |
 | `GET /assets/*` | 内嵌样式与脚本 |
 | `POST /targets` | 添加并立即查询；重复添加提示已关注 |
 | `POST /targets/delete` | 停止调度，保留历史 |
@@ -43,7 +43,7 @@
 ## 输入 / 输出 / 边界
 
 - **输入**：URL 参数（`q`、`sort`、`following`、`kind`、`tab`、`days`、`page`、`seq`）；表单（`type`、`id`、`interval_hours`）。BV、UID 和可本地解析的标准链接在入口规范化，短链和任意 URL 不传给上游。
-- **输出**：HTML 页面、指标和状态 JSON、作者视频与导入任务 API；副作用是写 `tracking_targets`、触发 `RunNow`、读取 storage 和内存日志。
+- **输出**：HTML 页面、指标和状态 JSON、仅供页面使用的`/manage/...`作者视频与导入交互；副作用是写 `tracking_targets`、触发 `RunNow`、读取 storage 和内存日志。
 - **它不认识**：B站端点、指纹算法、调度器内部；自身不直接请求上游。
 
 ## 关键约束

@@ -11,6 +11,7 @@ import (
 	"html/template"
 	"io/fs"
 	"math"
+	"mime"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -66,13 +67,13 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /activity", s.activity)
 	mux.HandleFunc("GET /logs", s.logsPage)
 	mux.HandleFunc("GET /detail/{type}/{id}", s.contentDetail)
-	mux.HandleFunc("GET /api/metrics/{type}/{id}", s.metrics)
-	mux.HandleFunc("GET /api/targets/status", s.targetStatus)
-	mux.HandleFunc("GET /api/creators/{id}/videos", s.creatorVideos)
-	mux.HandleFunc("POST /api/creators/{id}/videos/cancel", s.cancelCreatorVideos)
-	mux.HandleFunc("POST /api/ingest/videos", s.ingestVideos)
-	mux.HandleFunc("GET /api/ingest/jobs/{id}", s.ingestProgress)
-	mux.HandleFunc("POST /api/ingest/jobs/{id}/{action}", s.ingestAction)
+	mux.HandleFunc("GET /manage/metrics/{type}/{id}", s.metrics)
+	mux.HandleFunc("GET /manage/targets/status", s.targetStatus)
+	mux.HandleFunc("GET /manage/creators/{id}/videos", s.creatorVideos)
+	mux.HandleFunc("POST /manage/creators/{id}/videos/cancel", s.cancelCreatorVideos)
+	mux.HandleFunc("POST /manage/ingest/videos", s.ingestVideos)
+	mux.HandleFunc("GET /manage/ingest/jobs/{id}", s.ingestProgress)
+	mux.HandleFunc("POST /manage/ingest/jobs/{id}/{action}", s.ingestAction)
 	assets, _ := fs.Sub(templateFS, "assets")
 	mux.Handle("GET /assets/", http.StripPrefix("/assets/", http.FileServer(http.FS(assets))))
 	mux.HandleFunc("POST /targets", s.addTarget)
@@ -83,8 +84,9 @@ func (s *Server) Handler() http.Handler {
 }
 
 func (s *Server) addTarget(w http.ResponseWriter, r *http.Request) {
-	if strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
-		s.requestTarget(w, r)
+	media, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type"))
+	if media != "application/x-www-form-urlencoded" && media != "multipart/form-data" {
+		http.Error(w, "后台只接受管理表单，客户端请连接 8181。", http.StatusUnsupportedMediaType)
 		return
 	}
 	targetType := strings.TrimSpace(r.FormValue("type"))

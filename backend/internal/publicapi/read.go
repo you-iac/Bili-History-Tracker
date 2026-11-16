@@ -1,6 +1,6 @@
-// client.go 将8182既有查询与目标接纳暴露为 JSON；HTML 管理页继续使用原行为。
-// 只返回资料/指标，不返回日志和凭据；不是用户账号或公网准入系统。见 docs/client-library.md。
-package admin
+// read.go 提供公共库、详情、指标和精确跟踪状态，只读取已有观测，不触发平台采集。
+// 不返回管理日志或凭据。协议与采样边界见 docs/public-api.md、docs/client-library.md。
+package publicapi
 
 import (
 	"context"
@@ -9,16 +9,10 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"bili-history-tracker/backend/internal/storage"
-	"bili-history-tracker/backend/internal/tracker"
 )
-
-func wantsJSON(r *http.Request) bool {
-	return strings.Contains(r.Header.Get("Accept"), "application/json")
-}
 
 func clientItem(i storage.ContentItem) map[string]any {
 	if i.Kind == "creator" && i.Seq == 0 {
@@ -173,37 +167,28 @@ func (s *Server) clientTargetStatus(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{"kind": kind, "id": id, "recorded": err == nil && i.Recorded && (kind != "creator" || i.Seq > 0), "tracking": exists && t.Enabled, "status": state})
 }
 
-func (s *Server) requestTarget(w http.ResponseWriter, r *http.Request) {
-	if !sameOriginJSON(w, r) {
+// metrics 与详情使用同一 UTC 日采样口径；目标不存在时不请求上游补齐。
+func (s *Server) metrics(w http.ResponseWriter, r *http.Request) {
+	kind, id := r.PathValue("type"), r.PathValue("id")
+	days := rangeDays(r.URL.Query().Get("days"), -1)
+	if !validID(kind, id) || days < 0 {
+		writeJSON(w, 400, map[string]string{"error": "目标或时间范围无效。"})
 		return
 	}
-	var input struct {
-		Kind string `json:"type"`
-		ID   string `json:"id"`
-	}
-	if !decodeJSON(w, r, &input) {
-		return
-	}
-	input.ID = normalizeID(input.Kind, input.ID)
-	if !validID(input.Kind, input.ID) {
-		writeJSON(w, 400, map[string]string{"error": "目标标识无效。"})
-		return
-	}
-	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
-	state, err := s.tracker.RequestTarget(ctx, input.Kind, input.ID)
-	if err != nil {
-		code, message := 502, "服务器无法验证或保存该目标，尚未确认加入跟踪。"
-		switch {
-		case errors.Is(err, tracker.ErrTargetBusy):
-			code, message = 409, "目标正在采集中，请先刷新状态或稍后重试。"
-		case errors.Is(err, tracker.ErrRequestCapacity):
-			code, message = 429, "服务器采集任务较多，请稍后重试。"
-		case errors.Is(err, tracker.ErrTargetPaused):
-			code, message = 409, "目标已被服务器暂停，请联系管理员。"
+	if _, err := s.reader.Content(ctx, s.platform, kind, id, time.Now()); err != nil {
+		code := 500
+		if errors.Is(err, sql.ErrNoRows) {
+			code = 404
 		}
-		writeJSON(w, code, map[string]string{"error": message})
+		writeJSON(w, code, map[string]string{"error": "无法读取目标。"})
 		return
 	}
-	writeJSON(w, 200, map[string]any{"kind": input.Kind, "id": input.ID, "tracking": true, "status": state})
+	series, err := s.reader.Metrics(ctx, s.platform, kind, id, days, time.Now())
+	if err != nil {
+		writeJSON(w, 500, map[string]string{"error": "无法读取指标。"})
+		return
+	}
+	writeJSON(w, 200, series)
 }

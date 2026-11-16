@@ -59,7 +59,7 @@
     const creator = root.dataset.creator;
     if (!creator) return;
     const get = name => root.querySelector(`[data-${name}]`), model = new Selection();
-    const endpoint = `/api/creators/${encodeURIComponent(creator)}/videos`;
+    const endpoint = `/manage/creators/${encodeURIComponent(creator)}/videos`;
     let cursor = "", session = "", state = "pending", job = "", loading = false, running = false, timer, jobTimer, stopped = false;
     const text = (tag, value) => { const el = document.createElement(tag); el.textContent = value; return el; };
     async function json(url, body) {
@@ -127,20 +127,20 @@
       clearTimeout(jobTimer); if (running) jobTimer = setTimeout(pollJob, 700);
       buttons();
     }
-    async function pollJob() { try { showProgress(await json(`/api/ingest/jobs/${encodeURIComponent(job)}`)); } catch (error) { running = false; get("import-state").textContent = `${error.message} 可点击“恢复进度查询”。`; get("import-retry").hidden = false; get("import-retry").textContent = "恢复进度查询"; buttons(); } }
+    async function pollJob() { try { showProgress(await json(`/manage/ingest/jobs/${encodeURIComponent(job)}`)); } catch (error) { running = false; get("import-state").textContent = `${error.message} 可点击“恢复进度查询”。`; get("import-retry").hidden = false; get("import-retry").textContent = "恢复进度查询"; buttons(); } }
     async function start(all) {
       if (running || !session) return;
       if (!all && model.selected.size > 100) { get("video-state").textContent = "每次最多选择 100 个视频，也可以使用一键添加全部。"; return; }
       running = true; buttons();
-      try { const body = { platform: root.dataset.platform, creator_id: creator, all, session, videos: all ? [] : [...model.selected] }; showProgress(await json("/api/ingest/videos", body)); }
+      try { const body = { platform: root.dataset.platform, creator_id: creator, all, session, videos: all ? [] : [...model.selected] }; showProgress(await json("/manage/ingest/videos", body)); }
       catch (error) { get("video-state").textContent = error.message; running = false; buttons(); }
     }
     get("video-search").addEventListener("input", render);
     get("video-more").addEventListener("click", () => load()); get("video-retry").addEventListener("click", () => load(true));
     get("add-selected").addEventListener("click", () => start(false)); get("add-all").addEventListener("click", () => start(true));
     get("video-cancel").addEventListener("click", async () => { stopped = true; clearTimeout(timer); try { await json(`${endpoint}/cancel`, { session }); get("video-state").textContent = "已停止发现，当前结果和选择已保留。"; } catch (error) { get("video-state").textContent = error.message; } buttons(); });
-    get("import-retry").addEventListener("click", async () => { try { if (get("import-retry").textContent === "恢复进度查询") { get("import-retry").textContent = "重试失败及未完成项"; await pollJob(); } else showProgress(await json(`/api/ingest/jobs/${encodeURIComponent(job)}/retry`, {})); } catch (error) { get("import-state").textContent = error.message; } });
-    get("import-cancel").addEventListener("click", async () => { try { showProgress(await json(`/api/ingest/jobs/${encodeURIComponent(job)}/cancel`, {})); } catch (error) { get("import-state").textContent = error.message; } });
+    get("import-retry").addEventListener("click", async () => { try { if (get("import-retry").textContent === "恢复进度查询") { get("import-retry").textContent = "重试失败及未完成项"; await pollJob(); } else showProgress(await json(`/manage/ingest/jobs/${encodeURIComponent(job)}/retry`, {})); } catch (error) { get("import-state").textContent = error.message; } });
+    get("import-cancel").addEventListener("click", async () => { try { showProgress(await json(`/manage/ingest/jobs/${encodeURIComponent(job)}/cancel`, {})); } catch (error) { get("import-state").textContent = error.message; } });
     get("import-done").addEventListener("click", () => { get("import-progress").hidden = true; root.scrollIntoView({ behavior: "smooth", block: "start" }); });
     window.addEventListener("pagehide", () => { clearTimeout(timer); clearTimeout(jobTimer); });
     load();

@@ -80,7 +80,7 @@ UP 宽松卡片的“近7日新投稿”仅统计服务器已记录、发布时�
           | fixed public JSON       | platform HTTPS
           v                         v
 +-----------------------+  +-----------------------+
-| 8182 / storage        |  | Bilibili              |
+| 8181 / storage        |  | Bilibili              |
 | recorded public data  |  | logged-in visibility  |
 +-----------------------+  +-----------------------+
 ```
@@ -101,7 +101,7 @@ UP 宽松卡片的“近7日新投稿”仅统计服务器已记录、发布时�
 |---|---|
 | `POST /api/follows/refresh?kind=creator或video` | 同步全部本地关注的已记录摘要，保留待提交状态，受 CSRF 保护 |
 | `GET /api/follows?kind=video&q=&sort=published&owner=123&page=1` | 链接归一化、本地全量排序和归属过滤，仍每页20条 |
-| `GET /api/remote/catalog?kind=video&q=&sort=hot&owner=123&page=1` | 向既有8182目录透传排序和 UP 归属，补本地关注标记 |
+| `GET /api/remote/catalog?kind=video&q=&sort=hot&owner=123&page=1` | 向8181公共目录透传排序和 UP 归属，补本地关注标记 |
 | `GET /api/creator-videos/{UID}?scope=followed或discovered&q=&sort=published&page=1` | 只读组合 `catalog/job/configured/busy_elsewhere`，不启动扫描 |
 | `POST /api/scan`、取消、继续 | 复用原有扫描路径；详情不跳转 |
 | `POST /api/follows` | 若视频来自当前扫描，同时保留私人投稿来源上下文 |

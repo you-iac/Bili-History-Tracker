@@ -81,12 +81,12 @@
 
 | 入口 | 输入 | 输出与约束 |
 |---|---|---|
-| `GET /api/creators/{id}/videos`，`scope=available` | `platform`、`cursor`、受限 `limit` | 服务端融合、去重并排除已关注后的待添加视频页，统一 `next_cursor`、发现会话和加载状态 |
+| `GET /manage/creators/{id}/videos`，`scope=available` | `platform`、`cursor`、受限 `limit` | 服务端融合、去重并排除已关注后的待添加视频页，统一 `next_cursor`、发现会话和加载状态 |
 | 同一入口，`scope=recorded` | `platform`、`cursor`、受限 `limit` | 只读本地已记录视频，不排除已跟踪项，不请求平台；维持详情和内容库的本地读取边界 |
-| `POST /api/ingest/videos` | `platform`、`creator_id`、显式视频 ID，或表示本次作者范围的“添加全部”意图 | 后台任务与进度；服务端继续枚举、校验归属、保存、加入关注，返回成功、已存在、拒绝与失败项 |
-| `GET /api/ingest/jobs/{id}` | 任务 ID | 进度与逐项结果，`running` / `complete` / `partial` / `cancelled` |
-| `POST /api/ingest/jobs/{id}/retry`、`/cancel` | 任务 ID | 显式重试失败及未完成项，或取消并保留成功项 |
-| `POST /api/creators/{id}/videos/cancel` | `{session}` | 停止当前发现，保留已有列表和选择 |
+| `POST /manage/ingest/videos` | `platform`、`creator_id`、显式视频 ID，或表示本次作者范围的“添加全部”意图 | 后台任务与进度；服务端继续枚举、校验归属、保存、加入关注，返回成功、已存在、拒绝与失败项 |
+| `GET /manage/ingest/jobs/{id}` | 任务 ID | 进度与逐项结果，`running` / `complete` / `partial` / `cancelled` |
+| `POST /manage/ingest/jobs/{id}/retry`、`/cancel` | 任务 ID | 显式重试失败及未完成项，或取消并保留成功项 |
+| `POST /manage/creators/{id}/videos/cancel` | `{session}` | 停止当前发现，保留已有列表和选择 |
 
 写入接口要求 `application/json` 并检查请求来源；本期仅支持当前本地工作区的同源页面，不将此视为用户登录，也不开放未确认认证方案的外部扩展写入。单视频关注仍保留原表单入口。
 

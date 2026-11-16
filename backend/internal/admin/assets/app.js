@@ -132,7 +132,7 @@
     const timer = setInterval(async () => {
       if (document.hidden) return; if (++attempts > 12) { clearInterval(timer); return; }
       try {
-        const response = await fetch(`/api/targets/status${location.search}`, { headers: { Accept: "application/json" } }); if (!response.ok) return;
+        const response = await fetch(`/manage/targets/status${location.search}`, { headers: { Accept: "application/json" } }); if (!response.ok) return;
         const statuses = await response.json(), rows = new Map([...document.querySelectorAll("[data-state-key]")].map(row => [row.dataset.stateKey, row]));
         for (const item of statuses) {
           const row = rows.get(item.Key); if (!row) continue;

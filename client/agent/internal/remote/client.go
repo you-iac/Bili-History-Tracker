@@ -1,4 +1,4 @@
-// Package remote 通过固定8182路径读取公共资料和申请跟踪，不转发本地 Cookie 或会话。
+// Package remote 通过8181公共协议的固定路径读取资料和申请跟踪，不转发本地 Cookie 或会话。
 // 限制响应大小、超时和重定向，不提供任意 URL 代理。目录透传白名单排序和 UP 归属。
 // 见 docs/client-library.md、docs/client-catalog.md。
 package remote
@@ -195,7 +195,7 @@ func (c *Client) call(ctx context.Context, base, method, path string, body any, 
 	}
 	media, _, _ := mime.ParseMediaType(response.Header.Get("Content-Type"))
 	if media != "application/json" {
-		return &Error{Message: "服务器未返回客户端 JSON 数据，请更新远程 backend 后重试。", Status: 502}
+		return &Error{Message: "服务器未返回客户端 JSON 数据，请确认连接 8181 公共接口端口，并更新远程 backend。", Status: 502}
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		var failure struct {
