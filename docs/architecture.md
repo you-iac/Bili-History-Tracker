@@ -1,5 +1,7 @@
 # 服务端查询模块
 
+公共JSON业务应答和Agent核对的新方案见 [协议](public-response.md) 与 [实施计划](../PLANs/2026-11-17-public-json-response.md)。新增职责将在现有publicapi、remote、library和详情模块实现，不变更数据库结构。
+
 当前实现一次性视频元数据查询、UP 主资料查询、SQLite 持久化、8182 观察台和循环调度。成功观测按 [数据库设计](database.md) 的五表写入当前索引与内容版本表；查询失败只记日志，不修改已有内容。尚未实现完整投稿列表发现（B站列表接口需要登录态，当前只用公开合集发现）、可访问性状态机、事件日志和 Agent 同步，不能视为完整实现 FR-005、FR-006、FR-008 或 FR-009。
 
 数据库由 0001 迁移建表；0002 曾增加 `snapshot_version`，0003 删除该列，过滤规则版本改为仅由适配器代码管理；0004 为 `tracking_targets` 增加最近采集状态并回填旧目标。当前 `PRAGMA user_version = 4`；调度目标单独存放在 `tracking_targets`，属于调度配置而非内容设计。迁移不裁剪已有 payload，也不新增历史内容版本。
