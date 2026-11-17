@@ -24,7 +24,7 @@ Agent 是运行在本机的 Go 程序：提供网页、本地 UP/视频关注库
 |---|---|
 | [main](cmd/agent/main.go) | 组装回环服务并自动打开已认证网页，默认8183 |
 | [httpapi](internal/httpapi/server.go)、[关注接口](internal/httpapi/library.go) | 网页与27个API，会话、来源、CSRF保护 |
-| [library](internal/library/service.go) | 本地关注/公开搜索、总览缓存、自动提交与退避队列，见 [pending.go](internal/library/pending.go) |
+| [library](internal/library/service.go) | 本地关注/公开搜索、总览缓存、浏览与后台核对、缺失补申请和有界退避，见 [reconciliation.go](internal/library/reconciliation.go)、[pending.go](internal/library/pending.go) 和 [JSON协议](../../docs/public-response.md) |
 | [remote](internal/remote/client.go) | 按8181公共协议的固定路径查询/提交，不转发平台 Cookie或本地会话 |
 | [scanner](internal/scanner/service.go)、[bilibili](internal/bilibili/client.go) | Cookie验证、投稿分页、取消与检查点恢复 |
 | [localstate](internal/localstate/store.go) | 状态原子保存与 [目录迁移](internal/localstate/directory.go)，初始目录保留位置指向 |

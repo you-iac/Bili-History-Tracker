@@ -4,6 +4,7 @@ package publicapi
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -23,19 +24,19 @@ func TestGateRollingWindowAndSharedPaths(t *testing.T) {
 		if w.Code != want {
 			t.Fatalf("%s: %d, want %d", path, w.Code, want)
 		}
-		if want == 429 && (w.Header().Get("Retry-After") != "1" || w.Header().Get("Content-Type") != "application/json; charset=utf-8") {
+		if want == 200 && (w.Header().Get("Retry-After") != "1" || w.Header().Get("Content-Type") != "application/json; charset=utf-8") {
 			t.Fatal("missing retry response", w.Header())
 		}
 	}
 	request("/creators", 204)
 	now = now.Add(500 * time.Millisecond)
 	request("/api/v1/platforms/bilibili/creators/1", 204)
-	request("/healthz", 429)
+	request("/healthz", 200)
 	now = now.Add(499 * time.Millisecond)
-	request("/videos", 429)
+	request("/videos", 200)
 	now = now.Add(time.Millisecond)
 	request("/videos", 204)
-	request("/healthz", 429)
+	request("/healthz", 200)
 	if calls != 3 || g.active != 0 {
 		t.Fatal("rejected request reached handler or leaked slot", calls, g.active)
 	}
@@ -55,7 +56,7 @@ func TestGateLimitsConcurrentRequestsAfterWindowExpires(t *testing.T) {
 	ticks.Store(int64(2 * time.Second))
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, httptest.NewRequest("GET", "/other", nil))
-	if w.Code != 429 {
+	if w.Code != 200 || !strings.Contains(w.Body.String(), `"code":"RATE_LIMITED"`) {
 		t.Fatalf("slow request lost its slot after time window: %d", w.Code)
 	}
 	close(release)

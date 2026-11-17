@@ -23,6 +23,8 @@ func TestAutomaticFollowPublicSearchAndOverview(t *testing.T) {
 			t.Error("cookie forwarded")
 		}
 		switch r.URL.Path {
+		case "/api/targets/status":
+			json.NewEncoder(w).Encode(remote.Status{Kind: "creator", ID: "123", Tracking: posts.Load() > 0})
 		case "/targets":
 			posts.Add(1)
 			json.NewEncoder(w).Encode(remote.Status{Kind: "creator", ID: "123", Tracking: true, State: "tracking"})
@@ -212,7 +214,7 @@ func TestFollowQueuesOfflineAndBackgroundRecovers(t *testing.T) {
 			w.Write([]byte(`{"kind":"video","id":"BV17x411w7KC","tracking":true,"status":"tracking"}`))
 			return
 		}
-		w.Write([]byte(`{"kind":"video","id":"BV17x411w7KC","recorded":false,"tracking":true,"status":"pending"}`))
+		json.NewEncoder(w).Encode(remote.Status{Kind: "video", ID: "BV17x411w7KC", Tracking: calls.Load() > 1})
 	}))
 	defer server.Close()
 	s, _ := New(store, remote.New(nil))

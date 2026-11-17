@@ -26,11 +26,11 @@ func TestPendingFollowsGetSummariesWithoutSubmittingTracking(t *testing.T) {
 			http.Error(w, "unexpected", 500)
 			return
 		}
-		pages = append(pages, r.URL.Query().Get("page"))
+		pages = append(pages, r.URL.Query().Get("id"))
 		page := 1
 		id, name := "123", "已有资料的 UP"
-		if r.URL.Query().Get("page") == "2" {
-			page = 2
+		if r.URL.Query().Get("id") == "456" {
+			page = 1
 			id = "456"
 			name = "第二页的 UP"
 		}
@@ -44,7 +44,7 @@ func TestPendingFollowsGetSummariesWithoutSubmittingTracking(t *testing.T) {
 	_, _ = s.Add("creator", "456")
 	_ = s.Configure(upstream.URL)
 	count, err := s.SyncSummaries(context.Background(), "creator")
-	if err != nil || count != 2 || strings.Join(pages, ",") != "1,2" {
+	if err != nil || count != 2 || strings.Join(pages, ",") != "123,456" {
 		t.Fatal(count, pages, err)
 	}
 	for _, f := range s.ListCatalog("creator", "", 1, false, "popular", "").Items {
@@ -68,7 +68,7 @@ func TestPendingFollowsGetSummariesWithoutSubmittingTracking(t *testing.T) {
 func TestSummarySyncKeepsPartialResultsAndOldCache(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		if r.URL.Query().Get("page") == "2" {
+		if r.URL.Query().Get("id") == "456" {
 			w.WriteHeader(502)
 			w.Write([]byte(`{"error":"offline"}`))
 			return

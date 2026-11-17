@@ -14,6 +14,9 @@ var ErrTargetBusy = errors.New("target busy")
 var ErrTargetPaused = errors.New("target paused")
 var ErrRequestCapacity = errors.New("target request capacity")
 
+// ErrTargetStorage标记本服务持久化故障，公共接口不能把它伪装为正常业务拒绝。
+var ErrTargetStorage = errors.New("target storage failure")
+
 // RequestTarget 不接受客户端元数据或调度设置。kind/id 应由入口校验；失败不创建跟踪目标。
 // 并发上限覆盖本进程正在执行的采集，防止显式申请无限制启动上游请求。
 func (t *Tracker) RequestTarget(ctx context.Context, kind, id string) (string, error) {
@@ -35,7 +38,7 @@ func (t *Tracker) RequestTarget(ctx context.Context, kind, id string) (string, e
 	defer func() { t.mu.Lock(); delete(t.running, key); t.mu.Unlock() }()
 	old, exists, err := t.store.TrackingTarget(ctx, t.platform, kind, id)
 	if err != nil {
-		return "", err
+		return "", errors.Join(ErrTargetStorage, err)
 	}
 	if exists {
 		if !old.Enabled {
@@ -68,7 +71,7 @@ func (t *Tracker) RequestTarget(ctx context.Context, kind, id string) (string, e
 			return "", err
 		}
 		if _, err = t.store.SaveCreator(ctx, profile, fingerprint); err != nil {
-			return "", err
+			return "", errors.Join(ErrTargetStorage, err)
 		}
 		if profile.FollowerCount != nil {
 			t.recordMetric(ctx, "creator", id, "follower", *profile.FollowerCount)
@@ -76,12 +79,12 @@ func (t *Tracker) RequestTarget(ctx context.Context, kind, id string) (string, e
 	}
 	inserted, err := t.store.AddRequestedTarget(ctx, target, time.Now())
 	if err != nil {
-		return "", err
+		return "", errors.Join(ErrTargetStorage, err)
 	}
 	if !inserted {
 		current, _, err := t.store.TrackingTarget(ctx, t.platform, kind, id)
 		if err != nil {
-			return "", err
+			return "", errors.Join(ErrTargetStorage, err)
 		}
 		if !current.Enabled {
 			return "", ErrTargetPaused

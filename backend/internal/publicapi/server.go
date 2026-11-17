@@ -1,7 +1,7 @@
 // Package publicapi 组装 8181 公共 JSON 路由、进程级限流和有界目标申请。
 // 资料读取复用 storage，目标接纳委托 tracker，实时查询委托 httpapi；
 // 不导入 admin，不暴露管理表单、日志或批量导入，不接收本地 Cookie。
-// 入口数量限制不等于长期跟踪预算或身份认证。见 docs/public-api.md、docs/architecture.md。
+// 正常业务HTTP200并检查JSON结果；入口限制不等于长期预算或认证。见 docs/public-response.md、docs/architecture.md。
 package publicapi
 
 import (
@@ -65,7 +65,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/targets/status", s.clientTargetStatus)
 	mux.HandleFunc("GET /api/metrics/{type}/{id}", s.metrics)
 	mux.HandleFunc("POST /targets", s.requestTarget)
-	mux.Handle("/api/v1/", s.legacy)
+	mux.HandleFunc("/api/v1/", s.legacyJSON)
 	return newGate(s.config.RequestsPerSecond).wrap(mux)
 }
 

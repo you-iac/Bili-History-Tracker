@@ -20,13 +20,18 @@ type targetInput struct {
 }
 
 type targetResult struct {
-	Index      int    `json:"index"`
-	Kind       string `json:"kind"`
-	ID         string `json:"id"`
-	HTTPStatus int    `json:"http_status"`
-	Tracking   bool   `json:"tracking"`
-	Status     string `json:"status"`
-	Error      string `json:"error,omitempty"`
+	OK         bool         `json:"ok"`
+	Code       string       `json:"code"`
+	Result     string       `json:"result,omitempty"`
+	Target     *targetState `json:"target,omitempty"`
+	RetryAfter int          `json:"retry_after_seconds,omitempty"`
+	Index      int          `json:"index"`
+	Kind       string       `json:"kind"`
+	ID         string       `json:"id"`
+	HTTPStatus int          `json:"http_status"`
+	Tracking   bool         `json:"tracking"`
+	Status     string       `json:"status"`
+	Error      string       `json:"error,omitempty"`
 }
 
 func (s *Server) requestTarget(w http.ResponseWriter, r *http.Request) {
@@ -54,10 +59,14 @@ func (s *Server) requestTarget(w http.ResponseWriter, r *http.Request) {
 			if result.HTTPStatus == 429 {
 				w.Header().Set("Retry-After", "1")
 			}
-			writeJSON(w, result.HTTPStatus, map[string]string{"error": result.Error})
+			status := 200
+			if result.HTTPStatus == 400 || result.HTTPStatus == 500 {
+				status = result.HTTPStatus
+			}
+			writeJSON(w, status, result)
 			return
 		}
-		writeJSON(w, 200, map[string]any{"kind": result.Kind, "id": result.ID, "tracking": true, "status": result.Status})
+		writeJSON(w, 200, map[string]any{"kind": result.Kind, "id": result.ID, "tracking": true, "tracking_state": result.Target.TrackingState, "recorded": result.Target.Recorded, "status": result.Target.Status, "result": result.Result})
 		return
 	}
 	var targets []json.RawMessage
@@ -80,7 +89,7 @@ func (s *Server) submitBatch(ctx context.Context, inputs []json.RawMessage) []ta
 		if err == nil && decoder.Decode(new(any)) != io.EOF {
 			err = errors.New("extra JSON value")
 		}
-		result := targetResult{Kind: input.Kind, ID: input.ID, HTTPStatus: 400, Status: "error", Error: "目标 JSON 格式无效。"}
+		result := targetResult{Code: "INVALID_TARGET", Kind: input.Kind, ID: input.ID, HTTPStatus: 400, Status: "error", Error: "目标 JSON 格式无效。"}
 		if err == nil {
 			result = s.submit(ctx, input)
 		}
@@ -92,29 +101,57 @@ func (s *Server) submitBatch(ctx context.Context, inputs []json.RawMessage) []ta
 
 func (s *Server) submit(ctx context.Context, input targetInput) targetResult {
 	input.ID = normalizeID(input.Kind, input.ID)
-	result := targetResult{Kind: input.Kind, ID: input.ID, HTTPStatus: 400, Status: "error", Error: "目标标识无效。"}
+	result := targetResult{Code: "INVALID_TARGET", Kind: input.Kind, ID: input.ID, HTTPStatus: 400, Status: "error", Error: "目标标识无效。"}
 	if !validID(input.Kind, input.ID) {
 		return result
 	}
 	if ctx.Err() != nil {
+		result.Code = "REQUEST_TIMEOUT"
 		result.HTTPStatus, result.Error = 504, "本次处理已超时，请查询状态后重试。"
 		return result
 	}
 	state, err := s.tracker.RequestTarget(ctx, input.Kind, input.ID)
 	if err == nil {
-		result.HTTPStatus, result.Tracking, result.Status, result.Error = 200, true, state, ""
+		target, stateErr := s.targetStatus(ctx, input.Kind, input.ID)
+		if stateErr != nil {
+			result.HTTPStatus = 500
+			result.Code = "INTERNAL_ERROR"
+			result.Error = "无法读取提交后的目标状态。"
+			return result
+		}
+		result.OK = true
+		result.Code = "OK"
+		result.Target = &target
+		result.Result = "created"
+		if state == "existing" {
+			result.Result = "existing"
+		}
+		result.HTTPStatus, result.Tracking, result.Status, result.Error = 200, true, target.Status, ""
 		return result
 	}
 	result.HTTPStatus, result.Error = 502, "服务器无法验证或保存该目标，尚未确认加入跟踪。"
+	result.Code = "TARGET_SUBMISSION_FAILED"
 	switch {
+	case errors.Is(err, tracker.ErrTargetStorage):
+		result.HTTPStatus, result.Code, result.Error = 500, "INTERNAL_ERROR", "服务器无法读取或保存目标。"
 	case errors.Is(err, tracker.ErrTargetBusy):
+		result.Code = "TARGET_BUSY"
 		result.HTTPStatus, result.Error = 409, "目标正在采集中，请先刷新状态或稍后重试。"
 	case errors.Is(err, tracker.ErrRequestCapacity):
+		result.RetryAfter = 1
+		result.Code = "RATE_LIMITED"
 		result.HTTPStatus, result.Error = 429, "服务器采集任务较多，请稍后重试。"
 	case errors.Is(err, tracker.ErrTargetPaused):
+		result.Code = "TARGET_PAUSED"
 		result.HTTPStatus, result.Error = 409, "目标已被服务器暂停，请联系管理员。"
 	case ctx.Err() != nil, errors.Is(err, context.DeadlineExceeded), errors.Is(err, context.Canceled):
+		result.Code = "REQUEST_TIMEOUT"
 		result.HTTPStatus, result.Error = 504, "本次处理已超时，请查询状态后重试。"
+	}
+	if ctx.Err() == nil && result.HTTPStatus != 500 {
+		if target, e := s.targetStatus(ctx, input.Kind, input.ID); e == nil {
+			result.Target = &target
+		}
 	}
 	return result
 }

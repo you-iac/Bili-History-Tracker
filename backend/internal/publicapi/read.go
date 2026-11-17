@@ -85,11 +85,15 @@ func (s *Server) clientDetail(w http.ResponseWriter, r *http.Request, kind, id s
 	defer cancel()
 	i, err := s.reader.Content(ctx, s.platform, kind, id, time.Now())
 	if errors.Is(err, sql.ErrNoRows) {
-		writeJSON(w, 404, map[string]string{"error": "服务器尚无该目标的成功观测记录。"})
+		s.missingDetail(w, r, kind, id)
 		return
 	}
 	if err != nil {
 		writeJSON(w, 500, map[string]string{"error": "无法读取服务器详情。"})
+		return
+	}
+	if !i.Recorded || kind == "creator" && i.Seq == 0 {
+		s.missingDetail(w, r, kind, id)
 		return
 	}
 	days := 30
@@ -118,16 +122,29 @@ func (s *Server) clientDetail(w http.ResponseWriter, r *http.Request, kind, id s
 	for _, v := range versions.Items {
 		entries = append(entries, map[string]any{"seq": v.Seq, "at": v.At, "name": v.Name})
 	}
-	result := map[string]any{"item": clientItem(i), "metrics": series, "versions": entries, "version_page": versions.Page, "version_total": versions.Total, "version_limit": versions.Limit}
+	target, stateErr := s.targetStatus(ctx, kind, id)
+	if stateErr != nil {
+		writeJSON(w, 500, map[string]string{"error": "无法读取目标状态。"})
+		return
+	}
+	result := map[string]any{"item": clientItem(i), "target": target, "metrics": series, "versions": entries, "version_page": versions.Page, "version_total": versions.Total, "version_limit": versions.Limit}
 	if raw := r.URL.Query().Get("seq"); raw != "" {
 		seq, e := strconv.ParseInt(raw, 10, 64)
-		if e != nil || seq < 1 || seq > i.Seq {
+		if e != nil || seq < 1 {
 			writeJSON(w, 400, map[string]string{"error": "版本号无效。"})
 			return
 		}
+		if seq > i.Seq {
+			business(w, "SNAPSHOT_NOT_FOUND", "没有该版本快照。", map[string]any{"target": target})
+			return
+		}
 		snapshot, e := s.reader.ReadSnapshot(ctx, s.platform, kind, id, seq)
+		if errors.Is(e, sql.ErrNoRows) {
+			business(w, "SNAPSHOT_NOT_FOUND", "没有该版本快照。", map[string]any{"target": target})
+			return
+		}
 		if e != nil {
-			writeJSON(w, 404, map[string]string{"error": "没有该版本快照。"})
+			writeJSON(w, 500, map[string]string{"error": "无法读取版本快照。"})
 			return
 		}
 		result["snapshot"] = json.RawMessage(snapshot.Payload)
@@ -144,27 +161,12 @@ func (s *Server) clientTargetStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
-	t, exists, err := s.store.TrackingTarget(ctx, s.platform, kind, id)
+	state, err := s.targetStatus(ctx, kind, id)
 	if err != nil {
-		writeJSON(w, 500, map[string]string{"error": "无法读取跟踪状态。"})
+		writeJSON(w, 500, map[string]string{"error": "无法读取目标状态。"})
 		return
 	}
-	i, err := s.reader.Content(ctx, s.platform, kind, id, time.Now())
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		writeJSON(w, 500, map[string]string{"error": "无法读取资料状态。"})
-		return
-	}
-	state := "not_recorded"
-	if err == nil {
-		state = i.Status
-	}
-	if exists && t.Enabled && err != nil {
-		state = "pending"
-	}
-	if exists && !t.Enabled {
-		state = "paused"
-	}
-	writeJSON(w, 200, map[string]any{"kind": kind, "id": id, "recorded": err == nil && i.Recorded && (kind != "creator" || i.Seq > 0), "tracking": exists && t.Enabled, "status": state})
+	writeJSON(w, 200, state)
 }
 
 // metrics 与详情使用同一 UTC 日采样口径；目标不存在时不请求上游补齐。
@@ -178,11 +180,11 @@ func (s *Server) metrics(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 	if _, err := s.reader.Content(ctx, s.platform, kind, id, time.Now()); err != nil {
-		code := 500
 		if errors.Is(err, sql.ErrNoRows) {
-			code = 404
+			s.missingDetail(w, r, kind, id)
+		} else {
+			writeJSON(w, 500, map[string]string{"error": "无法读取目标。"})
 		}
-		writeJSON(w, code, map[string]string{"error": "无法读取目标。"})
 		return
 	}
 	series, err := s.reader.Metrics(ctx, s.platform, kind, id, days, time.Now())

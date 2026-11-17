@@ -1,5 +1,5 @@
 // detail.js 编排独立详情、真实趋势与稳定字段版本对比；复用Agent既有详情路径。见 docs/client-catalog.md。
-import {compactNumber,signedNumber,utcDay,snapshotChanges,followState,publishedAt} from './view.mjs';
+import {compactNumber,signedNumber,utcDay,snapshotChanges,followState,publishedAt,detailReadMessage} from './view.mjs';
 import {renderTrend} from './trend.mjs';
 import {cardStatus} from './cards.js';
 import {snapshotImageURL} from './images.js';
@@ -15,7 +15,7 @@ export function initDetail({api,notify,onAdd,onChanged,onScan,onSyncSummaries,im
   function controls(){const disabled=!usable||working||!data;for(const id of ['detail-days','detail-refresh','detail-follow','detail-unfollow','detail-scan','detail-previous','detail-next'])$(id).disabled=disabled;
     $('detail-refresh').disabled=!usable||working;
     $('detail-previous').disabled=disabled||page<=1;$('detail-next').disabled=disabled||page*(data?.version_limit||10)>=(data?.version_total||0);
-    $('detail-follow').disabled=disabled||Boolean(data?.local_follow&&!data.local_follow.pending_submission);
+    $('detail-follow').disabled=disabled||Boolean(data?.local_follow&&!data.local_follow.pending_submission&&!data.local_follow.needs_attention);
     for(const el of $('detail-versions').querySelectorAll('button'))el.disabled=disabled||snapshotBusy;
   }
   function render(d){
@@ -23,7 +23,7 @@ export function initDetail({api,notify,onAdd,onChanged,onScan,onSyncSummaries,im
     $('detail-name').textContent=item.name||route.id;$('detail-identity').textContent=`${creator?'UID ':''}${route.id}${!creator&&item.owner_name?` · ${item.owner_name}`:''}`;
     $('detail-avatar').textContent=creator?(item.name||route.id).slice(0,1):'▷';$('detail-avatar').classList.toggle('detail-cover',!creator);$('detail-avatar').closest('section').classList.toggle('video-hero',!creator);images.show($('detail-avatar'),{kind:route.kind,id:route.id,seq:item.seq});$('detail-record-status').textContent=cardStatus(item);$('detail-record-status').dataset.state=item.status||'unknown';
     $('detail-local-state').textContent=local?`已本地关注 · ${followState(local)}`:'尚未本地关注';
-    $('detail-follow').textContent=local?(local.pending_submission?'重试提交':'已本地关注'):'关注并跟踪';$('detail-unfollow').hidden=!local;$('detail-scan').hidden=!creator;
+    $('detail-follow').textContent=local?(local.needs_attention?'重新核对':local.pending_submission?'重试提交':'已本地关注'):'关注并跟踪';$('detail-unfollow').hidden=!local;$('detail-scan').hidden=!creator;
     $('detail-source').textContent=`数据来自 ${d.server_url} · 最近观测 ${date(item.observed_at)}`;
     $('detail-external').href=creator?`https://space.bilibili.com/${route.id}`:`https://www.bilibili.com/video/${route.id}`;
     $('detail-metric-label').textContent=creator?'最新粉丝数':'最新播放量';$('detail-latest').textContent=compactNumber(item.metric);$('detail-latest').title=item.metric?.toLocaleString('zh-CN')||'未知';
@@ -38,7 +38,7 @@ export function initDetail({api,notify,onAdd,onChanged,onScan,onSyncSummaries,im
     const versions=document.createDocumentFragment();for(const version of d.versions||[]){const button=node('button',null,'version-button');button.type='button';button.dataset.seq=version.seq;button.append(node('strong',`v${version.seq} · ${version.seq===1?'首次记录':'内容更新'}`),node('span',date(version.at)),node('small',version.name||''));button.addEventListener('click',()=>selectSnapshot(version.seq));versions.append(button);}
     if(!d.versions?.length)versions.append(node('p','尚无可查看的完整内容版本。','empty-copy'));$('detail-versions').replaceChildren(versions);
     $('detail-version-page').textContent=`第 ${page} / ${Math.max(1,Math.ceil((d.version_total||0)/(d.version_limit||10)))} 页 · ${d.version_total||0} 个版本`;
-    $('detail-error').hidden=!d.cached&&!d.cache_error;if(d.cache_error)$('detail-error').textContent='资料已读取，本地缓存保存失败：'+d.cache_error;if(d.cached)$('detail-error').textContent=`服务器暂不可达，当前为本地缓存（最近核对 ${date(local?.updated_at)}）。${d.read_error||''}`;
+    const readMessage=detailReadMessage(d);$('detail-error').hidden=!readMessage;$('detail-error').textContent=readMessage;
     $('detail-body').hidden=false;markSelected();controls();
   }
   function markSelected(){for(const button of $('detail-versions').querySelectorAll('button'))button.setAttribute('aria-pressed',String(Number(button.dataset.seq)===selected));}

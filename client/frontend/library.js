@@ -79,17 +79,18 @@ export function initLibrary({api,notify,onScan,navigate}) {
     if(!publicMode)$('refresh-library').textContent='↻ 刷新库资料';
     summaryNote();
   }
-  function summaryKey(base,k){return base+'|'+summaryEpoch+'|'+k;}
+  function summaryKey(base,k){const view=views[k];return base+'|'+summaryEpoch+'|'+k+'|'+view.page+'|'+view.q+'|'+view.sort+'|'+view.pending;}
   function summaryNote(){const text=summaryNotes.get(summaryKey(server,kind))||'';$('library-read-note').textContent=text;$('library-read-note').hidden=views[kind].scope==='public'||!text;}
-  function syncLocalSummaries(requestedKind,base,force=false){
+  function syncLocalSummaries(requestedKind,base,force=false,requestedIDs=null){
     if(!base||base!==server)return Promise.resolve(null);
-    const key=summaryKey(base,requestedKind),epoch=summaryEpoch;
+    const noteKey=summaryKey(base,requestedKind),ids=requestedIDs||result.items.map(item=>item.id),key=noteKey+'|'+[...ids].sort().join(','),epoch=summaryEpoch;
+    if(!ids.length)return Promise.resolve(null);
     if(summaryJobs.has(key))return summaryJobs.get(key);
     if(!force&&Date.now()-(summaryReads.get(key)||0)<60000)return Promise.resolve(null);
-    summaryReads.set(key,Date.now());summaryNotes.set(key,'正在读取服务器已记录资料…');summaryNote();
+    summaryReads.set(key,Date.now());summaryNotes.set(noteKey,'正在读取服务器已记录资料…');summaryNote();
     const job=(async()=>{
-      try{const data=await post('/api/follows/refresh?'+new URLSearchParams({kind:requestedKind}));summaryNotes.delete(key);return data;}
-      catch(error){summaryNotes.set(key,'服务器资料暂未读取，已保留本地关注和最近资料。'+error.message);throw error;}
+      try{if(!ids.length)return null;const params=new URLSearchParams({kind:requestedKind});for(const id of ids)params.append('id',id);const data=await post('/api/follows/refresh?'+params);summaryNotes.delete(noteKey);await localDashboard();return data;}
+      catch(error){summaryNotes.set(noteKey,'服务器资料暂未读取，已保留本地关注和最近资料。'+error.message);throw error;}
       finally{summaryJobs.delete(key);summaryNote();if(epoch===summaryEpoch&&server===base&&kind===requestedKind&&views[kind].scope==='local'&&current===(kind==='creator'?'creators':'videos')&&!$('follow-rows').querySelector('details[open]'))await load(false);}
     })();
     summaryJobs.set(key,job);return job;
@@ -129,9 +130,9 @@ export function initLibrary({api,notify,onScan,navigate}) {
   }
   async function add(followKind,id) {
     const f=await api('/api/follows',{method:'POST',body:JSON.stringify({kind:followKind,id})});
-    notify(f.pending_submission?`已保存本地关注，服务器尚未确认；后台将重试。${f.last_error||''}`:'已关注，服务器已确认持续跟踪。',Boolean(f.pending_submission));
+    notify(f.remote?.tracking_state==='paused'||f.remote?.status==='paused'?'已保存本地关注，服务器已暂停此目标。':f.needs_attention?`已保存本地关注，需要手动核对。${f.last_error||''}`:f.pending_submission?`已保存本地关注，服务器尚未确认；后台将重试。${f.last_error||''}`:'已关注，服务器已确认持续跟踪。',Boolean(f.pending_submission));
     if(!f.pending_submission)await post(`${path(f)}/refresh`).catch(error=>notify(`已关注并提交，资料暂未读取：${error.message}`,true));
-    summaryReads.delete(summaryKey(server,followKind));await reload();return f;
+    summaryReads.clear();await reload();return f;
   }
   async function settings() {
     const data=await api('/api/settings');$('data-directory').value=data.data_directory;$('directory-current').textContent=data.data_directory;
@@ -169,7 +170,7 @@ export function initLibrary({api,notify,onScan,navigate}) {
   }));
   $('overview-refresh').addEventListener('click',()=>run(refreshOverview));
   for(const [k,name] of [['creator','creators'],['video','videos']]){for(const [direction,delta] of [['previous',-1],['next',1]])$('overview-'+name+'-'+direction).addEventListener('click',()=>overviewPage(k,overviewPages[k].page+delta));}
-  const detail=initDetail({api,notify,onAdd:add,onChanged:localDashboard,onScan,onSyncSummaries:k=>syncLocalSummaries(k,server),images});
+  const detail=initDetail({api,notify,onAdd:add,onChanged:localDashboard,onScan,onSyncSummaries:(k,ids)=>syncLocalSummaries(k,server,false,ids),images});
   let size='standard';try{const saved=localStorage.getItem('bht.card-size');if(['compact','standard','large'].includes(saved))size=saved;}catch{}
   $('card-size').value=size;$('follow-rows').dataset.size=size;
   $('card-size').addEventListener('change',()=>{size=$('card-size').value;$('follow-rows').dataset.size=size;try{localStorage.setItem('bht.card-size',size);}catch{}window.dispatchEvent(new CustomEvent('bht-density',{detail:size}));});

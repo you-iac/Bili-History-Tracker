@@ -48,7 +48,7 @@ func TestBatchPrefixIncludesInvalidPositionsAndDoesNotTouchTail(t *testing.T) {
 	if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &response) != nil {
 		t.Fatal(w.Code, w.Body.String())
 	}
-	if response.Received != 4 || response.Processed != 2 || response.Ignored != 2 || len(response.Results) != 2 || !response.Results[0].Tracking || response.Results[0].Status != "tracking" || response.Results[1].HTTPStatus != 400 || response.Results[1].Tracking {
+	if response.Received != 4 || response.Processed != 2 || response.Ignored != 2 || len(response.Results) != 2 || !response.Results[0].Tracking || response.Results[0].Result != "created" || !response.Results[0].OK || response.Results[1].HTTPStatus != 400 || response.Results[1].Tracking {
 		t.Fatal(w.Body.String())
 	}
 	for i, result := range response.Results {
@@ -90,7 +90,7 @@ func TestBatchDuplicatePausedAndFailedResults(t *testing.T) {
 			t.Fatal(w.Body.String())
 		}
 	}
-	if response.Results[1].Status != "existing" || q.calls.Load() != 2 {
+	if response.Results[1].Result != "existing" || q.calls.Load() != 2 {
 		t.Fatal("duplicate/paused target queried upstream", w.Body.String(), q.calls.Load())
 	}
 	if _, exists, _ := store.TrackingTarget(context.Background(), "bilibili", "creator", "99999"); exists {
@@ -173,11 +173,11 @@ func TestSingleTargetReplyAndStandardLink(t *testing.T) {
 	h := s.Handler()
 	w := postJSON(t, h, `{"type":"creator","id":"https://space.bilibili.com/72541187?spm_id_from=test"}`)
 	var data map[string]any
-	if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &data) != nil || len(data) != 4 || data["id"] != "72541187" || data["tracking"] != true || data["status"] != "tracking" {
+	if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &data) != nil || len(data) != 9 || data["id"] != "72541187" || data["tracking"] != true || data["result"] != "created" || data["recorded"] != true || data["tracking_state"] != "active" {
 		t.Fatal(w.Code, w.Body.String())
 	}
 	w = postJSON(t, h, `{"type":"creator","id":"72541187"}`)
-	if w.Code != 200 || !strings.Contains(w.Body.String(), `"status":"existing"`) || q.calls.Load() != 1 {
+	if w.Code != 200 || !strings.Contains(w.Body.String(), `"result":"existing"`) || q.calls.Load() != 1 {
 		t.Fatal("repeat resampled", w.Code, w.Body.String(), q.calls.Load())
 	}
 }
