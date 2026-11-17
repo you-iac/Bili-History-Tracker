@@ -86,7 +86,7 @@ func (t *Tracker) persistVideo(ctx context.Context, target storage.Target, video
 	}
 	result, err := t.store.SaveVideo(ctx, video, fingerprint)
 	if err != nil {
-		return result, err
+		return result, errors.Join(ErrTargetStorage, err)
 	}
 	t.log.Add(Entry{Time: time.Now(), Level: "info", Target: targetLabel(target), Action: "query_video", Message: "ok", Detail: fmt.Sprintf("seq=%d name=%s", result.Seq, video.Title), VersionAdded: result.VersionAdded})
 	if video.ViewCount != nil {

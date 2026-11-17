@@ -57,7 +57,7 @@ func TestLegacyQueriesPreservedAndShareRateLimit(t *testing.T) {
 	}
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/platforms/bilibili/videos/BV17x411w7KC", nil))
-	if w.Code != 429 || q.calls.Load() != 1 || w.Header().Get("Retry-After") != "1" {
+	if w.Code != 200 || !strings.Contains(w.Body.String(), `"code":"RATE_LIMITED"`) || q.calls.Load() != 1 || w.Header().Get("Retry-After") != "1" {
 		t.Fatal("legacy query bypassed global gate", w.Code, q.calls.Load())
 	}
 }

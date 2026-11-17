@@ -58,6 +58,7 @@ export function initCreatorVideos({api,notify,onAdd,onChanged,onSyncSummaries,im
       const data=await api(`/api/creator-videos/${owner}?`+new URLSearchParams({scope,sort,q,page:String(page)}));
       if(token!==sequence||owner!==uid)return;
       render(data,force);$('creator-videos-error').hidden=true;lastRead=Date.now();
+      if(force&&scope==='followed')void onSyncSummaries?.('video',result.items.map(item=>item.id)).then(()=>{if(uid===owner&&token===sequence)load();}).catch(()=>{});
     }catch(error){if(token===sequence){$('creator-videos-error').textContent=error.message+' 已保留上次读取的结果。';$('creator-videos-error').hidden=false;}}
     finally{if(token===sequence){loading=false;$('creator-videos-loading').hidden=true;controls();}}
   }
@@ -80,7 +81,7 @@ export function initCreatorVideos({api,notify,onAdd,onChanged,onSyncSummaries,im
   window.addEventListener('bht-density',event=>density(event.detail));
   return {
     setConnected(value){connected=value;controls();},
-    show(id){sequence++;uid=id||'';scope='followed';sort='published';q='';page=1;stamp='';job=null;result={items:[],page:1,total:0,limit:20};$('creator-videos-panel').hidden=!uid;$('creator-videos-rows').replaceChildren();$('creator-videos-query').value='';$('creator-videos-sort').value=sort;$('creator-videos-error').hidden=true;controls();if(uid){const owner=uid;load(true);onSyncSummaries?.('video').then(()=>{if(uid===owner)load(true);}).catch(()=>{});}},
+    show(id){sequence++;uid=id||'';scope='followed';sort='published';q='';page=1;stamp='';job=null;result={items:[],page:1,total:0,limit:20};$('creator-videos-panel').hidden=!uid;$('creator-videos-rows').replaceChildren();$('creator-videos-query').value='';$('creator-videos-sort').value=sort;$('creator-videos-error').hidden=true;controls();if(uid)load(true);},
     leave(){sequence++;uid='';loading=false;$('creator-videos-loading').hidden=true;},
     start,
     tick(){if(uid&&connected&&!working&&!loading&&Date.now()-lastRead>2000&&!$('creator-videos-rows').querySelector('details[open]'))return load();}

@@ -47,7 +47,7 @@ func (g *gate) wrap(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !g.enter() {
 			w.Header().Set("Retry-After", "1")
-			writeJSON(w, 429, map[string]string{"error": "服务器请求较多，请稍后重试。"})
+			business(w, "RATE_LIMITED", "服务器请求较多，请稍后重试。", map[string]any{"retry_after_seconds": 1})
 			return
 		}
 		defer g.leave()

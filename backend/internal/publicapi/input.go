@@ -14,6 +14,32 @@ import (
 )
 
 func writeJSON(w http.ResponseWriter, code int, value any) {
+	// 先编码再加协议字段，覆盖map与结构体，保留原有成功数据形状。
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		http.Error(w, "JSON encoding failed", 500)
+		return
+	}
+	var fields map[string]json.RawMessage
+	if json.Unmarshal(encoded, &fields) == nil && fields != nil {
+		if _, exists := fields["ok"]; !exists {
+			fields["ok"] = json.RawMessage("false")
+			if code >= 200 && code < 300 {
+				fields["ok"] = json.RawMessage("true")
+			}
+		}
+		if _, exists := fields["code"]; !exists {
+			if code >= 200 && code < 300 {
+				fields["code"] = json.RawMessage(`"OK"`)
+			} else {
+				fields["code"] = json.RawMessage(`"REQUEST_ERROR"`)
+				if code >= 500 {
+					fields["code"] = json.RawMessage(`"INTERNAL_ERROR"`)
+				}
+			}
+		}
+		value = fields
+	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(code)

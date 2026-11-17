@@ -25,7 +25,7 @@ func TestLibraryAPIWithoutPlatformCookie(t *testing.T) {
 			submitted.Add(1)
 			w.Write([]byte(`{"kind":"creator","id":"123","tracking":true,"status":"tracking"}`))
 		case "/api/targets/status":
-			w.Write([]byte(`{"kind":"creator","id":"123","recorded":true,"tracking":true,"status":"ok"}`))
+			json.NewEncoder(w).Encode(map[string]any{"kind": "creator", "id": "123", "recorded": true, "tracking": submitted.Load() > 0, "status": "ok"})
 		default:
 			w.Write([]byte(`{"item":{"kind":"creator","id":"123","name":"远程 UP","metric":42,"seq":1},"versions":[{"seq":1,"name":"远程 UP"}],"metrics":{"points":[]}}`))
 		}
@@ -49,13 +49,13 @@ func TestLibraryAPIWithoutPlatformCookie(t *testing.T) {
 	if !strings.Contains(r.Body.String(), "远程 UP") || !strings.Contains(r.Body.String(), `"tracking":true`) {
 		t.Fatal(r.Body.String())
 	}
-	if submitted.Load() != 2 {
-		t.Fatal("add should submit once and explicit retry once", submitted.Load())
+	if submitted.Load() != 1 {
+		t.Fatal("add submits once; explicit retry reuses confirmed task", submitted.Load())
 	}
 	if r = h.call("DELETE", "/api/follows/creator/123", "{}"); r.Code != 200 {
 		t.Fatal(r.Code)
 	}
-	if submitted.Load() != 2 {
+	if submitted.Load() != 1 {
 		t.Fatal("unfollow submitted remote action")
 	}
 	r = h.call("GET", "/api/follows", "")

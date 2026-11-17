@@ -1,6 +1,6 @@
 # 公共 JSON 应答与 Agent 关注核对
 
-状态：设计已确认，待实施。实施与验证见 [计划](../PLANs/2026-11-17-public-json-response.md)。本协议覆盖 [公共接口](public-api.md) 的旧业务 HTTP 映射；仅影响8181，不改变8182管理及Agent本机会话保护。
+状态：已实现，验证记录见关联计划。实施与验证见 [计划](../PLANs/2026-11-17-public-json-response.md)。本协议覆盖 [公共接口](public-api.md) 的旧业务 HTTP 映射；仅影响8181，不改变8182管理及Agent本机会话保护。
 
 ## HTTP 与 JSON
 
@@ -53,12 +53,12 @@
      -> 查询失败：保留未知/缓存，退避
 ```
 
-启动、切服及每30秒后台轮次最多处理3个到期目标，已确认目标每15分钟复核；浏览60秒内复用确认。核对和提交按目标合并，写回校验服务器代际及关注身份；切服、取关、重新关注拒绝旧结果。提交前和超时后先查状态，连续失败6次进入人工处理，手动重试先核对；暂停不自动恢复。重试次数、下次处理、核对时间及错误业务码持久化。摘要/观测时间不充当跟踪核对时间。
+启动、切服及每30秒后台轮次最多处理3个到期目标，已确认目标每15分钟复核；浏览60秒内复用确认。核对和提交按目标合并，写回校验服务器代际及关注身份；切服、取关、重新关注拒绝旧结果。提交前和超时后先查状态，连续失败6次进入人工处理，手动重试先核对；暂停不自动恢复。重试次数、下次处理、核对时间及错误业务码持久化；follow_identity使用随机标识，避免同一时间戳下取关重关注误接旧响应。摘要/观测时间不充当跟踪核对时间。
 
-摘要精确读取当前页本地目标，避免缺失目标触发公共全库扫描；Agent统一限制请求速率，限流不紧密循环。详情返回read_code/read_error/target/cached；分别显示无资料、限流、业务失败与连接失败。无缓存也展示目标和关注身份，不伪造播放量、版本或下架。
+摘要精确读取当前页本地目标，避免缺失目标触发公共全库扫描；Agent统一以150毫秒的启动间隔限制请求速率，限流不紧密循环。详情返回read_code/read_error/target/cached；分别显示无资料、限流、业务失败与连接失败。无缓存也展示目标和关注身份，不伪造播放量、版本或下架。
 
 兼容旧成功结构与旧HTTP404/409/429/502；旧404须精确核对，不解析中文推断永久原因。先升级Agent再升级服务器，旧Agent不保证能识别200业务失败。
 
 ## 实现导航
 
-[服务器](../backend/internal/publicapi/server.go)、[远程解析](../client/agent/internal/remote/client.go)、[关注服务](../client/agent/internal/library/service.go)、[队列](../client/agent/internal/library/pending.go)、[摘要](../client/agent/internal/library/summaries.go)、[详情](../client/frontend/detail.js)。使用模拟上游和临时数据库验证，不操作真实数据库。
+[服务器](../backend/internal/publicapi/server.go)、[应答和目标状态](../backend/internal/publicapi/response.go)、[实时兼容](../backend/internal/publicapi/legacy.go)、[协议回归](../backend/internal/publicapi/response_test.go)、[远程解析](../client/agent/internal/remote/client.go)、[关注服务](../client/agent/internal/library/service.go)、[队列](../client/agent/internal/library/pending.go)、[核对实现](../client/agent/internal/library/reconciliation.go)、[核对回归](../client/agent/internal/library/reconciliation_test.go)、[摘要](../client/agent/internal/library/summaries.go)、[详情](../client/frontend/detail.js)。使用模拟上游和临时数据库验证，不操作真实数据库。

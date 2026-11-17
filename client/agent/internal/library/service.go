@@ -1,11 +1,13 @@
 // Package library 管理本地私人 UP/视频关注、服务器地址与最近读取的公共资料。
 // 写入成功才更新内存；网络操作在锁外执行，取消关注不会请求服务器停采。见 docs/client-library.md。
 // 摘要同步独立于关注提交，范围匹配的详情才可作为离线缓存。
+// 浏览/后台核对、JSON业务失败和有界重试见 docs/public-response.md。
 // 自动关注、公开查询和退避队列见 docs/client-workspace.md；独立详情与匹配缓存见 docs/client-catalog.md；图片地址缓存见 docs/client-launch-media.md。
 package library
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"net/url"
 	"regexp"
@@ -29,6 +31,11 @@ type Storage interface {
 	SaveLibrary(any) error
 }
 type Follow struct {
+	Identity         string `json:"follow_identity,omitempty"`
+	epoch            uint64
+	CheckedAt        *time.Time      `json:"checked_at,omitempty"`
+	LastCode         string          `json:"last_code,omitempty"`
+	NeedsAttention   bool            `json:"needs_attention,omitempty"`
 	Summary          *remote.Item    `json:"summary,omitempty"`
 	SummaryAt        *time.Time      `json:"summary_at,omitempty"`
 	DiscoveryOwnerID string          `json:"discovery_creator_id,omitempty"`
@@ -94,8 +101,13 @@ func New(store Storage, client *remote.Client) (*Service, error) {
 			return nil, errors.New("本地关注标识或格式无效")
 		}
 		seen[key] = true
+		if f.Identity == "" {
+			s.state.Follows[i].Identity = rand.Text()
+		}
+		// 每次启动重新核对旧确认，但保留失败退避和人工处理状态。
+		s.state.Follows[i].CheckedAt = nil
 		if f.Status == nil || !f.Status.Tracking {
-			s.state.Follows[i].Pending = true
+			s.state.Follows[i].Pending = f.Status == nil || f.Status.State != "paused" && f.Status.TrackingState != "paused"
 		}
 	}
 	return s, nil
@@ -167,6 +179,9 @@ func (s *Service) Configure(input string) error {
 		next.Follows[i].Pending = true
 		next.Follows[i].Attempts = 0
 		next.Follows[i].NextAttempt = nil
+		next.Follows[i].CheckedAt = nil
+		next.Follows[i].LastCode = ""
+		next.Follows[i].NeedsAttention = false
 	}
 	err = s.save(next)
 	if err == nil {
@@ -195,7 +210,7 @@ func (s *Service) Add(kind, input string) (Follow, error) {
 	if len(s.state.Follows) >= 10000 {
 		return Follow{}, &Error{Message: "本地关注已达10000项上限。", Status: 409}
 	}
-	f := Follow{Kind: kind, ID: id, AddedAt: time.Now().UTC(), Pending: true}
+	f := Follow{Identity: rand.Text(), Kind: kind, ID: id, AddedAt: time.Now().UTC(), Pending: true}
 	next := s.copyState()
 	next.Follows = append(next.Follows, f)
 	return f, s.save(next)
@@ -224,6 +239,7 @@ func (s *Service) find(kind, id string) (Follow, string, error) {
 	defer s.mu.Unlock()
 	for _, f := range s.state.Follows {
 		if f.Kind == kind && f.ID == id {
+			f.epoch = s.serverEpoch
 			return f, s.state.ServerURL, nil
 		}
 	}
@@ -232,12 +248,12 @@ func (s *Service) find(kind, id string) (Follow, string, error) {
 func (s *Service) update(original Follow, base string, change func(*Follow)) (Follow, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if base != s.state.ServerURL {
+	if base != s.state.ServerURL || original.epoch != s.serverEpoch {
 		return Follow{}, &Error{Message: "服务器配置已更改，请重新刷新。", Status: 409}
 	}
 	next := s.copyState()
 	for i, f := range next.Follows {
-		if f.Kind == original.Kind && f.ID == original.ID && f.AddedAt.Equal(original.AddedAt) {
+		if f.Kind == original.Kind && f.ID == original.ID && sameFollow(f, original) {
 			change(&next.Follows[i])
 			err := s.save(next)
 			return next.Follows[i], err
@@ -252,7 +268,14 @@ func (s *Service) Refresh(ctx context.Context, kind, id string) (Follow, error) 
 	if err != nil {
 		return f, err
 	}
-	status, err := s.client.Status(ctx, base, kind, id)
+	checked, err := s.Reconcile(ctx, kind, id, true)
+	if err != nil {
+		return checked, err
+	}
+	if checked.Status == nil {
+		return checked, nil
+	}
+	status := *checked.Status
 	var detail *remote.Detail
 	if err == nil && status.Recorded {
 		value, e := s.client.Detail(ctx, base, kind, id, 1, 0)
@@ -266,57 +289,23 @@ func (s *Service) Refresh(ctx context.Context, kind, id string) (Follow, error) 
 	return s.update(f, base, func(v *Follow) {
 		now := time.Now().UTC()
 		v.Status = &status
-		v.Data = detail
 		if detail != nil {
+			v.Data = detail
 			item := detail.Item
 			v.Summary = &item
 			v.SummaryAt = &now
 		}
 		v.ServerURL = base
 		v.UpdatedAt = &now
-		v.LastError = ""
+		if status.TrackingState != "paused" && status.State != "paused" {
+			v.LastError = ""
+		}
 	})
 }
 
 // Submit 仅提交已保存的本地关注；远端失败不回滚个人关注。
 func (s *Service) Submit(ctx context.Context, kind, id string) (Follow, error) {
-	key := kind + ":" + id
-	s.mu.Lock()
-	if s.inFlight[key] {
-		s.mu.Unlock()
-		return Follow{}, &Error{Message: "目标正在提交，请稍后刷新状态。", Status: 409}
-	}
-	s.inFlight[key] = true
-	s.mu.Unlock()
-	defer func() { s.mu.Lock(); delete(s.inFlight, key); s.mu.Unlock() }()
-	f, base, err := s.find(kind, id)
-	if err != nil {
-		return f, err
-	}
-	status, err := s.client.Submit(ctx, base, kind, id)
-	if err != nil {
-		_, saveErr := s.update(f, base, func(v *Follow) {
-			v.LastError = err.Error()
-			v.Pending = true
-			v.Attempts++
-			next := time.Now().UTC().Add(min(time.Duration(1<<min(v.Attempts-1, 4))*time.Minute, 15*time.Minute))
-			v.NextAttempt = &next
-		})
-		if saveErr != nil {
-			return f, saveErr
-		}
-		return f, err
-	}
-	return s.update(f, base, func(v *Follow) {
-		now := time.Now().UTC()
-		v.Status = &status
-		v.ServerURL = base
-		v.UpdatedAt = &now
-		v.LastError = ""
-		v.Pending = false
-		v.Attempts = 0
-		v.NextAttempt = nil
-	})
+	return s.Reconcile(ctx, kind, id, true)
 }
 
 // Follow 始终先保存本地再申请公共跟踪；远程失败返回成功保存的关注和待提交状态。
@@ -426,6 +415,7 @@ type DetailView struct {
 	ServerURL   string  `json:"server_url"`
 	Cached      bool    `json:"cached"`
 	ReadError   string  `json:"read_error,omitempty"`
+	ReadCode    string  `json:"read_code,omitempty"`
 	CacheError  string  `json:"cache_error,omitempty"`
 }
 
@@ -447,7 +437,35 @@ func (s *Service) Detail(ctx context.Context, kind, id string, page int, seq int
 		}
 	}
 	s.mu.Unlock()
+	readStarted := time.Now()
 	data, readErr := s.client.Detail(ctx, base, kind, normalized, page, seq, days)
+	var failure *remote.Error
+	if original != nil && (data.Target != nil || errors.As(readErr, &failure) && failure.Code == "DETAIL_NOT_RECORDED") {
+		// 新鲜服务器结果可推翻旧确认的TTL；失败后的退避与人工处理仍须遵守。
+		hint := data.Target
+		if failure != nil {
+			hint = failure.Target
+		}
+		s.mu.Lock()
+		currentRequest := base == s.state.ServerURL && epoch == s.serverEpoch
+		stillFollowed := false
+		for i, f := range s.state.Follows {
+			if f.Kind == kind && f.ID == normalized && sameFollow(f, *original) {
+				stillFollowed = true
+				if currentRequest && hint != nil && f.Status != nil && f.LastError == "" && (f.Status.Tracking != hint.Tracking || f.Status.TrackingState != hint.TrackingState) {
+					s.state.Follows[i].CheckedAt = nil
+				}
+				break
+			}
+		}
+		s.mu.Unlock()
+		if currentRequest && stillFollowed {
+			checked, checkErr := s.Reconcile(ctx, kind, normalized, false)
+			if checkErr == nil && readErr != nil && checked.Status != nil && checked.Status.Tracking && checked.Status.Recorded && seq == 0 {
+				data, readErr = s.client.Detail(ctx, base, kind, normalized, page, seq, days)
+			}
+		}
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if base != s.state.ServerURL || epoch != s.serverEpoch {
@@ -458,7 +476,7 @@ func (s *Service) Detail(ctx context.Context, kind, id string, page int, seq int
 		if original != nil {
 			next := s.copyState()
 			for index, f := range next.Follows {
-				if f.Kind == kind && f.ID == normalized && f.AddedAt.Equal(original.AddedAt) {
+				if f.Kind == kind && f.ID == normalized && sameFollow(f, *original) {
 					now := time.Now().UTC()
 					if setSummary(&next.Follows[index], data.Item, base, now) {
 						if page == 1 && seq == 0 && (days == "" || days == "30") {
@@ -484,11 +502,39 @@ func (s *Service) Detail(ctx context.Context, kind, id string, page int, seq int
 		}
 	}
 	if readErr != nil {
+		code := "REMOTE_ERROR"
+		var remoteFailure *remote.Error
+		if errors.As(readErr, &remoteFailure) {
+			code = remoteFailure.Code
+			view.Target = remoteFailure.Target
+		}
+		if view.LocalFollow != nil && view.LocalFollow.Status != nil && view.LocalFollow.CheckedAt != nil && (view.Target == nil || view.LocalFollow.CheckedAt.After(readStarted)) {
+			view.Target = view.LocalFollow.Status
+		}
+		view.ReadCode = code
 		f := view.LocalFollow
 		if f != nil && f.Data != nil && f.ServerURL == base && page == 1 && seq == 0 && (days == "" || days == "30") {
+			target := view.Target
 			view.Detail = *f.Data
+			view.Target = target
 			f.Data = nil
 			view.Cached, view.ReadError = true, readErr.Error()
+			return view, nil
+		}
+		if code == "DETAIL_NOT_RECORDED" && seq == 0 {
+			view.Item = remote.Item{Kind: kind, ID: normalized, Status: "not_recorded"}
+			if view.Target != nil {
+				view.Item.Tracking = view.Target.Tracking
+				view.Item.Status = view.Target.State
+			}
+			if f != nil {
+				if f.Summary != nil {
+					view.Item.Name = f.Summary.Name
+					view.Item.OwnerName = f.Summary.OwnerName
+				}
+				f.Data = nil
+			}
+			view.ReadError = readErr.Error()
 			return view, nil
 		}
 		return DetailView{}, readErr
@@ -498,3 +544,6 @@ func (s *Service) Detail(ctx context.Context, kind, id string, page int, seq int
 	}
 	return view, nil
 }
+
+// sameFollow使用随机身份区分取消后重新关注；时间戳在Windows同一时钟刻度内可能相同。
+func sameFollow(a, b Follow) bool { return a.Identity == b.Identity && a.AddedAt.Equal(b.AddedAt) }

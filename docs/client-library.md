@@ -46,17 +46,17 @@
 
 ## 8181 公共协议
 
-协议已从8182迁至8181，字段与单目标应答兼容；旧管理端口不保留Agent别名。限流、批量与迁移见[公共接口](public-api.md)。
+协议已从8182迁至8181，正常业务HTTP200并以JSON的ok/code区分，目标和资料状态见 [应答协议](public-response.md)；新Agent兼容旧成功结构与HTTP业务失败；旧管理端口不保留Agent别名。限流、批量与迁移见[公共接口](public-api.md)。
 
 | 路径 | 当前行为 |
 |---|---|
 | `GET /creators`、`GET /videos` | 直接返回JSON `items/page/limit/total`，共用原`Catalog`；支持精确`id`、排序及UP归属，不提供HTML |
 | `GET /detail/{type}/{id}` | 直接返回JSON `item/metrics/versions/version_page/version_total/version_limit`；`days=7/30/90/all`、版本 `page` 和 `seq` 均校验，指定 `seq` 返回元数据 `snapshot` |
 | `GET /api/targets/status?kind=...&id=...` | 精确返回 `recorded/tracking/status`，未知目标也是明确状态；缺少参数返回400，管理页状态数组不在此提供 |
-| `POST /targets`，JSON `{"type":"creator或video","id":"..."}` | 只接受客户端JSON；同步验证并保存首次观测后建立跟踪，返回`kind/id/tracking/status`。有界批量使用`targets`数组，管理表单不接受 |
+| `POST /targets`，JSON `{"type":"creator或video","id":"..."}` | 只接受客户端JSON；同步验证并保存首次观测后建立跟踪，返回`ok/code/kind/id/tracking_state/tracking/recorded/status/result`。有界批量使用`targets`数组，管理表单不接受 |
 | 指标与批量申请 | `GET /api/metrics/{type}/{id}`读取指标；`POST /targets`可批量处理前N项。后台导入仅在8182内部，Agent单个提交无需先知道作者 |
 
-`RequestTarget` 已跟踪时直接返回 `existing`，不查询上游或改间隔。新目标使用默认3小时间隔，查询成功后保存观测和公共目标，失败不生成跟踪成功状态。并发中的同一目标返回409供刷新/重试；本进程采集并发达到16时新申请返回429。最终插入也按目标唯一键去重，不覆盖其他请求建立的调度。禁用的目标返回409；已有记录但没有调度目标时允许重新验证后申请跟踪，当前没有持久化拒绝名单。
+`RequestTarget` 已跟踪时直接返回 `existing`，不查询上游或改间隔。新目标使用默认3小时间隔，查询成功后保存观测和公共目标，失败不生成跟踪成功状态。并发同目标及本进程采集并发达到16分别返回HTTP200、ok:false及TARGET_BUSY/RATE_LIMITED。最终插入也按目标唯一键去重，不覆盖其他请求建立的调度。禁用的目标返回HTTP200、ok:false/code:TARGET_PAUSED；已有记录但没有调度目标时允许重新验证后申请跟踪，当前没有持久化拒绝名单。
 
 UP 占位作者行不等于已有成功资料观测，`recorded` 对 UP 要求存在资料版本。版本与指标分开；列表净变化沿用服务器最近7个 UTC 日采样窗口，详情展示最近30天真实日采样，负值保留、样本不足显示未知。历史元数据快照不是历史媒体文件。
 

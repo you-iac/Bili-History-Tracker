@@ -296,7 +296,11 @@ func writeError(w http.ResponseWriter, err error) {
 	}
 	var external *remote.Error
 	if errors.As(err, &external) {
-		apiError(w, external.Status, "remote_error", external.Message)
+		code := external.Code
+		if code == "" {
+			code = "remote_error"
+		}
+		apiError(w, external.Status, code, external.Message)
 		return
 	}
 	var known *bilibili.Error

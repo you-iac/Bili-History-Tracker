@@ -21,6 +21,8 @@ func TestDetailRangesAndLocalFollow(t *testing.T) {
 		case "/detail/creator/123":
 			ranges = append(ranges, r.URL.Query().Get("days"))
 			w.Write([]byte(`{"item":{"kind":"creator","id":"123","seq":2},"metrics":{"points":[]},"versions":[],"version_page":1,"version_limit":10,"version_total":2}`))
+		case "/api/targets/status":
+			json.NewEncoder(w).Encode(map[string]any{"kind": "creator", "id": "123", "tracking": posts > 0})
 		case "/targets":
 			posts++
 			w.Write([]byte(`{"kind":"creator","id":"123","tracking":true}`))

@@ -38,7 +38,7 @@ func TestClientOverviewPublicContract(t *testing.T) {
 		}
 		var fields map[string]json.RawMessage
 		_ = json.Unmarshal(w.Body.Bytes(), &fields)
-		if len(fields) != 5 || q.calls.Load() != 0 {
+		if len(fields) != 7 || q.calls.Load() != 0 {
 			t.Fatal("overview exposed extra fields or queried upstream", w.Body.String())
 		}
 	}
@@ -80,14 +80,14 @@ func TestClientJSONReadsAndExactStatus(t *testing.T) {
 	r.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	s.Handler().ServeHTTP(w, r)
-	if w.Code != 200 || !strings.Contains(w.Body.String(), `"status":"existing"`) || q.calls.Load() != 0 {
+	if w.Code != 200 || !strings.Contains(w.Body.String(), `"result":"existing"`) || q.calls.Load() != 0 {
 		t.Fatal(w.Code, w.Body.String())
 	}
 	r = httptest.NewRequest("POST", "/targets", strings.NewReader(`{"type":"video","id":"BV1oa41137pj"}`))
 	r.Header.Set("Content-Type", "application/json")
 	w = httptest.NewRecorder()
 	s.Handler().ServeHTTP(w, r)
-	if w.Code != 502 {
+	if w.Code != 200 || !strings.Contains(w.Body.String(), `"code":"TARGET_SUBMISSION_FAILED"`) {
 		t.Fatal("unverified target accepted", w.Code, w.Body.String())
 	}
 }

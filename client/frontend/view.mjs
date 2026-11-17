@@ -46,9 +46,20 @@ export function snapshotChanges(kind,before,after) {
 }
 
 export function followState(follow) {
+	if (follow.needs_attention) return '需要手动核对';
+	if (follow.last_code === 'TARGET_PAUSED' || follow.remote?.tracking_state === 'paused' || follow.remote?.status === 'paused') return '服务器已暂停';
+	if (follow.last_error && follow.remote?.tracking) return '最近确认已跟踪 · 本次核对未完成';
   if (follow.pending_submission) return follow.last_error ? '待提交 · 后台将重试' : '正在申请服务器跟踪';
   if (!follow.remote) return '服务器状态未查询';
   if (follow.remote.tracking) return '服务器跟踪中';
   if (follow.remote.status === 'paused') return '服务器已暂停';
   return follow.remote.recorded ? '服务器已记录，未跟踪' : '服务器尚未记录';
+}
+
+// 缓存是数据来源；错误业务码才决定缺资料、限流或连接失败。
+export function detailReadMessage(detail) {
+  if (detail.cache_error) return '资料已读取，本地缓存保存失败：'+detail.cache_error;
+  if (!detail.read_error) return detail.cached?'当前显示本地缓存。':'';
+  const labels={DETAIL_NOT_RECORDED:detail.target?.tracking?'服务器已跟踪，暂无成功观测资料。':'服务器暂无成功观测资料。',RATE_LIMITED:'服务器请求较多，请稍后重试。',TARGET_BUSY:'目标正在处理中，请稍后刷新。',TARGET_PAUSED:'服务器已暂停此目标。',CONNECTION_FAILED:'无法连接服务器。'};
+  return (labels[detail.read_code]||detail.read_error)+(detail.cached?' 当前显示本地缓存。':'');
 }

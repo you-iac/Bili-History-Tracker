@@ -5,6 +5,7 @@ package library
 import (
 	"context"
 	"strconv"
+	"strings"
 	"time"
 
 	"bili-history-tracker/client/agent/internal/remote"
@@ -31,16 +32,35 @@ func setSummary(f *Follow, item remote.Item, base string, at time.Time) bool {
 	return true
 }
 
-// SyncSummaries 分页读取已记录公开目录，仅更新请求开始时仍被本地关注的目标。
-// 全部本地目标匹配或服务器目录读完即停止；最多20秒，同源同类型的并发同步合并。
-// 中途失败仍保存已经读到的摘要，旧缓存和关注提交状态保留；不会发起上游采集。
-func (s *Service) SyncSummaries(ctx context.Context, kind string) (int, error) {
+// SyncSummaries按当前页ID精确同步；显式ID来自浏览页时先核对，旧调用默认最多24项。
+// 最多20秒；相同服务器代际/目标集合的并发同步合并，不扫描公共全库。
+// 中途失败仍保存摘要和旧缓存；浏览核对可申请跟踪，实际采集仍由服务器管理。
+func (s *Service) SyncSummaries(ctx context.Context, kind string, ids ...string) (int, error) {
 	if kind != "creator" && kind != "video" {
 		return 0, &Error{Message: "资料类型无效。", Status: 400}
 	}
 	s.mu.Lock()
 	base, epoch := s.state.ServerURL, s.serverEpoch
-	key := base + "|" + strconv.FormatUint(epoch, 10) + "|" + kind
+	browse := len(ids) > 0
+	requested := map[string]bool{}
+	if len(ids) == 0 {
+		for _, f := range s.state.Follows {
+			if f.Kind == kind {
+				ids = append(ids, f.ID)
+				if len(ids) >= 24 {
+					break
+				}
+			}
+		}
+	}
+	if len(ids) > 24 {
+		s.mu.Unlock()
+		return 0, &Error{Message: "每轮最多同步24项。", Status: 400}
+	}
+	for _, id := range ids {
+		requested[id] = true
+	}
+	key := base + "|" + strconv.FormatUint(epoch, 10) + "|" + kind + "|" + strings.Join(ids, ",")
 	if call := s.summaryCalls[key]; call != nil {
 		s.mu.Unlock()
 		select {
@@ -52,7 +72,7 @@ func (s *Service) SyncSummaries(ctx context.Context, kind string) (int, error) {
 	}
 	targets := map[string]Follow{}
 	for _, f := range s.state.Follows {
-		if f.Kind == kind {
+		if f.Kind == kind && requested[f.ID] {
 			targets[f.ID] = f
 		}
 	}
@@ -67,23 +87,43 @@ func (s *Service) SyncSummaries(ctx context.Context, kind string) (int, error) {
 	defer cancel()
 	items := map[string]remote.Item{}
 	var readErr error
-	for page := 1; page <= 100000; page++ {
-		data, err := s.client.Catalog(ctx, base, kind, "", "", page)
+	for _, id := range ids {
+		if _, ok := targets[id]; !ok {
+			continue
+		}
+		if browse {
+			s.mu.Lock()
+			valid := base == s.state.ServerURL && epoch == s.serverEpoch
+			found := false
+			for _, current := range s.state.Follows {
+				if current.Kind == kind && current.ID == id && sameFollow(current, targets[id]) {
+					found = true
+					break
+				}
+			}
+			s.mu.Unlock()
+			if !valid {
+				readErr = &Error{Message: "服务器已切换，请刷新。", Status: 409}
+				break
+			}
+			if !found {
+				continue
+			}
+			s.BrowseCheck(ctx, kind, id)
+		}
+		data, err := s.client.Catalog(ctx, base, kind, "", id, 1)
 		if err != nil {
 			readErr = err
 			break
 		}
-		if data.Page != page {
-			readErr = &Error{Message: "服务器目录页码不匹配，已保留读取到的资料。", Status: 502}
+		if data.Page != 1 {
+			readErr = &Error{Message: "服务器目录页码不匹配。", Status: 502}
 			break
 		}
 		for _, item := range data.Items {
-			if _, ok := targets[item.ID]; ok && item.Kind == kind {
-				items[item.ID] = item
+			if item.ID == id && item.Kind == kind {
+				items[id] = item
 			}
-		}
-		if len(items) == len(targets) || data.Page*data.Limit >= data.Total {
-			break
 		}
 	}
 	s.mu.Lock()
@@ -96,7 +136,7 @@ func (s *Service) SyncSummaries(ctx context.Context, kind string) (int, error) {
 		for index, f := range next.Follows {
 			original, tracked := targets[f.ID]
 			item, found := items[f.ID]
-			if tracked && found && f.Kind == kind && f.AddedAt.Equal(original.AddedAt) && setSummary(&next.Follows[index], item, base, now) {
+			if tracked && found && f.Kind == kind && sameFollow(f, original) && setSummary(&next.Follows[index], item, base, now) {
 				call.count++
 			}
 		}
