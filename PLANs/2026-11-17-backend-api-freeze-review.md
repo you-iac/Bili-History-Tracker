@@ -1,7 +1,7 @@
 # 后端 API 固定前审查问题与修复计划
 
 - 创建时间：2026-11-17 14:51（Asia/Shanghai）。
-- 状态：部分实施。2026-11-18 完成 BACK-TARGET-REPLY，并补齐 BACK-SHUTDOWN 的 SIGTERM 停机入口。其余问题与后台退出验收仍待完成。下方保留原审查现场。
+- 状态：部分实施。2026-11-18 完成 BACK-TARGET-REPLY、BACK-PROFILE-METRICS，并补齐 BACK-SHUTDOWN 的 SIGTERM 停机入口。其余问题与后台退出验收仍待完成，整项计划不归档。下方保留原审查现场。
 - 审查基线：提交 `1baa4ab`（统一业务 JSON 应答并修复 Agent 跟踪核对）；此前设计提交为 `7fab9e9`。后续实施须先确认基线是否变化。
 - 来源：用户要求最后检查 backend 设计，计划部署后固定 API、尽量减少后端改动；审查后要求将五项发现详细记录到 PLANs。
 - 访问控制约定：用户明确选择服务器防火墙／IP 白名单，本计划不增加 Token、账号或认证接口。8181 仅向允许的来源开放，8182 保持本机管理访问。
@@ -16,7 +16,7 @@
 | BACK-ADMIN-ORIGIN | P1 | 管理表单接受跨站写入 | 隔离数据库临时测试已复现 |
 | BACK-TARGET-REPLY | P2 | 提交成功字段与当前跟踪状态矛盾 | 已修复，可控时序的单目标和批量回归通过 |
 | BACK-TIMEOUT-CODE | P2 | 落库阶段取消被归为内部故障 | 临时测试直接调用 submit 已复现；HTTP 映射由代码确认 |
-| BACK-PROFILE-METRICS | P2 | UP 占位资料在详情与指标接口中判定不一致 | 临时 HTTP 处理器测试已复现 |
+| BACK-PROFILE-METRICS | P2 | UP 占位资料在详情与指标接口中判定不一致 | 已修复；占位作者三种任务状态、四种指标范围、完整资料空采样及真实零值回归通过 |
 | BACK-SHUTDOWN | P2 | Linux SIGTERM 和后台任务退出链路不完整 | 静态审查确认；尚未完成 Linux 信号实测 |
 
 四个临时用例通过 Go overlay 注入，未修改受 Git 管理的源码；数据库由 `t.TempDir()` 创建，上游使用测试桩。没有调用真实 B站、使用真实 Cookie，或修改远程服务器／用户数据库。管理请求使用 `httptest` 验证服务端行为，不等同于已经验证所有浏览器都能完成跨站攻击。
@@ -211,6 +211,14 @@ FAIL: request cancellation was classified as INTERNAL_ERROR
 - 回归入口建议：[publicapi/targets_test.go](../backend/internal/publicapi/targets_test.go)、[publicapi/response_test.go](../backend/internal/publicapi/response_test.go)。
 
 ## BACK-PROFILE-METRICS：UP 占位资料的详情和指标判定不一致
+
+### 实施记录（2026-11-18 10:07，Asia/Shanghai）
+
+本项已修复并通过必要验证。[read.go](../backend/internal/publicapi/read.go) 新增 `hasRecordedContent`，供列表、详情、指标及 [response.go](../backend/internal/publicapi/response.go) 的目标状态共用：创作者引用行即使存在，`Seq=0` 仍不算成功资料，判定独立于跟踪状态。指标接口复用无资料应答，返回 HTTP200、`DETAIL_NOT_RECORDED` 和真实 `target`；完整资料没有粉丝指标或窗口内没有采样时仍成功返回空数组，真实零值保留。读取不触发上游采集或写入，不改变数据库结构、作者引用、已有历史、任务状态或服务器采集周期。协议同步至 [公共接口](../docs/public-api.md) 和 [JSON 应答](../docs/public-response.md)。
+
+[read_test.go](../backend/internal/publicapi/read_test.go) 的 `TestCreatorPlaceholderReadsPreserveTargetState` 使用 `SaveVideo` 建立真实作者引用行，覆盖 absent/active/paused 三种任务状态及 7/30/90/all 四种指标范围，并比较详情与精确目标状态，检查目录仍保留占位信息、数据库写入数不变及上游调用数为零。修复前这三种状态均因指标错误返回 `OK` 而失败，修复后通过。`TestRecordedCreatorMetricsAllowEmptyAndZeroSamples` 覆盖完整资料无粉丝指标、采样全部在窗口外及真实零值，确认全部时间范围的空数组与零采样语义；既有组合测试继续覆盖完全未知作者。[response_test.go](../backend/internal/publicapi/response_test.go) 补充数据库关闭时指标接口仍返回500、`INTERNAL_ERROR` 的验证。
+
+本次在 Windows/amd64 使用工作区缓存与临时数据库完成验证：`backend` 执行 `go test -p 1 ./internal/publicapi -count=1`、`go test -p 1 ./...`、`go vet -p 1 ./...` 均通过；`client` 使用工作区已有 Corepack pnpm 9.1.0 执行 `pnpm lint`、`pnpm test`，17 项前端测试通过。未访问真实 B站、使用真实 Cookie 或用户数据库，未部署。以下保留修复前审查现场，整项计划的其他未完成问题不受本项完成影响。
 
 ### 影响与出现条件
 

@@ -31,7 +31,7 @@ func (s *Server) targetStatus(ctx context.Context, kind, id string) (targetState
 		return result, err
 	}
 	if err == nil {
-		result.Recorded = i.Recorded && (kind != "creator" || i.Seq > 0)
+		result.Recorded = hasRecordedContent(i)
 		result.Status = i.Status
 	}
 	if exists {
