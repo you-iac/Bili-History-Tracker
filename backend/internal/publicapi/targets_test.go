@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"bili-history-tracker/backend/internal/source"
+	"bili-history-tracker/backend/internal/storage"
 )
 
 func creatorSuccess(ctx context.Context, platform, id string) (source.CreatorProfile, error) {
@@ -34,6 +35,129 @@ func postJSON(t *testing.T, h http.Handler, body string) *httptest.ResponseRecor
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	return w
+}
+
+type targetLookupBeforeRead struct {
+	targetLookup
+	before func(context.Context)
+}
+
+func (s targetLookupBeforeRead) TrackingTarget(ctx context.Context, platform, kind, id string) (storage.Target, bool, error) {
+	s.before(ctx)
+	return s.targetLookup.TrackingTarget(ctx, platform, kind, id)
+}
+
+func TestTargetReplyReflectsFinalTrackingState(t *testing.T) {
+	const id = "12345"
+	const input = `{"type":"creator","id":"12345"}`
+	cases := []struct {
+		name, before, after, code string
+		diagnostic                int
+	}{
+		{"existing/unchanged", "active", "active", "OK", 200},
+		{"existing/paused", "active", "paused", "TARGET_PAUSED", 409},
+		{"existing/removed", "active", "absent", "TARGET_SUBMISSION_FAILED", 502},
+		{"existing/read_failed", "active", "", "INTERNAL_ERROR", 500},
+		{"created/paused", "absent", "paused", "TARGET_PAUSED", 409},
+		{"created/removed", "absent", "absent", "TARGET_SUBMISSION_FAILED", 502},
+		{"created/read_failed", "absent", "", "INTERNAL_ERROR", 500},
+		{"previously_paused/removed", "paused", "absent", "TARGET_SUBMISSION_FAILED", 502},
+		{"previously_paused/resumed", "paused", "active", "OK", 200},
+	}
+	for _, tc := range cases {
+		for _, entry := range []string{"single", "batch"} {
+			t.Run(tc.name+"/"+entry, func(t *testing.T) {
+				s, store, q := dashboardServer(t)
+				ctx := context.Background()
+				q.creator = creatorSuccess
+				setEnabled := func(ctx context.Context, enabled bool) {
+					if _, err := store.DB().ExecContext(ctx, `UPDATE tracking_targets SET enabled=? WHERE platform='bilibili' AND target_type='creator' AND target_id=?`, enabled, id); err != nil {
+						t.Fatal(err)
+					}
+				}
+				if tc.before != "absent" {
+					if err := store.AddTarget(ctx, "bilibili", "creator", id, time.Hour, time.Now()); err != nil {
+						t.Fatal(err)
+					}
+				}
+				if tc.before == "paused" {
+					setEnabled(ctx, false)
+				}
+				// 实际 RequestTarget 已返回，此时变更隔离库，精确控制最后一次状态读取看到的结果。
+				s.store = targetLookupBeforeRead{s.store, func(ctx context.Context) {
+					switch tc.after {
+					case "active":
+						if tc.before == "paused" {
+							setEnabled(ctx, true)
+						}
+					case "paused":
+						setEnabled(ctx, false)
+					case "absent":
+						if err := store.RemoveTarget(ctx, "bilibili", "creator", id); err != nil {
+							t.Fatal(err)
+						}
+					case "":
+						if err := store.Close(); err != nil {
+							t.Fatal(err)
+						}
+					}
+				}}
+				body := input
+				wantHTTP := http.StatusOK
+				if entry == "batch" {
+					body = `{"targets":[` + input + `]}`
+				} else if tc.diagnostic == 500 {
+					wantHTTP = http.StatusInternalServerError
+				}
+				w := postJSON(t, s.Handler(), body)
+				var reply struct {
+					targetResult
+					TrackingState string `json:"tracking_state"`
+					Recorded      *bool  `json:"recorded"`
+					Results       []targetResult
+				}
+				if err := json.Unmarshal(w.Body.Bytes(), &reply); err != nil || w.Code != wantHTTP {
+					t.Fatalf("HTTP %d, decode error %v: %s", w.Code, err, w.Body)
+				}
+				result := reply.targetResult
+				if entry == "batch" {
+					if len(reply.Results) != 1 {
+						t.Fatal(w.Body.String())
+					}
+					result = reply.Results[0]
+				}
+				active := tc.after == "active"
+				if result.OK != active || result.Code != tc.code || result.Tracking != active || result.Kind != "creator" || result.ID != id {
+					t.Fatal(w.Body.String())
+				}
+				if tc.before == "absent" && q.calls.Load() != 1 || tc.before != "absent" && q.calls.Load() != 0 {
+					t.Fatalf("unexpected upstream queries: %d", q.calls.Load())
+				}
+				if active && entry == "single" {
+					if result.Result != "existing" || reply.TrackingState != "active" || reply.Recorded == nil || *reply.Recorded || result.Status != "pending" {
+						t.Fatal(w.Body.String())
+					}
+					return
+				}
+				if result.HTTPStatus != tc.diagnostic || (result.Error == "") != active {
+					t.Fatal(w.Body.String())
+				}
+				if tc.after == "" {
+					if result.Target != nil || result.Result != "" {
+						t.Fatal(w.Body.String())
+					}
+					return
+				}
+				target := result.Target
+				if target == nil || target.TrackingState != tc.after || target.Tracking != result.Tracking || target.Status != result.Status || target.Recorded != (tc.before == "absent") {
+					t.Fatal(w.Body.String())
+				}
+				if active && result.Result != "existing" || !active && result.Result != "" {
+					t.Fatal(w.Body.String())
+				}
+			})
+		}
+	}
 }
 
 func TestBatchPrefixIncludesInvalidPositionsAndDoesNotTouchTail(t *testing.T) {

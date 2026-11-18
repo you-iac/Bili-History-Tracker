@@ -5,6 +5,7 @@
 package publicapi
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -21,13 +22,19 @@ type Config struct {
 	BatchMax          int
 }
 
+// targetLookup 只读取准确的调度状态，区分暂停、缺失和读取错误。
+type targetLookup interface {
+	TrackingTarget(ctx context.Context, platform, kind, id string) (storage.Target, bool, error)
+}
+
 // Server 与后台共享存储和采集实例，只注册明确允许公开的操作。
 type Server struct {
-	store, reader *storage.Store
-	tracker       *tracker.Tracker
-	platform      string
-	legacy        http.Handler
-	config        Config
+	store    targetLookup
+	reader   *storage.Store
+	tracker  *tracker.Tracker
+	platform string
+	legacy   http.Handler
+	config   Config
 }
 
 // New 检查配置后创建公共入口；Handler 应在启动时调用一次并供所有连接共享。

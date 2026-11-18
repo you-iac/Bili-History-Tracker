@@ -14,7 +14,7 @@
 | TARGET_PAUSED | 管理员暂停，不自动恢复 |
 | TARGET_BUSY | 同目标处理中，退避后先查询 |
 | RATE_LIMITED | 入口/采集容量限制，按retry_after_seconds及Retry-After退避 |
-| TARGET_SUBMISSION_FAILED | 无法验证或保存，未确认成功；有界重试，不推断下架 |
+| TARGET_SUBMISSION_FAILED | 无法验证或保存，或最终读取时任务已不存在。先核对状态，再按有界退避重试，不能据此推断下架 |
 | REQUEST_TIMEOUT | 结果可能已生效，先核对再申请 |
 | UPSTREAM_UNAVAILABLE | 实时上游失败，不当作本服务断连 |
 
@@ -23,7 +23,7 @@
 统一状态为 `kind/id/tracking_state/tracking/recorded/status`。tracking_state为absent/active/paused；tracking兼容旧布尔字段；recorded表示当前有成功资料，不能区分从未采集与丢失，不能推断视频下架。status继续描述观测状态，提交结果用result=created/existing，不混用。
 
 - GET /api/targets/status：目标未知也以200返回ok:true/code:OK及真实状态，只读不采集。
-- POST /targets：成功返回平铺目标状态和result；失败ok:false/code/error，能够确认时附target。批量保留前N项和原序号，每项有ok/code，旧http_status仅兼容诊断，不能作为新Agent判断依据。
+- POST /targets：提交后确认任务为 `active` 才返回成功。单目标成功返回平铺状态和 `result`，失败返回 `ok:false/code/error`，能够确认时附 `target`。最终状态为 `paused` 或 `absent` 时，分别返回 `TARGET_PAUSED` 或 `TARGET_SUBMISSION_FAILED`，附读到的状态。批量保留前 N 项和原序号，每项按同一规则生成 `ok/code`，旧 `http_status` 保留作诊断。应答描述本次确认时观察到的状态，后续管理操作仍可改变任务状态。
 - GET /detail/{type}/{id}：成功保留item/metrics/versions并附target；无资料200+DETAIL_NOT_RECORDED及target；快照缺失200+SNAPSHOT_NOT_FOUND。任务读取失败不伪造absent。
 - 指标不存在同样使用DETAIL_NOT_RECORDED；实时查询的上游失败映射为公共JSON业务结果。
 

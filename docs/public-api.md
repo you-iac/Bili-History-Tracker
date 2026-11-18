@@ -78,7 +78,9 @@ JSON 请求体上限 64 KiB，超出返回 413；格式错误、未知字段或�
 {"ok":true,"code":"OK","kind":"creator","id":"72541187","tracking_state":"active","tracking":true,"recorded":true,"status":"ok","result":"created"}
 ```
 
-平台由当前服务器配置固定为 B站。UP 主为正整数 UID，视频为 BV 号；标准链接只提取 ID，不作为任意网址代理。新目标验证并保存成功后才确认跟踪；已启用目标返回 `result:existing` 和真实资料状态，不强制刷新或改间隔。暂停、无法验证、并发繁忙、容量限制和处理超时均返回HTTP200及 `ok:false`，分别使用 `TARGET_PAUSED/TARGET_SUBMISSION_FAILED/TARGET_BUSY/RATE_LIMITED/REQUEST_TIMEOUT`；本服务持久化故障返回500。失败或断连不能当作加入成功，先查精确状态再按有界退避重试。
+平台由当前服务器配置固定为 B站。UP 主为正整数 UID，视频为 BV 号。标准链接只提取 ID，不作为任意网址代理。新目标先验证并保存，已有任务复用原采集间隔和资料。
+
+单目标和批量中的每一项都以提交后的状态读取确认跟踪，`active` 时返回 `result:created` 或 `result:existing`。读到暂停返回 `TARGET_PAUSED`，读到任务已移除返回 `TARGET_SUBMISSION_FAILED`，并附读到的状态。无法验证、并发繁忙、容量限制和处理超时也使用 HTTP 200 及 `ok:false`，业务码见 [应答协议](public-response.md)。本服务状态读取或持久化故障使用 HTTP 500。失败或断连后先查精确状态，再按有界退避重试。
 
 批量使用同一路径，字段为 `targets`，不改变现有 Agent 的单目标调用：
 
