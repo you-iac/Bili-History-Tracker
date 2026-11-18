@@ -58,7 +58,7 @@ Agent 是运行在本机的 Go 程序：提供网页、本地 UP/视频关注库
 | `POST /api/scan/cancel` | 停止扫描，保留结果 |
 | `GET /api/scan/export?format=txt` | TXT或JSON导出扫描 |
 | `GET /api/remote/connection` | 已保存的服务器地址 |
-| `PUT /api/remote/connection` | `{"server_url":"http://...:8182"}`，空字符串断开；切服清缓存保留关注 |
+| `PUT /api/remote/connection` | `{"server_url":"http://...:8181"}`，空字符串断开；切服清缓存保留关注 |
 | `POST /api/remote/test` | 测试已保存服务器的JSON能力 |
 | `GET /api/overview` | 本地关注/待提交数量、服务器地址与最近公开总览 |
 | `POST /api/overview/refresh` | 用既有UP/视频库接口聚合总数与首页列表并缓存 |
@@ -67,12 +67,12 @@ Agent 是运行在本机的 Go 程序：提供网页、本地 UP/视频关注库
 | `GET /api/images/{kind}/{id}?seq=1` | 从既有快照解析头像/封面URL并按版本缓存；返回url/seq/available/cached，不代理图片文件 |
 | `GET /api/settings` | 活动/启动目录与状态文件占用 |
 | `PUT /api/settings/directory` | `data_directory` 绝对路径，复制到空目录并持久化切换 |
-| `POST /api/follows/refresh?kind=creator或video` | 只读公开目录，回填本地关注摘要，独立于提交状态；请求需 CSRF |
+| `POST /api/follows/refresh?kind=creator或video` | 回填本地关注摘要；传入当前页 id 时按既有规则核对关注并按需补申请，摘要与提交确认仍独立；请求需 CSRF |
 | `GET /api/follows?kind=creator&page=1&q=&sort=published` | 本地关注，链接搜索及分页前排序，可选 owner 筛选视频归属 |
 | `POST /api/follows` | `{"kind":"creator或video","id":"UID/BV/标准链接"}` 保存本地关注并自动提交；失败返回待提交状态 |
 | `DELETE /api/follows/{kind}/{id}` | 仅取消本地关注，不停服务器采集 |
 | `POST /api/follows/{kind}/{id}/refresh` | 核对公共状态，读取并保存最近资料/版本/指标 |
-| `POST /api/follows/{kind}/{id}/submit` | 提交已保存目标到8182，服务器确认后返回 |
-| `GET /api/library/{kind}/{id}?days=30&page=1&seq=1` | 读取公开详情、7/30/90/all趋势、版本页与快照；附带个人关注/来源和匹配的30日离线缓存状态，不自动提交跟踪 |
+| `POST /api/follows/{kind}/{id}/submit` | 核对并按需提交已保存目标到8181，返回确认或阶段失败 |
+| `GET /api/library/{kind}/{id}?days=30&page=1&seq=1` | 读取公开详情、7/30/90/all趋势、版本页与快照；附带个人关注/来源和匹配的30日离线缓存状态，已本地关注时按既有规则核对并按需补申请 |
 
-扫描后台执行，网页关闭不取消；关注刷新/提交绑定当前请求，失败可显式重试；待提交申请由后台退避处理。完整行为见 [本地关注实现](../../docs/client-library.md)，原扫描协议见 [发现说明](../../docs/client-discovery.md#本地-api-与会话)。
+扫描后台执行，网页关闭不取消；关注刷新/提交的本地等待绑定请求，但服务器已接收的有效资料可继续独立有界保存，超时后先核对状态。关注库保留 `last_stage/last_outcome`，核对65秒、刷新90秒，本地 HTTP 写入95秒、网页相关等待100秒；待提交申请由后台退避处理。完整行为见 [分阶段申请设计](../../docs/request-stages.md)、[本地关注实现](../../docs/client-library.md)，原扫描协议见 [发现说明](../../docs/client-discovery.md#本地-api-与会话)。

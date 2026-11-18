@@ -36,11 +36,11 @@ func (s *Service) RunPending(ctx context.Context) {
 			if ctx.Err() != nil {
 				return
 			}
-			attempt, cancel := context.WithTimeout(ctx, 22*time.Second)
+			attempt, cancel := context.WithTimeout(ctx, reconcileTimeout)
 			_, err := s.Reconcile(attempt, f.Kind, f.ID, false)
 			cancel()
 			if err == nil {
-				refresh, cancel := context.WithTimeout(ctx, 20*time.Second)
+				refresh, cancel := context.WithTimeout(ctx, refreshTimeout)
 				_, _ = s.Refresh(refresh, f.Kind, f.ID)
 				cancel()
 			}

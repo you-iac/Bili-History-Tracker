@@ -24,6 +24,12 @@ type Error struct {
 	Status  int
 }
 
+// 核对包含状态8秒、提交55秒与节流余量；刷新另含一次资料读取，见 docs/request-stages.md。
+const (
+	reconcileTimeout = 65 * time.Second
+	refreshTimeout   = 90 * time.Second
+)
+
 func (e *Error) Error() string { return e.Message }
 
 type Storage interface {
@@ -35,6 +41,8 @@ type Follow struct {
 	epoch            uint64
 	CheckedAt        *time.Time      `json:"checked_at,omitempty"`
 	LastCode         string          `json:"last_code,omitempty"`
+	LastStage        string          `json:"last_stage,omitempty"`
+	LastOutcome      string          `json:"last_outcome,omitempty"`
 	NeedsAttention   bool            `json:"needs_attention,omitempty"`
 	Summary          *remote.Item    `json:"summary,omitempty"`
 	SummaryAt        *time.Time      `json:"summary_at,omitempty"`
@@ -181,6 +189,8 @@ func (s *Service) Configure(input string) error {
 		next.Follows[i].NextAttempt = nil
 		next.Follows[i].CheckedAt = nil
 		next.Follows[i].LastCode = ""
+		next.Follows[i].LastStage = ""
+		next.Follows[i].LastOutcome = ""
 		next.Follows[i].NeedsAttention = false
 	}
 	err = s.save(next)
@@ -262,7 +272,7 @@ func (s *Service) update(original Follow, base string, change func(*Follow)) (Fo
 	return Follow{}, &Error{Message: "该项已在本地取消关注。", Status: 404}
 }
 func (s *Service) Refresh(ctx context.Context, kind, id string) (Follow, error) {
-	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, refreshTimeout)
 	defer cancel()
 	f, base, err := s.find(kind, id)
 	if err != nil {
@@ -315,7 +325,7 @@ func (s *Service) Follow(ctx context.Context, kind, input string) (Follow, error
 	if err != nil {
 		return f, err
 	}
-	ctx, cancel := context.WithTimeout(ctx, 22*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, reconcileTimeout)
 	defer cancel()
 	updated, err := s.Submit(ctx, f.Kind, f.ID)
 	if err == nil {

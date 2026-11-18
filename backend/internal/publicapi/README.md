@@ -23,7 +23,7 @@
 +------------------------+  +------------------------+  +------------------------+
 ```
 
-所有请求先通过进程共享的门，再进入业务处理；结果沿原请求返回。`New` 检查配置，`Handler` 在启动时创建一次，所有客户端共享同一个实例。`Config.RequestsPerSecond` 同时限定任意滚动一秒接纳数和在途数；拒绝不排队，返回HTTP200及JSON `ok:false/code:RATE_LIMITED` 和 `Retry-After`。`Config.BatchMax` 限定原始数组前 N 项，整个请求还受 64 KiB 和 20 秒预算约束。
+所有请求先通过进程共享的门，再进入业务处理；结果沿原请求返回。`New` 检查配置，`Handler` 在启动时创建一次，所有客户端共享同一个实例。`Config.RequestsPerSecond` 同时限定任意滚动一秒接纳数和在途数；拒绝不排队，返回HTTP200及JSON `ok:false/code:RATE_LIMITED` 和 `Retry-After`。`Config.BatchMax` 限定原始数组前 N 项，整个请求还受64 KiB和25秒接纳预算约束；已取得有效资料的当前项允许独立有界收尾，最长业务处理约36秒。应答带 `stage/outcome`，阶段与错误原因分开，见 [阶段设计](../../../docs/request-stages.md) 和 [阶段回归](request_stages_test.go)。
 
 本包不依赖 `admin`，不暴露管理表单或日志，不处理私人 Cookie，也不提供账号/令牌。长期跟踪负载仍由调度器承担，入口限流不等于存储或目标总量预算。
 

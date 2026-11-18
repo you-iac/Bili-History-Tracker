@@ -11,6 +11,8 @@ import (
 
 // Reconcile在浏览、后台和手动重试间合并同目标操作；force只提前本地调度，不绕过暂停。
 func (s *Service) Reconcile(ctx context.Context, kind, id string, force bool) (Follow, error) {
+	ctx, cancel := context.WithTimeout(ctx, reconcileTimeout)
+	defer cancel()
 	f, base, err := s.find(kind, id)
 	if err != nil {
 		return f, err
@@ -89,6 +91,7 @@ func (s *Service) confirm(f Follow, base string, status remote.Status) (Follow, 
 		v.Pending = !status.Tracking && status.TrackingState != "paused" && status.State != "paused"
 		v.LastError = ""
 		v.LastCode = ""
+		v.LastStage, v.LastOutcome = "", ""
 		v.Attempts = 0
 		v.NextAttempt = nil
 		v.NeedsAttention = false
@@ -110,6 +113,10 @@ func (s *Service) checkFailed(f Follow, base string, cause error) (Follow, error
 	updated, err := s.update(f, base, func(v *Follow) {
 		v.LastError = cause.Error()
 		v.LastCode = code
+		v.LastStage, v.LastOutcome = "", ""
+		if failure != nil {
+			v.LastStage, v.LastOutcome = failure.Stage, failure.Outcome
+		}
 		v.Pending = true
 		v.Attempts++
 		v.NeedsAttention = v.Attempts >= 6

@@ -2,6 +2,7 @@
 // 资料读取复用 storage，目标接纳委托 tracker，实时查询委托 httpapi；
 // 不导入 admin，不暴露管理表单、日志或批量导入，不接收本地 Cookie。
 // 正常业务HTTP200并检查JSON结果；入口限制不等于长期预算或认证。见 docs/public-response.md、docs/architecture.md。
+// 申请阶段预算及有界收尾见 docs/request-stages.md。
 package publicapi
 
 import (
@@ -10,6 +11,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"bili-history-tracker/backend/internal/httpapi"
 	"bili-history-tracker/backend/internal/storage"
@@ -29,12 +31,14 @@ type targetLookup interface {
 
 // Server 与后台共享存储和采集实例，只注册明确允许公开的操作。
 type Server struct {
-	store    targetLookup
-	reader   *storage.Store
-	tracker  *tracker.Tracker
-	platform string
-	legacy   http.Handler
-	config   Config
+	store            targetLookup
+	reader           *storage.Store
+	tracker          *tracker.Tracker
+	platform         string
+	legacy           http.Handler
+	config           Config
+	admissionTimeout time.Duration
+	confirmTimeout   time.Duration
 }
 
 // New 检查配置后创建公共入口；Handler 应在启动时调用一次并供所有连接共享。
@@ -51,7 +55,7 @@ func New(store *storage.Store, trk *tracker.Tracker, queries httpapi.Querier, pl
 	if store == nil || trk == nil || queries == nil || platform == "" {
 		return nil, fmt.Errorf("public API requires storage, tracker, queries and platform")
 	}
-	return &Server{store: store, reader: store, tracker: trk, platform: platform, legacy: httpapi.New(queries), config: cfg}, nil
+	return &Server{store: store, reader: store, tracker: trk, platform: platform, legacy: httpapi.New(queries), config: cfg, admissionTimeout: 25 * time.Second, confirmTimeout: 3 * time.Second}, nil
 }
 
 // Handler 返回一个共享限额的路由树；不按 IP 分配额度，不挂载后台处理器。

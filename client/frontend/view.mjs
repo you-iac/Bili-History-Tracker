@@ -47,6 +47,7 @@ export function snapshotChanges(kind,before,after) {
 
 export function followState(follow) {
 	if (follow.needs_attention) return '需要手动核对';
+	if (follow.last_outcome === 'unknown') return '处理结果待确认 · 后台将先核对';
 	if (follow.last_code === 'TARGET_PAUSED' || follow.remote?.tracking_state === 'paused' || follow.remote?.status === 'paused') return '服务器已暂停';
 	if (follow.last_error && follow.remote?.tracking) return '最近确认已跟踪 · 本次核对未完成';
   if (follow.pending_submission) return follow.last_error ? '待提交 · 后台将重试' : '正在申请服务器跟踪';

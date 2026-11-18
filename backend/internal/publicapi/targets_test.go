@@ -297,7 +297,7 @@ func TestSingleTargetReplyAndStandardLink(t *testing.T) {
 	h := s.Handler()
 	w := postJSON(t, h, `{"type":"creator","id":"https://space.bilibili.com/72541187?spm_id_from=test"}`)
 	var data map[string]any
-	if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &data) != nil || len(data) != 9 || data["id"] != "72541187" || data["tracking"] != true || data["result"] != "created" || data["recorded"] != true || data["tracking_state"] != "active" {
+	if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &data) != nil || len(data) != 11 || data["stage"] != "confirm" || data["outcome"] != "confirmed" || data["id"] != "72541187" || data["tracking"] != true || data["result"] != "created" || data["recorded"] != true || data["tracking_state"] != "active" {
 		t.Fatal(w.Code, w.Body.String())
 	}
 	w = postJSON(t, h, `{"type":"creator","id":"72541187"}`)
