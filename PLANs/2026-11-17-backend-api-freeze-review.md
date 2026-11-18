@@ -1,7 +1,7 @@
 # 后端 API 固定前审查问题与修复计划
 
 - 创建时间：2026-11-17 14:51（Asia/Shanghai）。
-- 状态：部分实施。2026-11-18 补齐 BACK-SHUTDOWN 的 SIGTERM 停机入口；后台任务等待等剩余修复与原验收条件尚未完成。下方保留原审查现场。
+- 状态：部分实施。2026-11-18 完成 BACK-TARGET-REPLY，并补齐 BACK-SHUTDOWN 的 SIGTERM 停机入口。其余问题与后台退出验收仍待完成。下方保留原审查现场。
 - 审查基线：提交 `1baa4ab`（统一业务 JSON 应答并修复 Agent 跟踪核对）；此前设计提交为 `7fab9e9`。后续实施须先确认基线是否变化。
 - 来源：用户要求最后检查 backend 设计，计划部署后固定 API、尽量减少后端改动；审查后要求将五项发现详细记录到 PLANs。
 - 访问控制约定：用户明确选择服务器防火墙／IP 白名单，本计划不增加 Token、账号或认证接口。8181 仅向允许的来源开放，8182 保持本机管理访问。
@@ -14,7 +14,7 @@
 | 问题标识 | 优先级 | 发现 | 证据状态 |
 |---|---|---|---|
 | BACK-ADMIN-ORIGIN | P1 | 管理表单接受跨站写入 | 隔离数据库临时测试已复现 |
-| BACK-TARGET-REPLY | P2 | 提交成功字段与当前跟踪状态矛盾 | 隔离数据库并发测试已复现 |
+| BACK-TARGET-REPLY | P2 | 提交成功字段与当前跟踪状态矛盾 | 已修复，可控时序的单目标和批量回归通过 |
 | BACK-TIMEOUT-CODE | P2 | 落库阶段取消被归为内部故障 | 临时测试直接调用 submit 已复现；HTTP 映射由代码确认 |
 | BACK-PROFILE-METRICS | P2 | UP 占位资料在详情与指标接口中判定不一致 | 临时 HTTP 处理器测试已复现 |
 | BACK-SHUTDOWN | P2 | Linux SIGTERM 和后台任务退出链路不完整 | 静态审查确认；尚未完成 Linux 信号实测 |
@@ -83,6 +83,12 @@ FAIL: cross-site management write was accepted
 - 回归入口建议：[admin/admin_test.go](../backend/internal/admin/admin_test.go)、[admin/isolation_test.go](../backend/internal/admin/isolation_test.go) 及相关管理 JSON 测试。
 
 ## BACK-TARGET-REPLY：提交成功应答可能与任务状态矛盾
+
+### 实施记录（2026-11-18 09:06，Asia/Shanghai）
+
+[提交实现](../backend/internal/publicapi/targets.go) 用最终读取的状态生成单目标和批量逐项应答。确认 `active` 才报告成功，已暂停返回 `TARGET_PAUSED`，已移除返回 `TARGET_SUBMISSION_FAILED`，两者都附实际读到的目标状态。状态读取失败保留 `INTERNAL_ERROR`。应答反映本次读取结果，采集间隔和任务启停仍由原有流程管理。协议细节见 [公共 JSON 应答](../docs/public-response.md#目标与接口)。
+
+[回归测试](../backend/internal/publicapi/targets_test.go) 在提交之后、最后一次查询之前确定性地修改临时 SQLite，覆盖新建及复用任务时的暂停、删除和查询失败，以及启用但未记录资料的应答。旧逻辑复现误报，修复后回归连续三次通过。后端全量 Go 测试、`go vet`、Windows 服务构建、Agent 全量 Go 测试以及客户端 `pnpm lint`、`pnpm test` 均通过。以下为修复前的审查现场。
 
 ### 影响与出现条件
 

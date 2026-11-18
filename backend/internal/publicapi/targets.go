@@ -1,4 +1,4 @@
-// targets.go 提供兼容单目标的有界批量申请；成功才确认跟踪，超出前 N 项不执行。
+// targets.go 提供单目标和有界批量申请。最后一次读取确认任务已启用才返回成功。
 // 整批共用超时并顺序处理，不能通过一个 HTTP 请求放大无限上游并发。见 docs/public-api.md。
 package publicapi
 
@@ -55,7 +55,7 @@ func (s *Server) requestTarget(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		result := s.submit(ctx, target)
-		if result.Error != "" {
+		if !result.OK {
 			if result.HTTPStatus == 429 {
 				w.Header().Set("Retry-After", "1")
 			}
@@ -66,7 +66,17 @@ func (s *Server) requestTarget(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, status, result)
 			return
 		}
-		writeJSON(w, 200, map[string]any{"kind": result.Kind, "id": result.ID, "tracking": true, "tracking_state": result.Target.TrackingState, "recorded": result.Target.Recorded, "status": result.Target.Status, "result": result.Result})
+		writeJSON(w, result.HTTPStatus, map[string]any{
+			"ok":             result.OK,
+			"code":           result.Code,
+			"kind":           result.Kind,
+			"id":             result.ID,
+			"tracking":       result.Tracking,
+			"tracking_state": result.Target.TrackingState,
+			"recorded":       result.Target.Recorded,
+			"status":         result.Status,
+			"result":         result.Result,
+		})
 		return
 	}
 	var targets []json.RawMessage
@@ -111,7 +121,8 @@ func (s *Server) submit(ctx context.Context, input targetInput) targetResult {
 		return result
 	}
 	state, err := s.tracker.RequestTarget(ctx, input.Kind, input.ID)
-	if err == nil {
+	if err == nil || errors.Is(err, tracker.ErrTargetPaused) {
+		// 管理操作可能发生在接纳申请和状态读取之间，两处应答共用这次确认结果。
 		target, stateErr := s.targetStatus(ctx, input.Kind, input.ID)
 		if stateErr != nil {
 			result.HTTPStatus = 500
@@ -119,14 +130,20 @@ func (s *Server) submit(ctx context.Context, input targetInput) targetResult {
 			result.Error = "无法读取提交后的目标状态。"
 			return result
 		}
-		result.OK = true
-		result.Code = "OK"
 		result.Target = &target
-		result.Result = "created"
-		if state == "existing" {
+		result.Tracking, result.Status = target.Tracking, target.Status
+		switch target.TrackingState {
+		case "active":
+			result.OK, result.Code, result.HTTPStatus, result.Error = true, "OK", http.StatusOK, ""
 			result.Result = "existing"
+			if state == "tracking" {
+				result.Result = "created"
+			}
+		case "paused":
+			result.HTTPStatus, result.Code, result.Error = http.StatusConflict, "TARGET_PAUSED", "目标已被服务器暂停，请联系管理员。"
+		default:
+			result.HTTPStatus, result.Code, result.Error = http.StatusBadGateway, "TARGET_SUBMISSION_FAILED", "提交后目标已不在跟踪列表，请查询状态后重试。"
 		}
-		result.HTTPStatus, result.Tracking, result.Status, result.Error = 200, true, target.Status, ""
 		return result
 	}
 	result.HTTPStatus, result.Error = 502, "服务器无法验证或保存该目标，尚未确认加入跟踪。"
@@ -141,9 +158,6 @@ func (s *Server) submit(ctx context.Context, input targetInput) targetResult {
 		result.RetryAfter = 1
 		result.Code = "RATE_LIMITED"
 		result.HTTPStatus, result.Error = 429, "服务器采集任务较多，请稍后重试。"
-	case errors.Is(err, tracker.ErrTargetPaused):
-		result.Code = "TARGET_PAUSED"
-		result.HTTPStatus, result.Error = 409, "目标已被服务器暂停，请联系管理员。"
 	case ctx.Err() != nil, errors.Is(err, context.DeadlineExceeded), errors.Is(err, context.Canceled):
 		result.Code = "REQUEST_TIMEOUT"
 		result.HTTPStatus, result.Error = 504, "本次处理已超时，请查询状态后重试。"
