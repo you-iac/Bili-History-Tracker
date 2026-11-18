@@ -52,6 +52,7 @@ go run ./agent/cmd/agent
 |---|---|---|
 | `BHT_ADDR` | `0.0.0.0:8181` | 公共 API 监听所有 IPv4 网卡，可通过服务器 IP 访问 |
 | `BHT_ADMIN_ADDR` | `127.0.0.1:8182` | 本机管理观察台监听地址 |
+| `BHT_PPROF_ADDR` | 空，关闭 | 可选独立回环诊断入口，如 `127.0.0.1:6060`；采样参数与火焰图见 [性能诊断](docs/performance-profiling.md) |
 | `BHT_API_RPS` | `20` | 全部8181接口共用的滚动每秒接纳数和在途数上限，最大10000 |
 | `BHT_API_BATCH_MAX` | `10` | 批量申请只处理前N项，最大100 |
 | `BHT_DB` | `data/bht.db` | SQLite 文件路径 |

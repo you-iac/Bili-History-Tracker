@@ -1,6 +1,6 @@
 # cmd/server 入口
 
-唯一组装点：读环境变量、创建对象、启动两个服务和一个调度器。8181通过`publicapi.New`组装Agent协议及原实时API，共用全局限额；8182只提供本地管理。配置、批量与应答见[公共接口说明](../../../docs/public-api.md)。
+唯一组装点：读环境变量、创建对象、启动两个业务服务、可选诊断服务和一个调度器。8181通过`publicapi.New`组装Agent协议及原实时API，共用全局限额；8182只提供本地管理。配置、批量与应答见[公共接口说明](../../../docs/public-api.md)。
 
 > 与 [main.go](main.go) 的包注释保持一致；架构总览见 [docs/architecture.md](../../../docs/architecture.md)。
 
@@ -42,10 +42,12 @@
 ## 输入 / 输出 / 边界
 
 - **输入**：`BHT_*` 环境变量、操作系统的中断／终止信号（Linux 上为 `SIGINT`、`SIGTERM`）。
-- **输出**：两个监听端口、一个调度 goroutine、一个 SQLite 文件。
+- **输出**：两个业务监听端口、可选回环 pprof 诊断端口、一个调度 goroutine、一个 SQLite 文件。
 - **它不认识**：业务规则、SQL、B站字段；只负责创建、连接和生命周期。
 
-Linux 的 `SIGTERM` 与 Ctrl+C 的 `SIGINT` 共用停机入口。主 context 取消 HTTP 查询，`Tracker.Stop` 停止接纳新工作；已进入保存的显式申请继续短预算收尾。两个 HTTP 服务并行关闭（共45秒预算，记录错误），随后等待 tracker 登记工作与调度器结束，再关闭日志和数据库。公共 HTTP 写入时限50秒；阶段预算与 Agent 配套等待见 [分阶段设计](../../../docs/request-stages.md)。发现服务后台分页的完整等待及真实 Linux 活跃任务信号验收仍见 [BACK-SHUTDOWN 评审](../../../PLANs/2026-11-17-backend-api-freeze-review.md#back-shutdownlinux-sigterm-与后台退出链路不完整)。
+Linux 的 `SIGTERM` 与 Ctrl+C 的 `SIGINT` 共用停机入口。主 context 取消 HTTP 查询，`Tracker.Stop` 停止接纳新工作；已进入保存的显式申请继续短预算收尾。已启用的 HTTP 服务并行关闭（共45秒预算，记录错误），随后等待 tracker 登记工作与调度器结束，再关闭日志和数据库。公共 HTTP 写入时限50秒；阶段预算与 Agent 配套等待见 [分阶段设计](../../../docs/request-stages.md)。发现服务后台分页的完整等待及真实 Linux 活跃任务信号验收仍见 [BACK-SHUTDOWN 评审](../../../PLANs/2026-11-17-backend-api-freeze-review.md#back-shutdownlinux-sigterm-与后台退出链路不完整)。
+
+可选诊断服务由 [profiling.go](profiling.go) 的 `profilingOptions/newProfilingServer` 组装，不使用业务路由或 DefaultServeMux；[回归](profiling_test.go) 验证默认关闭、回环配置、实际 CPU/heap 数据和业务入口隔离。完整采样步骤与 CPU/等待语义见 [性能诊断](../../../docs/performance-profiling.md)。
 
 ## 环境变量
 
@@ -53,6 +55,9 @@ Linux 的 `SIGTERM` 与 Ctrl+C 的 `SIGINT` 共用停机入口。主 context 取
 |---|---|
 | `BHT_ADDR` | `0.0.0.0:8181`（所有 IPv4 网卡，允许通过服务器 IP 连接） |
 | `BHT_ADMIN_ADDR` | `127.0.0.1:8182` |
+| `BHT_PPROF_ADDR` | 空，关闭；启用时仅接受回环 IP |
+| `BHT_PPROF_BLOCK_RATE` | `0`（关闭；单位纳秒） |
+| `BHT_PPROF_MUTEX_FRACTION` | `0`（关闭；平均每 N 次竞争采一次） |
 | `BHT_API_RPS` | `20`（1至10000） |
 | `BHT_API_BATCH_MAX` | `10`（1至100） |
 | `BHT_DB` | `data/bht.db` |
