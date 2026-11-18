@@ -16,7 +16,7 @@
 
 | 模块或独立职责 | 功能与边界 | 实现入口与关键符号 | 相关测试 |
 |---|---|---|---|
-| 服务启动 | 组装数据源和查询服务、读取配置、管理 HTTP 服务生命周期 | [main.go](../backend/cmd/server/main.go) 的 `main` | [main_test.go](../backend/cmd/server/main_test.go)、[shutdown_linux_test.go](../backend/cmd/server/shutdown_linux_test.go)（Linux 空闲服务信号入口）；启动与查询见本文命令 |
+| 服务启动 | 组装数据源和查询服务、读取配置、管理 HTTP 服务生命周期；公共入口默认监听所有 IPv4 网卡，管理入口默认本机 | [main.go](../backend/cmd/server/main.go) 的 `main/listenAddresses` | [main_test.go](../backend/cmd/server/main_test.go)（监听配置与限额）、[shutdown_linux_test.go](../backend/cmd/server/shutdown_linux_test.go)（Linux 空闲服务信号入口）；启动与查询见本文命令 |
 | 通用查询层 | 定义统一数据与错误，按平台和能力分发；平台格式校验交给适配器 | [source.go](../backend/internal/source/source.go) 的 `Provider`、`CreatorProvider`、`Service` | [source_test.go](../backend/internal/source/source_test.go) |
 | 实时查询内核 | 保留原实时平台查询，由publicapi统一挂载与限流 | [handler.go](../backend/internal/httpapi/handler.go) 的 `Querier`、`New` | [handler_test.go](../backend/internal/httpapi/handler_test.go) |
 | B站 Provider 与视频查询 | 初始化客户端、校验 BV、转换视频元数据和业务错误 | [bilibili.go](../backend/internal/provider/bilibili/bilibili.go) 的 `Provider`、`GetVideo` | [bilibili_test.go](../backend/internal/provider/bilibili/bilibili_test.go) |
@@ -126,7 +126,7 @@ server := &http.Server{
 err = server.ListenAndServe()
 ```
 
-监听地址由 `main.go` 读取环境变量 `BHT_ADDR` 决定，未设置时为 `127.0.0.1:8181`。`127.0.0.1` 表示本机回环地址，`8181` 是本项目服务的端口。
+监听地址由 `main.go` 的 `listenAddresses` 读取环境变量 `BHT_ADDR` 决定，未设置或为空时为 `0.0.0.0:8181`，监听所有 IPv4 网卡。本机可通过 `127.0.0.1:8181` 访问，其他主机通过服务器实际 IP 的 8181 端口访问；`0.0.0.0` 是监听地址，不作为客户端目标地址。`BHT_ADMIN_ADDR` 默认仍为 `127.0.0.1:8182`，两个入口独立覆盖。
 
 例如，在启动服务的 PowerShell 中设置：
 
@@ -174,7 +174,7 @@ flowchart TD
 
 | 环境变量 | 默认值 | 作用 |
 |---|---|---|
-| `BHT_ADDR` | `127.0.0.1:8181` | 对外查询 API 监听地址 |
+| `BHT_ADDR` | `0.0.0.0:8181` | 对外查询 API 监听所有 IPv4 网卡 |
 | `BHT_ADMIN_ADDR` | `127.0.0.1:8182` | 观察台监听地址 |
 | `BHT_DB` | `data/bht.db` | SQLite 文件路径 |
 | `BHT_QUERY_LOG` | 与数据库同目录的 `query.log` | 查询日志，JSON Lines |

@@ -51,7 +51,7 @@ Linux 的 `SIGTERM` 与 Ctrl+C 的 `SIGINT` 共用停机入口。主 context 取
 
 | 变量 | 默认值 |
 |---|---|
-| `BHT_ADDR` | `127.0.0.1:8181` |
+| `BHT_ADDR` | `0.0.0.0:8181`（所有 IPv4 网卡，允许通过服务器 IP 连接） |
 | `BHT_ADMIN_ADDR` | `127.0.0.1:8182` |
 | `BHT_API_RPS` | `20`（1至10000） |
 | `BHT_API_BATCH_MAX` | `10`（1至100） |
