@@ -88,7 +88,7 @@ func TestBusinessFailureAndInternalFailureRemainDistinct(t *testing.T) {
 	if err := store.Close(); err != nil {
 		t.Fatal(err)
 	}
-	for _, path := range []string{"/api/targets/status?kind=creator&id=1", "/detail/creator/1"} {
+	for _, path := range []string{"/api/targets/status?kind=creator&id=1", "/detail/creator/1", "/api/metrics/creator/1?days=30"} {
 		w = httptest.NewRecorder()
 		h.ServeHTTP(w, httptest.NewRequest("GET", path, nil))
 		_ = json.Unmarshal(w.Body.Bytes(), &reply)

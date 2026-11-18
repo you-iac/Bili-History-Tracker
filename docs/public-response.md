@@ -22,10 +22,12 @@
 
 统一状态为 `kind/id/tracking_state/tracking/recorded/status`。tracking_state为absent/active/paused；tracking兼容旧布尔字段；recorded表示当前有成功资料，不能区分从未采集与丢失，不能推断视频下架。status继续描述观测状态，提交结果用result=created/existing，不混用。
 
+创作者仅由视频引用建立的行是占位资料，没有完整资料版本时 `seq=0`、`recorded=false`；首次成功保存完整资料后 `seq=1`。版本号不表示是否跟踪，active 或 paused 任务都可能尚无成功资料，停止跟踪后也可保留已有版本。列表的 `recorded`、详情、指标和目标状态共用这一判定，不把作者行存在当作完整资料已采集。
+
 - GET /api/targets/status：目标未知也以200返回ok:true/code:OK及真实状态，只读不采集。
 - POST /targets：提交后确认任务为 `active` 才返回成功。单目标成功返回平铺状态和 `result`，失败返回 `ok:false/code/error`，能够确认时附 `target`。最终状态为 `paused` 或 `absent` 时，分别返回 `TARGET_PAUSED` 或 `TARGET_SUBMISSION_FAILED`，附读到的状态。批量保留前 N 项和原序号，每项按同一规则生成 `ok/code`，旧 `http_status` 保留作诊断。应答描述本次确认时观察到的状态，后续管理操作仍可改变任务状态。
 - GET /detail/{type}/{id}：成功保留item/metrics/versions并附target；无资料200+DETAIL_NOT_RECORDED及target；快照缺失200+SNAPSHOT_NOT_FOUND。任务读取失败不伪造absent。
-- 指标不存在同样使用DETAIL_NOT_RECORDED；实时查询的上游失败映射为公共JSON业务结果。
+- GET /api/metrics/{type}/{id}?days=7/30/90/all：目标无成功资料（包括作者占位行）时返回200、`ok:false/code:DETAIL_NOT_RECORDED` 及真实 `target`，不改变跟踪状态、不触发采集。已有完整资料但缺少粉丝指标或窗口内没有采样时，返回 `ok:true/code:OK/points:[]`；真实零值保留为值为0的采样点，不用零补齐缺失。数据库读取故障仍返回500。实时查询的上游失败映射为公共JSON业务结果。
 
 示例（HTTP200）：
 

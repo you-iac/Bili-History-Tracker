@@ -14,10 +14,15 @@ import (
 	"bili-history-tracker/backend/internal/storage"
 )
 
+// hasRecordedContent 将存储中的行存在与公共协议的成功资料区分。
+// 视频引用产生的作者占位行没有完整资料版本（Seq=0），与是否跟踪无关。
+// 列表、详情、指标和目标状态共用此规则；协议见 docs/public-response.md。
+func hasRecordedContent(i storage.ContentItem) bool {
+	return i.Recorded && (i.Kind != "creator" || i.Seq > 0)
+}
+
 func clientItem(i storage.ContentItem) map[string]any {
-	if i.Kind == "creator" && i.Seq == 0 {
-		i.Recorded = false
-	}
+	i.Recorded = hasRecordedContent(i)
 	return map[string]any{"kind": i.Kind, "id": i.ID, "name": i.Name, "owner_id": i.OwnerID, "owner_name": i.OwnerName, "metric": i.Metric, "growth": i.Growth, "growth_from": i.GrowthFrom, "growth_to": i.GrowthTo, "seq": i.Seq, "observed_at": i.ObservedAt, "published_at": i.PublishedAt, "recorded": i.Recorded, "tracking": i.Following, "status": i.Status, "video_count": i.VideoCount, "video_views": i.VideoViews, "recent_videos": i.RecentVideos}
 }
 
@@ -92,7 +97,7 @@ func (s *Server) clientDetail(w http.ResponseWriter, r *http.Request, kind, id s
 		writeJSON(w, 500, map[string]string{"error": "无法读取服务器详情。"})
 		return
 	}
-	if !i.Recorded || kind == "creator" && i.Seq == 0 {
+	if !hasRecordedContent(i) {
 		s.missingDetail(w, r, kind, id)
 		return
 	}
@@ -169,7 +174,8 @@ func (s *Server) clientTargetStatus(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, state)
 }
 
-// metrics 与详情使用同一 UTC 日采样口径；目标不存在时不请求上游补齐。
+// metrics 与详情共用成功资料判定和 UTC 日采样口径；无资料时不请求上游补齐。
+// 完整资料存在但窗口内没有指标时返回空采样，不能把缺失指标补成零。
 func (s *Server) metrics(w http.ResponseWriter, r *http.Request) {
 	kind, id := r.PathValue("type"), r.PathValue("id")
 	days := rangeDays(r.URL.Query().Get("days"), -1)
@@ -179,12 +185,17 @@ func (s *Server) metrics(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
-	if _, err := s.reader.Content(ctx, s.platform, kind, id, time.Now()); err != nil {
+	i, err := s.reader.Content(ctx, s.platform, kind, id, time.Now())
+	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			s.missingDetail(w, r, kind, id)
 		} else {
 			writeJSON(w, 500, map[string]string{"error": "无法读取目标。"})
 		}
+		return
+	}
+	if !hasRecordedContent(i) {
+		s.missingDetail(w, r, kind, id)
 		return
 	}
 	series, err := s.reader.Metrics(ctx, s.platform, kind, id, days, time.Now())
