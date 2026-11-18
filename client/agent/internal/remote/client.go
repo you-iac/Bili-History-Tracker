@@ -19,6 +19,8 @@ import (
 )
 
 type Error struct {
+	Stage      string
+	Outcome    string
 	Message    string
 	Status     int
 	Code       string
@@ -26,6 +28,13 @@ type Error struct {
 	RetryAfter time.Duration
 	Cause      error
 }
+
+// 服务器最长批量收尾约36秒，另留请求读取和传输余量；状态只读有独立短预算。
+const (
+	ReadTimeout   = 22 * time.Second
+	StatusTimeout = 8 * time.Second
+	SubmitTimeout = 55 * time.Second
+)
 
 func (e *Error) Error() string { return e.Message }
 func (e *Error) Unwrap() error { return e.Cause }
@@ -182,7 +191,7 @@ func (c *Client) Overview(ctx context.Context, base string) (Overview, error) {
 
 // New 使用独立客户端，不共享平台 CookieJar；禁止重定向。
 func New(transport http.RoundTripper) *Client {
-	return &Client{http: &http.Client{Transport: transport, Timeout: 22 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return errors.New("redirect refused") }}}
+	return &Client{http: &http.Client{Transport: transport, Timeout: SubmitTimeout, CheckRedirect: func(*http.Request, []*http.Request) error { return errors.New("redirect refused") }}}
 }
 func NormalizeBase(input string) (string, error) {
 	input = strings.TrimSpace(input)
@@ -198,12 +207,25 @@ func NormalizeBase(input string) (string, error) {
 	return strings.TrimRight(u.String(), "/"), nil
 }
 func (c *Client) call(ctx context.Context, base, method, path string, body any, out any) error {
+	timeout := ReadTimeout
+	if method == "POST" && path == "/targets" {
+		timeout = SubmitTimeout
+	}
+	if strings.HasPrefix(path, "/api/targets/status?") {
+		timeout = StatusTimeout
+	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	transportOutcome := "not_applied"
+	if method == "POST" && path == "/targets" {
+		transportOutcome = "unknown"
+	}
 	if base == "" {
 		return &Error{Message: "请先配置服务器地址；本地关注仍可独立使用。", Status: 422}
 	}
 	var input io.Reader
 	if err := c.wait(ctx); err != nil {
-		return &Error{Message: "请求等待超时或已取消，请稍后核对。", Status: 502, Code: "REQUEST_TIMEOUT", Cause: err}
+		return &Error{Message: "请求排队超时或已取消，尚未发出本次请求。", Status: 502, Code: "REQUEST_TIMEOUT", Stage: "transport", Outcome: "not_applied", Cause: err}
 	}
 	if body != nil {
 		data, err := json.Marshal(body)
@@ -222,29 +244,34 @@ func (c *Client) call(ctx context.Context, base, method, path string, body any, 
 	}
 	response, err := c.http.Do(r)
 	if err != nil {
-		if ctx.Err() != nil {
-			return &Error{Message: "请求超时或已取消，请稍后核对服务器状态。", Status: 502, Code: "REQUEST_TIMEOUT", Cause: ctx.Err()}
+		if ctx.Err() != nil || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+			return &Error{Message: "等待服务器应答超时或已取消，请稍后核对处理结果。", Status: 502, Code: "REQUEST_TIMEOUT", Stage: "transport", Outcome: transportOutcome, Cause: err}
 		}
-		return &Error{Message: "无法连接服务器，请检查地址、网络和服务是否运行。", Status: 502, Code: "CONNECTION_FAILED"}
+		return &Error{Message: "无法连接服务器，请检查地址、网络和服务是否运行。", Status: 502, Code: "CONNECTION_FAILED", Stage: "transport", Outcome: transportOutcome, Cause: err}
 	}
 	defer response.Body.Close()
 	data, err := io.ReadAll(io.LimitReader(response.Body, (8<<20)+1))
+	if err != nil && (ctx.Err() != nil || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled)) {
+		return &Error{Message: "读取服务器应答超时或已取消，请稍后核对处理结果。", Status: 502, Code: "REQUEST_TIMEOUT", Stage: "transport", Outcome: transportOutcome, Cause: err}
+	}
 	if err != nil || len(data) > 8<<20 {
-		return &Error{Message: "服务器响应不完整或超出大小限制。", Status: 502}
+		return &Error{Message: "服务器响应不完整或超出大小限制。", Status: 502, Stage: "transport", Outcome: transportOutcome, Cause: err}
 	}
 	media, _, _ := mime.ParseMediaType(response.Header.Get("Content-Type"))
 	if media != "application/json" {
-		return &Error{Message: "服务器未返回客户端 JSON 数据，请确认连接 8181 公共接口端口，并更新远程 backend。", Status: 502}
+		return &Error{Message: "服务器未返回客户端 JSON 数据，请确认连接 8181 公共接口端口，并更新远程 backend。", Status: 502, Stage: "transport", Outcome: transportOutcome}
 	}
 	var failure struct {
-		OK     *bool           `json:"ok"`
-		Code   string          `json:"code"`
-		Error  json.RawMessage `json:"error"`
-		Target *Status         `json:"target"`
-		Retry  int             `json:"retry_after_seconds"`
+		Stage   string          `json:"stage"`
+		Outcome string          `json:"outcome"`
+		OK      *bool           `json:"ok"`
+		Code    string          `json:"code"`
+		Error   json.RawMessage `json:"error"`
+		Target  *Status         `json:"target"`
+		Retry   int             `json:"retry_after_seconds"`
 	}
 	if err = json.Unmarshal(data, &failure); err != nil {
-		return &Error{Message: "服务器数据格式不兼容，请更新backend。", Status: 502, Code: "INVALID_RESPONSE"}
+		return &Error{Message: "服务器数据格式不兼容，请更新backend。", Status: 502, Code: "INVALID_RESPONSE", Stage: "transport", Outcome: transportOutcome}
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 || failure.OK != nil && !*failure.OK || failure.Code != "" && failure.Code != "OK" || len(failure.Error) > 0 && string(failure.Error) != "null" {
 		message := "服务器未完成操作。"
@@ -292,10 +319,10 @@ func (c *Client) call(ctx context.Context, base, method, path string, body any, 
 			}
 			c.mu.Unlock()
 		}
-		return &Error{Message: message, Status: status, Code: code, Target: failure.Target, RetryAfter: retry}
+		return &Error{Message: message, Status: status, Code: code, Stage: failure.Stage, Outcome: failure.Outcome, Target: failure.Target, RetryAfter: retry}
 	}
 	if err = json.Unmarshal(data, out); err != nil {
-		return &Error{Message: "服务器数据格式不兼容，请更新 backend。", Status: 502}
+		return &Error{Message: "服务器数据格式不兼容，请更新 backend。", Status: 502, Stage: "transport", Outcome: transportOutcome}
 	}
 	return nil
 }

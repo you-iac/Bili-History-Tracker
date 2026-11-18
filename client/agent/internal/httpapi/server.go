@@ -300,7 +300,7 @@ func writeError(w http.ResponseWriter, err error) {
 		if code == "" {
 			code = "remote_error"
 		}
-		apiError(w, external.Status, code, external.Message)
+		writeJSON(w, external.Status, map[string]any{"error": map[string]string{"code": code, "message": external.Message, "stage": external.Stage, "outcome": external.Outcome}})
 		return
 	}
 	var known *bilibili.Error

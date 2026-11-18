@@ -1,5 +1,5 @@
 // targets.go 提供单目标和有界批量申请。最后一次读取确认任务已启用才返回成功。
-// 整批共用超时并顺序处理，不能通过一个 HTTP 请求放大无限上游并发。见 docs/public-api.md。
+// 整批共用接纳时限，已开始保存的项目独立有界收尾。阶段和结果语义见 docs/request-stages.md。
 package publicapi
 
 import (
@@ -9,7 +9,6 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"time"
 
 	"bili-history-tracker/backend/internal/tracker"
 )
@@ -20,6 +19,8 @@ type targetInput struct {
 }
 
 type targetResult struct {
+	Stage      string       `json:"stage"`
+	Outcome    string       `json:"outcome"`
 	OK         bool         `json:"ok"`
 	Code       string       `json:"code"`
 	Result     string       `json:"result,omitempty"`
@@ -34,6 +35,18 @@ type targetResult struct {
 	Error      string       `json:"error,omitempty"`
 }
 
+// 无最终状态时省略兼容 tracking 字段，避免把默认 false 当成已查明任务不存在。
+func (r targetResult) MarshalJSON() ([]byte, error) {
+	type fields targetResult
+	if r.Target == nil {
+		return json.Marshal(struct {
+			fields
+			Tracking *bool `json:"tracking,omitempty"`
+		}{fields: fields(r)})
+	}
+	return json.Marshal(fields(r))
+}
+
 func (s *Server) requestTarget(w http.ResponseWriter, r *http.Request) {
 	if !sameOriginJSON(w, r) {
 		return
@@ -46,7 +59,7 @@ func (s *Server) requestTarget(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &input) {
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), s.admissionTimeout)
 	defer cancel()
 	if input.Targets == nil {
 		var target targetInput
@@ -67,6 +80,8 @@ func (s *Server) requestTarget(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeJSON(w, result.HTTPStatus, map[string]any{
+			"stage":          result.Stage,
+			"outcome":        result.Outcome,
 			"ok":             result.OK,
 			"code":           result.Code,
 			"kind":           result.Kind,
@@ -99,7 +114,7 @@ func (s *Server) submitBatch(ctx context.Context, inputs []json.RawMessage) []ta
 		if err == nil && decoder.Decode(new(any)) != io.EOF {
 			err = errors.New("extra JSON value")
 		}
-		result := targetResult{Code: "INVALID_TARGET", Kind: input.Kind, ID: input.ID, HTTPStatus: 400, Status: "error", Error: "目标 JSON 格式无效。"}
+		result := targetResult{Stage: "check", Outcome: "not_applied", Code: "INVALID_TARGET", Kind: input.Kind, ID: input.ID, HTTPStatus: 400, Status: "error", Error: "目标 JSON 格式无效。"}
 		if err == nil {
 			result = s.submit(ctx, input)
 		}
@@ -111,7 +126,7 @@ func (s *Server) submitBatch(ctx context.Context, inputs []json.RawMessage) []ta
 
 func (s *Server) submit(ctx context.Context, input targetInput) targetResult {
 	input.ID = normalizeID(input.Kind, input.ID)
-	result := targetResult{Code: "INVALID_TARGET", Kind: input.Kind, ID: input.ID, HTTPStatus: 400, Status: "error", Error: "目标标识无效。"}
+	result := targetResult{Stage: "check", Outcome: "not_applied", Code: "INVALID_TARGET", Kind: input.Kind, ID: input.ID, HTTPStatus: 400, Status: "error", Error: "目标标识无效。"}
 	if !validID(input.Kind, input.ID) {
 		return result
 	}
@@ -123,13 +138,11 @@ func (s *Server) submit(ctx context.Context, input targetInput) targetResult {
 	state, err := s.tracker.RequestTarget(ctx, input.Kind, input.ID)
 	if err == nil || errors.Is(err, tracker.ErrTargetPaused) {
 		// 管理操作可能发生在接纳申请和状态读取之间，两处应答共用这次确认结果。
-		target, stateErr := s.targetStatus(ctx, input.Kind, input.ID)
+		target, stateErr := s.confirmTarget(ctx, input.Kind, input.ID)
 		if stateErr != nil {
-			result.HTTPStatus = 500
-			result.Code = "INTERNAL_ERROR"
-			result.Error = "无法读取提交后的目标状态。"
-			return result
+			return requestFailure(result, &tracker.RequestError{Stage: "confirm", Outcome: "unknown", Cause: errors.Join(tracker.ErrTargetStorage, stateErr)})
 		}
+		result.Stage, result.Outcome = "confirm", "confirmed"
 		result.Target = &target
 		result.Tracking, result.Status = target.Tracking, target.Status
 		switch target.TrackingState {
@@ -146,11 +159,30 @@ func (s *Server) submit(ctx context.Context, input targetInput) targetResult {
 		}
 		return result
 	}
-	result.HTTPStatus, result.Error = 502, "服务器无法验证或保存该目标，尚未确认加入跟踪。"
-	result.Code = "TARGET_SUBMISSION_FAILED"
+	result = requestFailure(result, err)
+	// 不额外启动第二轮确认预算；原阶段失败不暗示任务不存在，后续客户端先查状态。
+	return result
+}
+
+func (s *Server) confirmTarget(ctx context.Context, kind, id string) (targetState, error) {
+	phase, cancel := context.WithTimeout(context.WithoutCancel(ctx), s.confirmTimeout)
+	defer cancel()
+	return s.targetStatus(phase, kind, id)
+}
+
+func requestFailure(result targetResult, err error) targetResult {
+	var phase *tracker.RequestError
+	if errors.As(err, &phase) {
+		result.Stage, result.Outcome = phase.Stage, phase.Outcome
+	}
+	label := map[string]string{"check": "检查已有任务", "query": "查询并校验平台资料", "persist": "保存资料和指标", "target": "建立跟踪任务", "confirm": "确认最终状态"}[result.Stage]
+	result.HTTPStatus, result.Code, result.Error = 502, "TARGET_SUBMISSION_FAILED", label+"失败，请核对状态后重试。"
 	switch {
+	case errors.Is(err, context.DeadlineExceeded), errors.Is(err, context.Canceled):
+		result.Code = "REQUEST_TIMEOUT"
+		result.HTTPStatus, result.Error = 504, label+"超时或已取消，请查询状态确认处理结果。"
 	case errors.Is(err, tracker.ErrTargetStorage):
-		result.HTTPStatus, result.Code, result.Error = 500, "INTERNAL_ERROR", "服务器无法读取或保存目标。"
+		result.HTTPStatus, result.Code, result.Error = 500, "INTERNAL_ERROR", label+"时发生数据库故障，请核对状态后重试。"
 	case errors.Is(err, tracker.ErrTargetBusy):
 		result.Code = "TARGET_BUSY"
 		result.HTTPStatus, result.Error = 409, "目标正在采集中，请先刷新状态或稍后重试。"
@@ -158,14 +190,8 @@ func (s *Server) submit(ctx context.Context, input targetInput) targetResult {
 		result.RetryAfter = 1
 		result.Code = "RATE_LIMITED"
 		result.HTTPStatus, result.Error = 429, "服务器采集任务较多，请稍后重试。"
-	case ctx.Err() != nil, errors.Is(err, context.DeadlineExceeded), errors.Is(err, context.Canceled):
-		result.Code = "REQUEST_TIMEOUT"
-		result.HTTPStatus, result.Error = 504, "本次处理已超时，请查询状态后重试。"
-	}
-	if ctx.Err() == nil && result.HTTPStatus != 500 {
-		if target, e := s.targetStatus(ctx, input.Kind, input.ID); e == nil {
-			result.Target = &target
-		}
+	case errors.Is(err, tracker.ErrRequestStopping):
+		result.HTTPStatus, result.Code, result.Error, result.RetryAfter = 429, "RATE_LIMITED", "服务器正在停止，请稍后核对状态。", 1
 	}
 	return result
 }

@@ -21,10 +21,12 @@ function connection(text, isOnline) {
 async function request(path, options = {}) {
   const method = options.method || 'GET';
   let response;
+  const timeout = path.startsWith('/api/follows') || path.startsWith('/api/library/') ? 100000 : 25000;
   try {
-    response = await fetch(path, {credentials:'same-origin',cache:'no-store',signal:AbortSignal.timeout(25000),...options,
+    response = await fetch(path, {credentials:'same-origin',cache:'no-store',signal:AbortSignal.timeout(timeout),...options,
       headers:{...(method === 'GET' ? {} : {'Content-Type':'application/json','X-CSRF-Token':csrf}),...options.headers}});
-  } catch {
+  } catch (error) {
+    if (error.name === 'TimeoutError' || error.name === 'AbortError') throw new Error('本地操作等待超时或已取消，服务器可能仍在收尾，请稍后核对处理结果。');
     throw new Error('无法连接本地 Agent，请确认程序仍在运行。');
   }
   if (!response.ok) {
@@ -33,7 +35,7 @@ async function request(path, options = {}) {
       connected = false; csrf = ''; $('connect-card').hidden = false;
       connection('等待连接', false);
     }
-    throw new Error(error?.error?.message || '操作未完成，请稍后重试。');
+    throw Object.assign(new Error(error?.error?.message || '操作未完成，请稍后重试。'), {stage:error?.error?.stage||'',outcome:error?.error?.outcome||''});
   }
   return response;
 }

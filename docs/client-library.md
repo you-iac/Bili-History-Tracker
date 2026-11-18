@@ -64,7 +64,7 @@ UP 占位作者行不等于已有成功资料观测，`recorded` 对 UP 要求�
 
 完整27个路由见 [Agent API](../client/agent/README.md#api-接口)。新增连接配置、测试、本地关注增删、资料刷新、公共提交与详情读取；继续使用原会话、Host/Origin、同源 JSON 和 CSRF 校验。
 
-`remote.Client` 不共享平台客户端或 CookieJar，不跟随重定向，响应限制8MiB且要求 JSON；连接超时22秒，刷新总预算20秒。遇到旧服务器 HTML 或不兼容结构时明确提示升级 backend，不把管理网页当 API 解析。
+`remote.Client` 不共享平台客户端或 CookieJar，不跟随重定向，响应限制8MiB且要求 JSON；状态读取8秒、普通读取22秒、跟踪申请55秒，整次核对65秒、关注刷新90秒。阶段失败保留 `stage/outcome`，未知结果先核对再申请，`last_stage/last_outcome` 随关注库持久化；完整预算、旧协议兼容和收尾见 [分阶段申请设计](request-stages.md)。遇到旧服务器 HTML 或不兼容结构时明确提示升级 backend，不把管理网页当 API 解析。
 
 8182只用于本机管理；8181通过独立publicapi限定路由、统一限流和有界批量申请，本次不增加访问令牌、账号、设备注册或长期目标预算。JSON来源检查不等于身份认证。Agent只查询和申请，本地取消不调用全局管理命令；更完整准入仍见[既有计划](../PLANs/2026-11-10-client-agent.md)。
 

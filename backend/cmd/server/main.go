@@ -4,6 +4,7 @@
 // BHT_DB、BHT_QUERY_LOG、BHT_BILI_COOKIE，
 // 以及操作系统的中断／终止信号。
 // 输出：两个 HTTP 监听端口、一个调度 goroutine、一个 SQLite 文件；退出时按序关闭。
+// HTTP 查询随主 context 取消，tracker 登记工作与同步保存收尾后才关闭存储；预算见 docs/request-stages.md。
 // 它不认识：业务规则、SQL、B站字段；只负责创建对象、连接依赖和管理生命周期。
 //
 // 上下游关系：
@@ -49,6 +50,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -109,14 +111,16 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	go scheduler.Run(ctx)
+	schedulerDone := make(chan struct{})
+	go func() { defer close(schedulerDone); scheduler.Run(ctx) }()
 
 	apiServer := &http.Server{
 		Addr:              apiAddr,
 		Handler:           publicHandler.Handler(),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
-		WriteTimeout:      30 * time.Second,
+		WriteTimeout:      50 * time.Second,
+		BaseContext:       func(net.Listener) context.Context { return ctx },
 		IdleTimeout:       60 * time.Second,
 		MaxHeaderBytes:    16 << 10,
 	}
@@ -126,6 +130,7 @@ func main() {
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      30 * time.Second,
+		BaseContext:       func(net.Listener) context.Context { return ctx },
 		IdleTimeout:       60 * time.Second,
 		MaxHeaderBytes:    16 << 10,
 	}
@@ -151,11 +156,22 @@ func main() {
 		stop()
 	}
 
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	// 先关闭接纳并取消查询；同步 handler 内的独立保存与最终确认仍需收尾。
+	trk.Stop()
+	adminHandler.Close()
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
-	_ = apiServer.Shutdown(shutdownCtx)
-	_ = adminServer.Shutdown(shutdownCtx)
-	log.Printf("database closed, scheduler stopped")
+	closed := make(chan error, 2)
+	go func() { closed <- apiServer.Shutdown(shutdownCtx) }()
+	go func() { closed <- adminServer.Shutdown(shutdownCtx) }()
+	for range 2 {
+		if err := <-closed; err != nil {
+			log.Printf("HTTP shutdown incomplete: %v", err)
+		}
+	}
+	trk.Wait()
+	<-schedulerDone
+	log.Printf("tracker and scheduler stopped; closing storage")
 }
 
 func env(key, fallback string) string {

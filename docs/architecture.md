@@ -2,6 +2,8 @@
 
 公共JSON业务应答和Agent核对见 [协议](public-response.md) 与 [实施计划](../PLANs/archive/2026-11-17-public-json-response.md)。实现位于现有publicapi、remote、library和详情模块，不变更数据库结构。
 
+跟踪申请的阶段预算、错误原因、部分提交及 Agent 等待链见 [分阶段申请设计](request-stages.md)；实现入口为 [RequestTarget](../backend/internal/tracker/request.go)、[阶段策略](../backend/internal/tracker/request_policy.go) 和 [公共申请应答](../backend/internal/publicapi/targets.go)，回归见 [tracker 阶段测试](../backend/internal/tracker/request_stages_test.go) 与 [publicapi 阶段测试](../backend/internal/publicapi/request_stages_test.go)。
+
 当前实现一次性视频元数据查询、UP 主资料查询、SQLite 持久化、8182 观察台和循环调度。成功观测按 [数据库设计](database.md) 的五表写入当前索引与内容版本表；查询失败只记日志，不修改已有内容。尚未实现完整投稿列表发现（B站列表接口需要登录态，当前只用公开合集发现）、可访问性状态机、事件日志和 Agent 同步，不能视为完整实现 FR-005、FR-006、FR-008 或 FR-009。
 
 数据库由 0001 迁移建表；0002 曾增加 `snapshot_version`，0003 删除该列，过滤规则版本改为仅由适配器代码管理；0004 为 `tracking_targets` 增加最近采集状态并回填旧目标。当前 `PRAGMA user_version = 4`；调度目标单独存放在 `tracking_targets`，属于调度配置而非内容设计。迁移不裁剪已有 payload，也不新增历史内容版本。
@@ -41,6 +43,7 @@
 | Agent远程客户端 | JSON业务码、新旧应答解析、共享节流与限流冷却，无Cookie转发 | [client.go](../client/agent/internal/remote/client.go)，见 [协议](public-response.md) | [client_test.go](../client/agent/internal/remote/client_test.go)、[业务失败](../client/agent/internal/remote/response_test.go) |
 | 关注状态核对 | 浏览与后台精确核对、缺失补申请、暂停保留、六次失败转人工、代际和身份隔离 | [reconciliation.go](../client/agent/internal/library/reconciliation.go) 的 `Reconcile`、[pending.go](../client/agent/internal/library/pending.go)，见 [协议](public-response.md) | [reconciliation_test.go](../client/agent/internal/library/reconciliation_test.go) |
 | 8181公共入口 | JSON库/详情/指标/状态、有界单项及批量申请；统一滚动RPS与在途限制，保留实时查询 | [server.go](../backend/internal/publicapi/server.go)、[read.go](../backend/internal/publicapi/read.go)、[targets.go](../backend/internal/publicapi/targets.go)、[limit.go](../backend/internal/publicapi/limit.go)，[response.go](../backend/internal/publicapi/response.go)、[legacy.go](../backend/internal/publicapi/legacy.go)，见[协议](public-response.md) | [业务应答](../backend/internal/publicapi/response_test.go)、[路由](../backend/internal/publicapi/routes_test.go)、[读取](../backend/internal/publicapi/read_test.go)、[截断](../backend/internal/publicapi/targets_test.go)、[限流](../backend/internal/publicapi/limit_test.go) |
+| 显式申请阶段与收尾 | 独立阶段预算、有效资料有界保存、错误原因与最终结果确认；停机等待在途工作 | [request.go](../backend/internal/tracker/request.go) 的 `RequestTarget`、[request_policy.go](../backend/internal/tracker/request_policy.go) 的 `RequestBudgets/RequestError`、[tracker.go](../backend/internal/tracker/tracker.go) 的 `Stop/Wait`；见 [阶段设计](request-stages.md) | [阶段与事务回归](../backend/internal/tracker/request_stages_test.go)、[阶段应答回归](../backend/internal/publicapi/request_stages_test.go)、[Agent结果核对](../client/agent/internal/library/request_stages_test.go) |
 | 公共准入与下载（规划） | 完整准入、总预算、公共搜索增强及本地下载 | [目标设计](client-server-architecture.md) | 见该文验收，当前尚未全部实现 |
 | Qt桌面客户端（规划） | 未来以C++ + Qt重构客户端，应用内整合界面与业务，保持现有功能与数据迁移 | [技术路线](../client/README.md#未来技术路线c--qt)、[实施计划](../PLANs/2026-11-15-qt-client.md)；尚无Qt实现入口 | 计划中的功能对等、迁移、生命周期和安装验收；实现后补测试入口 |
 | 用户档案与数据管理（规划） | 本地管理、导入导出和备份恢复；未来直连用户自选云盘自动备份，公共服务器不托管私人数据 | [数据管理设计](client-data-management.md)，尚无实现入口；现有 [localstate](../client/agent/internal/localstate/store.go) 已保存状态并可迁移目录，完整档案与备份未实现 | 同文档“实施顺序与验收”，实现后补测试入口 |
@@ -106,7 +109,7 @@
 3. 创建共享`storage`、`tracker`、调度器和`admin`后，`publicapi.New(store, trk, queries, "bilibili", limits)`创建公共入口，内部通过`httpapi.New(queries)`保留实时查询。
 4. `http.Server` 使用该路由器作为 `Handler`，`ListenAndServe()` 开始监听并处理请求。
 
-停机入口通过 `signal.NotifyContext` 接收 `os.Interrupt`（Linux 的 `SIGINT`，通常由 Ctrl+C 触发）和 `syscall.SIGTERM`，取消主 context 后进入同一关闭流程。现有流程按顺序对两个 HTTP 服务调用 `Shutdown`，共用 5 秒预算，随后返回并由 defer 关闭管理任务、查询日志和数据库。当前尚未显式等待调度器及 `Tracker.RunNow` 异步任务完成，HTTP Shutdown 错误也尚未处理；补齐信号入口不代表整个后台退出链路已验收。剩余问题见 [BACK-SHUTDOWN](../PLANs/2026-11-17-backend-api-freeze-review.md#back-shutdownlinux-sigterm-与后台退出链路不完整)。
+停机入口通过 `signal.NotifyContext` 接收 `os.Interrupt`（Linux 的 `SIGINT`，通常由 Ctrl+C 触发）和 `syscall.SIGTERM`，主 context 也作为两个 HTTP 服务的 `BaseContext`。停止时 `Tracker.Stop` 关闭新工作登记并取消查询，已进入保存的显式申请继续短预算收尾；两个 HTTP 服务并行 `Shutdown`，共用45秒预算并记录错误，之后等待 tracker 已登记工作及调度 goroutine，再退出并关闭日志和数据库。`RunNow` 在启动 goroutine 前登记，避免停机漏等。发现服务目前仍只取消任务，分页后台工作的完整等待及真实 Linux 活跃任务信号验收继续见 [BACK-SHUTDOWN](../PLANs/2026-11-17-backend-api-freeze-review.md#back-shutdownlinux-sigterm-与后台退出链路不完整)；本次预算和收尾范围见 [分阶段申请设计](request-stages.md#停止接纳与收尾)。
 
 对应的核心代码为：
 

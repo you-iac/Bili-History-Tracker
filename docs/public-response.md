@@ -29,6 +29,8 @@
 - GET /detail/{type}/{id}：成功保留item/metrics/versions并附target；无资料200+DETAIL_NOT_RECORDED及target；快照缺失200+SNAPSHOT_NOT_FOUND。任务读取失败不伪造absent。
 - GET /api/metrics/{type}/{id}?days=7/30/90/all：目标无成功资料（包括作者占位行）时返回200、`ok:false/code:DETAIL_NOT_RECORDED` 及真实 `target`，不改变跟踪状态、不触发采集。已有完整资料但缺少粉丝指标或窗口内没有采样时，返回 `ok:true/code:OK/points:[]`；真实零值保留为值为0的采样点，不用零补齐缺失。数据库读取故障仍返回500。实时查询的上游失败映射为公共JSON业务结果。
 
+跟踪申请新增 `stage=check/query/persist/target/confirm` 与 `outcome=not_applied/unknown/confirmed`。查询、保存、建任务及确认各自计时；有效资料进入保存后不因请求取消而丢弃。无最终状态时省略兼容 `tracking` 字段，不能把未知结果当作任务不存在；`confirmed` 只表示最终状态已读取，仍以 `ok` 和实际任务状态判断成功。完整预算、HTTP与业务码、部分提交和客户端等待链见 [分阶段申请设计](request-stages.md)。
+
 示例（HTTP200）：
 
 ```json

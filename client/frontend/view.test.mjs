@@ -20,6 +20,7 @@ test('本地关注保存和服务器跟踪分别确认，失败明确进入重�
   assert.equal(followState({pending_submission:true}),'正在申请服务器跟踪');
   assert.equal(followState({remote:{tracking:true}}),'服务器跟踪中');
   assert.equal(followState({remote:{tracking:false,recorded:true}}),'服务器已记录，未跟踪');
+  assert.equal(followState({pending_submission:true,last_stage:'confirm',last_outcome:'unknown'}),'处理结果待确认 · 后台将先核对');
 });
 
 test('缓存提示按业务码区分无资料、限流和真正连接失败',()=>{

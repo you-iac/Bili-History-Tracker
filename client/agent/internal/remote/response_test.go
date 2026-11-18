@@ -4,6 +4,7 @@ package remote
 import (
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -46,5 +47,48 @@ func TestSubmitBusinessFailureNeverConfirmsTracking(t *testing.T) {
 	defer server.Close()
 	if _, err := New(nil).Submit(context.Background(), server.URL, "video", "BV17x411w7KC"); err == nil {
 		t.Fatal("HTTP200 business failure accepted")
+	}
+}
+
+func TestSubmissionFailurePreservesStageAndOutcome(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"ok":false,"code":"REQUEST_TIMEOUT","stage":"persist","outcome":"unknown","error":"保存超时，请核对"}`))
+	}))
+	defer server.Close()
+	_, err := New(nil).Submit(context.Background(), server.URL, "creator", "1")
+	var failure *Error
+	if !errors.As(err, &failure) || failure.Code != "REQUEST_TIMEOUT" || failure.Stage != "persist" || failure.Outcome != "unknown" || failure.Target != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestTransportTimeoutAfterSendingIsUnknownAndKeepsCause(t *testing.T) {
+	entered := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.Copy(io.Discard, r.Body)
+		close(entered)
+		<-r.Context().Done()
+	}))
+	defer server.Close()
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() { <-entered; cancel() }()
+	defer cancel()
+	_, err := New(nil).Submit(ctx, server.URL, "creator", "1")
+	var failure *Error
+	if !errors.As(err, &failure) || failure.Stage != "transport" || failure.Outcome != "unknown" || failure.Code != "REQUEST_TIMEOUT" || !errors.Is(err, context.Canceled) {
+		t.Fatal(err)
+	}
+}
+
+func TestQueueCancellationHasNotSentSubmission(t *testing.T) {
+	client := New(nil)
+	client.next = time.Now().Add(time.Minute)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := client.Submit(ctx, "http://127.0.0.1:1", "creator", "1")
+	var failure *Error
+	if !errors.As(err, &failure) || failure.Stage != "transport" || failure.Outcome != "not_applied" || !errors.Is(err, context.Canceled) {
+		t.Fatal(err)
 	}
 }

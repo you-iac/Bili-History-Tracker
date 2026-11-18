@@ -30,15 +30,14 @@ func (t *Tracker) GetCreatorVideoPage(ctx context.Context, platform, id, cursor 
 // IngestVideo 校验公开详情的作者后复用持久化。返回 added/existing/rejected；
 // 同一目标正在采集时返回可稍后显式重试的错误，不并发写入同一内容。
 func (t *Tracker) IngestVideo(ctx context.Context, creator, id string, interval time.Duration) (string, error) {
-	key := "video:" + id
-	t.mu.Lock()
-	if t.running[key] {
-		t.mu.Unlock()
-		return "failed", errors.New("target busy")
+	if err := t.beginTarget("video", id, false); err != nil {
+		return "failed", err
 	}
-	t.running[key] = true
-	t.mu.Unlock()
-	defer func() { t.mu.Lock(); delete(t.running, key); t.mu.Unlock() }()
+	defer t.endTarget("video", id)
+	ctx, cancel := context.WithCancel(ctx)
+	stop := context.AfterFunc(t.workCtx, cancel)
+	defer stop()
+	defer cancel()
 	states, err := t.store.VideoStates(ctx, t.platform, []string{id})
 	if err != nil {
 		return "failed", err

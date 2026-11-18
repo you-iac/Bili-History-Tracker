@@ -1,7 +1,7 @@
 # 后端 API 固定前审查问题与修复计划
 
 - 创建时间：2026-11-17 14:51（Asia/Shanghai）。
-- 状态：部分实施。2026-11-18 完成 BACK-TARGET-REPLY、BACK-PROFILE-METRICS，并补齐 BACK-SHUTDOWN 的 SIGTERM 停机入口。其余问题与后台退出验收仍待完成，整项计划不归档。下方保留原审查现场。
+- 状态：部分实施。2026-11-18 完成 BACK-TARGET-REPLY、BACK-PROFILE-METRICS 和 BACK-TIMEOUT-CODE 的分阶段预算改造；BACK-SHUTDOWN 已补齐信号入口、tracker/调度等待及保存收尾，发现分页后台任务完整等待和目标平台验收仍待完成。BACK-ADMIN-ORIGIN 仍待修复，整项计划不归档。下方保留原审查现场。
 - 审查基线：提交 `1baa4ab`（统一业务 JSON 应答并修复 Agent 跟踪核对）；此前设计提交为 `7fab9e9`。后续实施须先确认基线是否变化。
 - 来源：用户要求最后检查 backend 设计，计划部署后固定 API、尽量减少后端改动；审查后要求将五项发现详细记录到 PLANs。
 - 访问控制约定：用户明确选择服务器防火墙／IP 白名单，本计划不增加 Token、账号或认证接口。8181 仅向允许的来源开放，8182 保持本机管理访问。
@@ -15,7 +15,7 @@
 |---|---|---|---|
 | BACK-ADMIN-ORIGIN | P1 | 管理表单接受跨站写入 | 隔离数据库临时测试已复现 |
 | BACK-TARGET-REPLY | P2 | 提交成功字段与当前跟踪状态矛盾 | 已修复，可控时序的单目标和批量回归通过 |
-| BACK-TIMEOUT-CODE | P2 | 落库阶段取消被归为内部故障 | 临时测试直接调用 submit 已复现；HTTP 映射由代码确认 |
+| BACK-TIMEOUT-CODE | P2 | 落库阶段取消被归为内部故障 | 已实现分阶段预算、阶段与结果字段；实际事务取消、部分提交及确认超时回归通过 |
 | BACK-PROFILE-METRICS | P2 | UP 占位资料在详情与指标接口中判定不一致 | 已修复；占位作者三种任务状态、四种指标范围、完整资料空采样及真实零值回归通过 |
 | BACK-SHUTDOWN | P2 | Linux SIGTERM 和后台任务退出链路不完整 | 静态审查确认；尚未完成 Linux 信号实测 |
 
@@ -154,6 +154,18 @@ FAIL: contradictory successful reply
 
 ## BACK-TIMEOUT-CODE：落库阶段取消／超时被误报为内部故障
 
+### 方案扩展与实施记录（2026-11-18 11:12，Asia/Shanghai）
+
+用户确认将原错误码修复扩展为完整的分阶段时间预设和错误应答，并要求更新技术设计。本项已按该范围实现；详细职责、预算、结果状态及回归导航见 [分阶段申请设计](../docs/request-stages.md)，不再仅调整一个 switch 分支顺序。默认 `check/query/persist/target/confirm` 分别为2/12/5/3/3秒；有效资料进入保存后独立有界收尾，不因上游已消耗查询预算或客户端取消而丢弃，不删除已提交资料和任务。资料、指标、任务及初始状态写入失败均明确返回；保留错误链，取消/超时优先于存储标记，仅对阶段 context 已取消且返回 `sql.ErrTxDone` 的情况补充取消原因，不掩盖不相关数据库故障。
+
+单目标和批量逐项新增 `stage/outcome`，区分尚未写入、结果未知与最终状态已确认；确认失败保留任务，不返回默认 `tracking:false` 假装已查明无任务。批量25秒接纳截止后不启动后续项，已取得有效资料的当前项可继续最多11秒收尾，保守业务上限约36秒。公共 HTTP 写入50秒，Agent 状态/读取/申请8/22/55秒、核对65秒、刷新90秒，本地 HTTP 写入95秒，网页关注/详情等待100秒。Agent 保留并持久化阶段错误，旧协议缺字段继续兼容，结果未知时下次先核对，不直接重复申请。
+
+配套收尾：两个 HTTP 服务使用主 context 取消查询；`Tracker.Stop/Wait` 登记并等待显式申请、周期采集、RunNow 和视频导入，已进入保存的申请继续短预算。主入口并行关闭 HTTP、记录关闭错误、等待 tracker 和调度器后再退出，不再提前打印“数据库已关闭”。本项只补齐新保存策略所需的收尾；发现服务的后台分页完整等待及真实 Linux 活跃任务验收仍由 BACK-SHUTDOWN 跟进，不将整项停机问题标记完成。
+
+回归先后覆盖：查询前取消、查询阶段截止、有效资料返回时请求取消、资料/指标/任务/结果记录阶段超时、实际 SQLite 事务已写入未提交时取消并回滚、存储错误与取消同时出现、真实数据库关闭、任务已提交但确认超时、重试不重复采集/改间隔、批量截止后保留有效当前项而不启动尾部、停机取消查询并等待已登记的 RunNow/独立保存，以及 Agent 阶段字段传递和重启后核对。使用模拟上游、临时数据库与短预算，无真实 B站、Cookie 或用户数据操作。实际命令和最终结果补记在下方，原审查现场完整保留。
+
+验证记录（2026-11-18 11:17，Asia/Shanghai）：Windows/amd64 下 `backend` 与 `client` 的 `go test -p 1 ./...`、`go vet -p 1 ./...` 均通过；client 使用工作区 Corepack pnpm9.1.0 执行 `pnpm lint`、`pnpm test`，17项前端测试通过。Agent 的 DPAPI 假 Cookie 用例在沙箱内失败，改用正常 Windows 用户上下文及工作区临时档案后全量通过。额外尝试 `go test -race -p 1 ./internal/tracker ./internal/publicapi`，沙箱内及正常用户上下文均在本机 Go1.26 的 `runtime/cgo` 构建阶段因 `cgo.exe: exit status 2` 失败，未得到竞态检测结论；确定性并发与收尾测试已通过。未进行真实 Linux 活跃任务信号验收，不以此标记 BACK-SHUTDOWN 完成。改动保留工作区，未提交或部署。
+
 ### 影响与出现条件
 
 上游查询已经返回有效资料，但请求在开始数据库事务或落库过程中被取消／耗尽时间预算。该错误同时具有“存储调用失败”和“context 取消／超时”的性质；当前分支顺序先把它作为服务器内部故障处理。
@@ -273,6 +285,10 @@ FAIL: placeholder profile treated as successful record
 - 回归入口建议：[publicapi/read_test.go](../backend/internal/publicapi/read_test.go)、[publicapi/response_test.go](../backend/internal/publicapi/response_test.go)、[storage/creator_test.go](../backend/internal/storage/creator_test.go)。
 
 ## BACK-SHUTDOWN：Linux SIGTERM 与后台退出链路不完整
+
+### 配套进展（2026-11-18，分阶段申请改造）
+
+主入口现已使用 HTTP BaseContext 取消查询，并行等待两个 HTTP 服务关闭（45秒预算、记录错误），再等待 `Tracker.Stop/Wait` 登记的采集、申请、RunNow 和视频导入，以及调度 goroutine。有效资料保存继续独立短预算，增加查询取消和保存收尾的确定性测试。当前发现服务 `Close` 仍仅取消，后台分页 goroutine 的完整等待尚未补齐，也未因此补做真实 Linux 活跃任务信号验收，本项继续保持未完成。下面的08:43实施记录和原审查现场作为历史保留，当前生命周期细节见 [分阶段设计](../docs/request-stages.md#停止接纳与收尾)。
 
 ### 实施记录（2026-11-18 08:43，Asia/Shanghai）
 
