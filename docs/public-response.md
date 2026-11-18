@@ -1,6 +1,6 @@
 # 公共 JSON 应答与 Agent 关注核对
 
-状态：已实现，验证记录见关联计划。实施与验证见 [计划](../PLANs/2026-11-17-public-json-response.md)。本协议覆盖 [公共接口](public-api.md) 的旧业务 HTTP 映射；仅影响8181，不改变8182管理及Agent本机会话保护。
+状态：已实现，验证记录见关联计划。实施与验证见 [计划](../PLANs/archive/2026-11-17-public-json-response.md)。本协议覆盖 [公共接口](public-api.md) 的旧业务 HTTP 映射；仅影响8181，不改变8182管理及Agent本机会话保护。
 
 ## HTTP 与 JSON
 

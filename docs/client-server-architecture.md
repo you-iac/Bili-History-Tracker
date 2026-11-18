@@ -196,6 +196,6 @@ Agent 有本地状态：关注列表、配置、Cookie、缓存、待确认申�
 
 ## Agent 端跟踪状态对账
 
-[原计划](../PLANs/2026-11-16-agent-follow-reconciliation.md) 经用户授权由 [JSON计划](../PLANs/2026-11-17-public-json-response.md) 扩展，现已实现8181业务HTTP200及Agent核对。启动、浏览、切服及后台分批核对时，明确无任务才补申请；已启用复用、暂停不恢复、失败保留未知；连续6次失败转人工处理。协议和并发边界见 [说明](public-response.md)。
+[原计划](../PLANs/archive/2026-11-16-agent-follow-reconciliation.md) 经用户授权由 [JSON计划](../PLANs/archive/2026-11-17-public-json-response.md) 扩展，现已实现8181业务HTTP200及Agent核对。启动、浏览、切服及后台分批核对时，明确无任务才补申请；已启用复用、暂停不恢复、失败保留未知；连续6次失败转人工处理。协议和并发边界见 [说明](public-response.md)。
 
 摘要资料与跟踪核对分别记录，当前页浏览会触发独立精确核对；现有后台对部分失败没有提供可细分原因，因此 Agent 不宣称视频已下架，也不调整服务器采集频率或恢复管理员暂停的任务。只协调当前服务器，虚拟机测试不向云服务器双写。详细状态组合和验收见关联计划。

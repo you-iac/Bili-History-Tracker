@@ -1,6 +1,6 @@
 # 作者视频融合与按需关注设计
 
-本文记录已实现的作者视频融合与按需关注链路。实施与验收记录见 [作者视频融合计划](../PLANs/2026-11-08-creator-video-discovery.md)，模块导航见 [架构说明](architecture.md)。
+本文记录已实现的作者视频融合与按需关注链路。实施与验收记录见 [作者视频融合计划](../PLANs/archive/2026-11-08-creator-video-discovery.md)，模块导航见 [架构说明](architecture.md)。
 
 用户端只处理作者与视频，添加列表定义为：
 

@@ -5,7 +5,7 @@
 - 审查基线：提交 `1baa4ab`（统一业务 JSON 应答并修复 Agent 跟踪核对）；此前设计提交为 `7fab9e9`。后续实施须先确认基线是否变化。
 - 来源：用户要求最后检查 backend 设计，计划部署后固定 API、尽量减少后端改动；审查后要求将五项发现详细记录到 PLANs。
 - 访问控制约定：用户明确选择服务器防火墙／IP 白名单，本计划不增加 Token、账号或认证接口。8181 仅向允许的来源开放，8182 保持本机管理访问。
-- 关联：[JSON 应答协议](../docs/public-response.md)、[公共 API](../docs/public-api.md)、[上一轮实施记录](2026-11-17-public-json-response.md)、[架构导航](../docs/architecture.md)。
+- 关联：[JSON 应答协议](../docs/public-response.md)、[公共 API](../docs/public-api.md)、[上一轮实施记录](archive/2026-11-17-public-json-response.md)、[架构导航](../docs/architecture.md)。
 
 ## 审查结果与证据边界
 

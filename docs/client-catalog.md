@@ -1,6 +1,6 @@
 # 客户端卡片库、UP 视频与详情
 
-本轮实现见 [UI 优化计划](../PLANs/2026-11-16-client-ui-content.md)。原计划已单独提交，本版收录 UI 与摘要缓存修复；[跟踪状态对账](../PLANs/2026-11-16-agent-follow-reconciliation.md) 已由 [公共JSON计划](../PLANs/2026-11-17-public-json-response.md) 扩展实施，详见 [协议](public-response.md)。浏览器资源内嵌在 Agent，修改后需要重新构建并启动 Agent；公开库的新增排序和 UP 投稿统计需要同步更新 backend，然后刷新资料。旧资料缺少字段时显示未知。
+本轮实现见 [UI 优化计划](../PLANs/2026-11-16-client-ui-content.md)。原计划已单独提交，本版收录 UI 与摘要缓存修复；[跟踪状态对账](../PLANs/archive/2026-11-16-agent-follow-reconciliation.md) 已由 [公共JSON计划](../PLANs/archive/2026-11-17-public-json-response.md) 扩展实施，详见 [协议](public-response.md)。浏览器资源内嵌在 Agent，修改后需要重新构建并启动 Agent；公开库的新增排序和 UP 投稿统计需要同步更新 backend，然后刷新资料。旧资料缺少字段时显示未知。
 
 ## 页面与卡片密度
 
