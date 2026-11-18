@@ -40,7 +40,7 @@
 //
 //	                                 输入：环境变量 / 信号
 //
-// 对外查询 API 默认监听 127.0.0.1:8181，后台默认监听 127.0.0.1:8182。
+// 对外查询 API 默认监听 0.0.0.0:8181，后台默认监听 127.0.0.1:8182。
 // 数据库路径由 BHT_DB 指定，查询日志由 BHT_QUERY_LOG 指定。
 // 设计说明（仓库相对路径）：docs/architecture.md#module-navigation。
 package main
@@ -73,8 +73,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	apiAddr := env("BHT_ADDR", "127.0.0.1:8181")
-	adminAddr := env("BHT_ADMIN_ADDR", "127.0.0.1:8182")
+	apiAddr, adminAddr := listenAddresses()
 	apiLimits, err := publicLimits()
 	if err != nil {
 		log.Fatal(err)
@@ -172,6 +171,12 @@ func main() {
 	trk.Wait()
 	<-schedulerDone
 	log.Printf("tracker and scheduler stopped; closing storage")
+}
+
+// listenAddresses 默认允许 Agent 通过服务器 IP 访问公共入口，管理入口仍独立使用本机地址。
+// 显式环境变量优先，保留自定义端口、反向代理和 SSH 隧道部署方式。
+func listenAddresses() (api, admin string) {
+	return env("BHT_ADDR", "0.0.0.0:8181"), env("BHT_ADMIN_ADDR", "127.0.0.1:8182")
 }
 
 func env(key, fallback string) string {

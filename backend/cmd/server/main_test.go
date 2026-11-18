@@ -1,10 +1,38 @@
-// main_test.go 验证公共限额的默认值及显式误配置，不允许配置意外关闭保护。
+// main_test.go 验证两个入口的监听默认值与独立覆盖，以及公共限额的默认值和显式误配置。
 package main
 
 import (
 	"os"
 	"testing"
 )
+
+func TestListenAddresses(t *testing.T) {
+	for _, tc := range []struct {
+		name, api, admin, wantAPI, wantAdmin string
+		unset                                bool
+	}{
+		{name: "unset defaults", unset: true, wantAPI: "0.0.0.0:8181", wantAdmin: "127.0.0.1:8182"},
+		{name: "empty defaults", wantAPI: "0.0.0.0:8181", wantAdmin: "127.0.0.1:8182"},
+		{name: "public override", api: "127.0.0.1:9090", wantAPI: "127.0.0.1:9090", wantAdmin: "127.0.0.1:8182"},
+		{name: "admin override", admin: "127.0.0.1:9091", wantAPI: "0.0.0.0:8181", wantAdmin: "127.0.0.1:9091"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("BHT_ADDR", tc.api)
+			t.Setenv("BHT_ADMIN_ADDR", tc.admin)
+			if tc.unset {
+				for _, key := range []string{"BHT_ADDR", "BHT_ADMIN_ADDR"} {
+					if err := os.Unsetenv(key); err != nil {
+						t.Fatal(err)
+					}
+				}
+			}
+			api, admin := listenAddresses()
+			if api != tc.wantAPI || admin != tc.wantAdmin {
+				t.Fatalf("listen addresses = (%q, %q), want (%q, %q)", api, admin, tc.wantAPI, tc.wantAdmin)
+			}
+		})
+	}
+}
 
 func TestPublicLimits(t *testing.T) {
 	for _, key := range []string{"BHT_API_RPS", "BHT_API_BATCH_MAX"} {

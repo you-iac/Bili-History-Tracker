@@ -83,7 +83,7 @@ func TestServerShutdownSignals(t *testing.T) {
 				t.Fatalf("send signal: %v\n%s", err, r.log)
 			}
 			r := <-done
-			if ctx.Err() != nil || r.err != nil || !strings.Contains(r.log, "database closed, scheduler stopped") {
+			if ctx.Err() != nil || r.err != nil || !strings.Contains(r.log, "tracker and scheduler stopped") {
 				t.Fatalf("signal did not complete existing shutdown path: context=%v, exit=%v\n%s", ctx.Err(), r.err, r.log)
 			}
 		})
