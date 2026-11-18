@@ -35,6 +35,7 @@ func TestServerShutdownSignals(t *testing.T) {
 				"BHT_TEST_SERVER_SHUTDOWN=1",
 				"BHT_ADDR=127.0.0.1:0", "BHT_ADMIN_ADDR=127.0.0.1:0",
 				"BHT_API_RPS=20", "BHT_API_BATCH_MAX=10", "BHT_BILI_COOKIE=",
+				"BHT_PPROF_ADDR=", "BHT_PPROF_BLOCK_RATE=", "BHT_PPROF_MUTEX_FRACTION=",
 				"BHT_DB="+filepath.Join(dir, "test.db"),
 				"BHT_QUERY_LOG="+filepath.Join(dir, "query.log"))
 			output, err := cmd.StdoutPipe()

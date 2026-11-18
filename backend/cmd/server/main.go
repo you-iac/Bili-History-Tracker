@@ -42,6 +42,7 @@
 //
 // 对外查询 API 默认监听 0.0.0.0:8181，后台默认监听 127.0.0.1:8182。
 // 数据库路径由 BHT_DB 指定，查询日志由 BHT_QUERY_LOG 指定。
+// BHT_PPROF_ADDR 可显式启用独立回环诊断服务，见 docs/performance-profiling.md。
 // 设计说明（仓库相对路径）：docs/architecture.md#module-navigation。
 package main
 
@@ -75,6 +76,10 @@ func main() {
 
 	apiAddr, adminAddr := listenAddresses()
 	apiLimits, err := publicLimits()
+	if err != nil {
+		log.Fatal(err)
+	}
+	profilingCfg, err := profilingOptions()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -134,7 +139,14 @@ func main() {
 		MaxHeaderBytes:    16 << 10,
 	}
 
-	errCh := make(chan error, 2)
+	servers := []*http.Server{apiServer, adminServer}
+	profileServer := newProfilingServer(profilingCfg)
+	if profileServer != nil {
+		profilingCfg.enableSampling()
+		profileServer.BaseContext = func(net.Listener) context.Context { return ctx }
+		servers = append(servers, profileServer)
+	}
+	errCh := make(chan error, len(servers))
 	go func() {
 		log.Printf("public API listening on http://%s/ (RPS=%d, batch=%d)", apiAddr, apiLimits.RequestsPerSecond, apiLimits.BatchMax)
 		if err := apiServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -147,6 +159,15 @@ func main() {
 			errCh <- err
 		}
 	}()
+	if profileServer != nil {
+		go func() {
+			log.Printf("pprof listening on http://%s/debug/pprof/ (block_rate=%d, mutex_fraction=%d)",
+				profilingCfg.addr, profilingCfg.blockRate, profilingCfg.mutexFraction)
+			if err := profileServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				errCh <- err
+			}
+		}()
+	}
 
 	select {
 	case <-ctx.Done():
@@ -160,10 +181,11 @@ func main() {
 	adminHandler.Close()
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
-	closed := make(chan error, 2)
-	go func() { closed <- apiServer.Shutdown(shutdownCtx) }()
-	go func() { closed <- adminServer.Shutdown(shutdownCtx) }()
-	for range 2 {
+	closed := make(chan error, len(servers))
+	for _, server := range servers {
+		go func() { closed <- server.Shutdown(shutdownCtx) }()
+	}
+	for range servers {
 		if err := <-closed; err != nil {
 			log.Printf("HTTP shutdown incomplete: %v", err)
 		}

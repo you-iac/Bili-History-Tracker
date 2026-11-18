@@ -16,6 +16,8 @@
 
 | 模块或独立职责 | 功能与边界 | 实现入口与关键符号 | 相关测试 |
 |---|---|---|---|
+| 性能诊断 | 默认关闭的独立回环 pprof 入口，按需 CPU/内存/阻塞/锁/trace 采样，不挂载到业务端口 | [profiling.go](../backend/cmd/server/profiling.go) 的 `profilingOptions/newProfilingServer`；使用与火焰图见 [性能诊断](performance-profiling.md) | [配置、采样数据与路由隔离](../backend/cmd/server/profiling_test.go) |
+| Agent 视角吞吐压测 | 默认按 ID 读取详情，支持类型筛选和固定目标；保留混合读取、独立 HTTP 基线与申请诊断，区分业务成功、限流和收尾 | [load_test.py](../scripts/perf/load_test.py) 的 `run_load/run_operation`，见 [测量口径与用法](../scripts/perf/README.md) | [协议、统计、详情目标隔离与 HTTP 连接复用回归](../scripts/perf/test_load_test.py) |
 | 服务启动 | 组装数据源和查询服务、读取配置、管理 HTTP 服务生命周期；公共入口默认监听所有 IPv4 网卡，管理入口默认本机 | [main.go](../backend/cmd/server/main.go) 的 `main/listenAddresses` | [main_test.go](../backend/cmd/server/main_test.go)（监听配置与限额）、[shutdown_linux_test.go](../backend/cmd/server/shutdown_linux_test.go)（Linux 空闲服务信号入口）；启动与查询见本文命令 |
 | 通用查询层 | 定义统一数据与错误，按平台和能力分发；平台格式校验交给适配器 | [source.go](../backend/internal/source/source.go) 的 `Provider`、`CreatorProvider`、`Service` | [source_test.go](../backend/internal/source/source_test.go) |
 | 实时查询内核 | 保留原实时平台查询，由publicapi统一挂载与限流 | [handler.go](../backend/internal/httpapi/handler.go) 的 `Querier`、`New` | [handler_test.go](../backend/internal/httpapi/handler_test.go) |
@@ -109,7 +111,7 @@
 3. 创建共享`storage`、`tracker`、调度器和`admin`后，`publicapi.New(store, trk, queries, "bilibili", limits)`创建公共入口，内部通过`httpapi.New(queries)`保留实时查询。
 4. `http.Server` 使用该路由器作为 `Handler`，`ListenAndServe()` 开始监听并处理请求。
 
-停机入口通过 `signal.NotifyContext` 接收 `os.Interrupt`（Linux 的 `SIGINT`，通常由 Ctrl+C 触发）和 `syscall.SIGTERM`，主 context 也作为两个 HTTP 服务的 `BaseContext`。停止时 `Tracker.Stop` 关闭新工作登记并取消查询，已进入保存的显式申请继续短预算收尾；两个 HTTP 服务并行 `Shutdown`，共用45秒预算并记录错误，之后等待 tracker 已登记工作及调度 goroutine，再退出并关闭日志和数据库。`RunNow` 在启动 goroutine 前登记，避免停机漏等。发现服务目前仍只取消任务，分页后台工作的完整等待及真实 Linux 活跃任务信号验收继续见 [BACK-SHUTDOWN](../PLANs/2026-11-17-backend-api-freeze-review.md#back-shutdownlinux-sigterm-与后台退出链路不完整)；本次预算和收尾范围见 [分阶段申请设计](request-stages.md#停止接纳与收尾)。
+停机入口通过 `signal.NotifyContext` 接收 `os.Interrupt`（Linux 的 `SIGINT`，通常由 Ctrl+C 触发）和 `syscall.SIGTERM`，主 context 也作为业务及已启用诊断 HTTP 服务的 `BaseContext`。停止时 `Tracker.Stop` 关闭新工作登记并取消查询，已进入保存的显式申请继续短预算收尾；已启用的 HTTP 服务并行 `Shutdown`，共用45秒预算并记录错误，之后等待 tracker 已登记工作及调度 goroutine，再退出并关闭日志和数据库。`RunNow` 在启动 goroutine 前登记，避免停机漏等。发现服务目前仍只取消任务，分页后台工作的完整等待及真实 Linux 活跃任务信号验收继续见 [BACK-SHUTDOWN](../PLANs/2026-11-17-backend-api-freeze-review.md#back-shutdownlinux-sigterm-与后台退出链路不完整)；本次预算和收尾范围见 [分阶段申请设计](request-stages.md#停止接纳与收尾)。
 
 对应的核心代码为：
 
@@ -176,6 +178,7 @@ flowchart TD
 |---|---|---|
 | `BHT_ADDR` | `0.0.0.0:8181` | 对外查询 API 监听所有 IPv4 网卡 |
 | `BHT_ADMIN_ADDR` | `127.0.0.1:8182` | 观察台监听地址 |
+| `BHT_PPROF_ADDR` | 空，关闭 | 独立回环诊断入口；CPU/阻塞/锁采样步骤见 [性能诊断](performance-profiling.md) |
 | `BHT_DB` | `data/bht.db` | SQLite 文件路径 |
 | `BHT_QUERY_LOG` | 与数据库同目录的 `query.log` | 查询日志，JSON Lines |
 | `BHT_BILI_COOKIE` | 空 | 可选，访问需要登录态的接口时使用 |
