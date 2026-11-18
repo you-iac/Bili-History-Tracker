@@ -2,7 +2,7 @@
 //
 // 输入：环境变量 BHT_ADDR、BHT_ADMIN_ADDR、BHT_API_RPS、BHT_API_BATCH_MAX、
 // BHT_DB、BHT_QUERY_LOG、BHT_BILI_COOKIE，
-// 以及操作系统的中断信号。
+// 以及操作系统的中断／终止信号。
 // 输出：两个 HTTP 监听端口、一个调度 goroutine、一个 SQLite 文件；退出时按序关闭。
 // 它不认识：业务规则、SQL、B站字段；只负责创建对象、连接依赖和管理生命周期。
 //
@@ -54,6 +54,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strconv"
+	"syscall"
 	"time"
 
 	"bili-history-tracker/backend/internal/admin"
@@ -104,7 +105,8 @@ func main() {
 		log.Fatalf("build public API: %v", err)
 	}
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	// Linux 服务停止通常发送 SIGTERM；与 Ctrl+C 共用现有停机入口。
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	go scheduler.Run(ctx)

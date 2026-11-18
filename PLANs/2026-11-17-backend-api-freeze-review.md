@@ -1,7 +1,7 @@
 # 后端 API 固定前审查问题与修复计划
 
 - 创建时间：2026-11-17 14:51（Asia/Shanghai）。
-- 状态：待实施。本次仅记录五项审查问题、修复建议与验收条件，尚未实施代码修复。
+- 状态：部分实施。2026-11-18 补齐 BACK-SHUTDOWN 的 SIGTERM 停机入口；后台任务等待等剩余修复与原验收条件尚未完成。下方保留原审查现场。
 - 审查基线：提交 `1baa4ab`（统一业务 JSON 应答并修复 Agent 跟踪核对）；此前设计提交为 `7fab9e9`。后续实施须先确认基线是否变化。
 - 来源：用户要求最后检查 backend 设计，计划部署后固定 API、尽量减少后端改动；审查后要求将五项发现详细记录到 PLANs。
 - 访问控制约定：用户明确选择服务器防火墙／IP 白名单，本计划不增加 Token、账号或认证接口。8181 仅向允许的来源开放，8182 保持本机管理访问。
@@ -259,6 +259,12 @@ FAIL: placeholder profile treated as successful record
 - 回归入口建议：[publicapi/read_test.go](../backend/internal/publicapi/read_test.go)、[publicapi/response_test.go](../backend/internal/publicapi/response_test.go)、[storage/creator_test.go](../backend/internal/storage/creator_test.go)。
 
 ## BACK-SHUTDOWN：Linux SIGTERM 与后台退出链路不完整
+
+### 实施记录（2026-11-18 08:43，Asia/Shanghai）
+
+按用户要求先补齐信号入口：[main.go](../backend/cmd/server/main.go) 在保留 `os.Interrupt` 的同时注册 `syscall.SIGTERM`，两者共用现有停机流程。新增 [shutdown_linux_test.go](../backend/cmd/server/shutdown_linux_test.go)，在临时数据库、日志和随机端口下，以子进程验证空闲服务收到真实 SIGINT／SIGTERM 后进入现有关闭路径并正常返回；不调用真实上游。后台任务等待、关闭预算及日志真实性等原问题仍未修复，本项保持未完成。以下内容为原审查现场，不代表补齐入口后的代码。
+
+本次验证：Windows/amd64 的 `go test -p 1 ./...`、`go vet -p 1 ./...` 和服务构建通过；`GOOS=linux GOARCH=amd64 CGO_ENABLED=0` 的服务构建、`go test -c ./cmd/server` 测试二进制交叉编译及 `go vet -p 1 ./cmd/server` 通过。当前环境 WSL 枚举返回 `E_ACCESSDENIED`，未运行 Linux 信号测试，交叉编译结果不替代真实目标平台运行验收。架构和入口文档已同步说明信号及现有退出边界。
 
 ### 影响与出现条件
 

@@ -14,7 +14,7 @@
 
 | 模块或独立职责 | 功能与边界 | 实现入口与关键符号 | 相关测试 |
 |---|---|---|---|
-| 服务启动 | 组装数据源和查询服务、读取配置、管理 HTTP 服务生命周期 | [main.go](../backend/cmd/server/main.go) 的 `main` | 使用本文的启动、健康检查和查询命令验证 |
+| 服务启动 | 组装数据源和查询服务、读取配置、管理 HTTP 服务生命周期 | [main.go](../backend/cmd/server/main.go) 的 `main` | [main_test.go](../backend/cmd/server/main_test.go)、[shutdown_linux_test.go](../backend/cmd/server/shutdown_linux_test.go)（Linux 空闲服务信号入口）；启动与查询见本文命令 |
 | 通用查询层 | 定义统一数据与错误，按平台和能力分发；平台格式校验交给适配器 | [source.go](../backend/internal/source/source.go) 的 `Provider`、`CreatorProvider`、`Service` | [source_test.go](../backend/internal/source/source_test.go) |
 | 实时查询内核 | 保留原实时平台查询，由publicapi统一挂载与限流 | [handler.go](../backend/internal/httpapi/handler.go) 的 `Querier`、`New` | [handler_test.go](../backend/internal/httpapi/handler_test.go) |
 | B站 Provider 与视频查询 | 初始化客户端、校验 BV、转换视频元数据和业务错误 | [bilibili.go](../backend/internal/provider/bilibili/bilibili.go) 的 `Provider`、`GetVideo` | [bilibili_test.go](../backend/internal/provider/bilibili/bilibili_test.go) |
@@ -105,6 +105,8 @@
 2. `source.NewService(bilibili.New())` 创建查询服务，按 Provider 的 `Platform()` 返回值注册为 `providers["bilibili"]`。
 3. 创建共享`storage`、`tracker`、调度器和`admin`后，`publicapi.New(store, trk, queries, "bilibili", limits)`创建公共入口，内部通过`httpapi.New(queries)`保留实时查询。
 4. `http.Server` 使用该路由器作为 `Handler`，`ListenAndServe()` 开始监听并处理请求。
+
+停机入口通过 `signal.NotifyContext` 接收 `os.Interrupt`（Linux 的 `SIGINT`，通常由 Ctrl+C 触发）和 `syscall.SIGTERM`，取消主 context 后进入同一关闭流程。现有流程按顺序对两个 HTTP 服务调用 `Shutdown`，共用 5 秒预算，随后返回并由 defer 关闭管理任务、查询日志和数据库。当前尚未显式等待调度器及 `Tracker.RunNow` 异步任务完成，HTTP Shutdown 错误也尚未处理；补齐信号入口不代表整个后台退出链路已验收。剩余问题见 [BACK-SHUTDOWN](../PLANs/2026-11-17-backend-api-freeze-review.md#back-shutdownlinux-sigterm-与后台退出链路不完整)。
 
 对应的核心代码为：
 
