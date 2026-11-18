@@ -4,6 +4,8 @@ Go 服务的吞吐定位先使用 pprof：CPU profile 找计算热点，block/go
 
 实现位于 [profiling.go](../backend/cmd/server/profiling.go)，由 [main](../backend/cmd/server/main.go) 启用并统一关闭；配置、数据与路由隔离测试见 [profiling_test.go](../backend/cmd/server/profiling_test.go)。模块导航见 [architecture.md](architecture.md)。详情负载发生器与统计口径见 [压测说明](../scripts/perf/README.md)。
 
+实际详情负载的 CPU 样本、重复查询归因与优化建议见 [2026-11-18 分析报告](performance-analysis-2026-11-18.md)。
+
 ## 配置与边界
 
 | 变量 | 默认值 | 含义 |
