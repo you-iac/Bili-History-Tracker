@@ -41,9 +41,11 @@
 
 ## 输入 / 输出 / 边界
 
-- **输入**：`BHT_*` 环境变量、操作系统的中断信号。
+- **输入**：`BHT_*` 环境变量、操作系统的中断／终止信号（Linux 上为 `SIGINT`、`SIGTERM`）。
 - **输出**：两个监听端口、一个调度 goroutine、一个 SQLite 文件。
 - **它不认识**：业务规则、SQL、B站字段；只负责创建、连接和生命周期。
+
+Linux 的 `SIGTERM` 与 Ctrl+C 的 `SIGINT` 共用现有停机入口。当前入口会取消主 context、尝试关闭 HTTP 服务，再由 defer 关闭管理任务、日志和数据库；尚未显式等待调度器与 `RunNow` 异步任务结束。收到停机信号不等于后台工作已经完成，详见 [架构说明](../../../docs/architecture.md#启动时如何组装服务) 与 [BACK-SHUTDOWN 评审](../../../PLANs/2026-11-17-backend-api-freeze-review.md#back-shutdownlinux-sigterm-与后台退出链路不完整)。
 
 ## 环境变量
 
