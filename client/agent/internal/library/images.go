@@ -53,12 +53,12 @@ func (s *Service) Image(ctx context.Context, kind, input string, seq int64) (Ima
 	defer cancel()
 	key := imageKey(kind, id, seq)
 	s.mu.Lock()
-	base := s.state.ServerURL
+	base, epoch := s.state.ServerURL, s.serverEpoch
 	if record, ok := s.state.Images[key]; ok && (seq == 0 || record.Seq == seq) && (seq != 0 || time.Since(record.CheckedAt) < 15*time.Minute) && (record.URL == "" || remote.NormalizeImageURL(record.URL) == record.URL) {
 		s.mu.Unlock()
 		return ImageResult{URL: record.URL, Seq: record.Seq, Available: record.URL != "", Cached: true}, nil
 	}
-	flightKey := base + "|" + key
+	flightKey := base + "|" + strconv.FormatUint(epoch, 10) + "|" + key
 	if failure, ok := s.imageErrors[flightKey]; ok && time.Now().Before(failure.until) {
 		s.mu.Unlock()
 		return ImageResult{}, failure.err
@@ -78,7 +78,7 @@ func (s *Service) Image(ctx context.Context, kind, input string, seq int64) (Ima
 	result, err := s.readImage(ctx, base, kind, id, seq)
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if base != s.state.ServerURL {
+	if base != s.state.ServerURL || epoch != s.serverEpoch {
 		err = &Error{Message: "服务器已切换，请重新加载图片。", Status: 409}
 	}
 	if err == nil {
@@ -96,13 +96,23 @@ func (s *Service) Image(ctx context.Context, kind, input string, seq int64) (Ima
 }
 
 func (s *Service) readImage(ctx context.Context, base, kind, id string, seq int64) (ImageResult, error) {
+	if s.current != nil && seq == 0 {
+		item, err := s.currentOrFallback(ctx, base, kind, id)
+		return ImageResult{URL: item.Cover, Available: item.Cover != ""}, err
+	}
 	select {
 	case s.imageSlots <- struct{}{}:
 		defer func() { <-s.imageSlots }()
 	case <-ctx.Done():
 		return ImageResult{}, ctx.Err()
 	}
-	data, err := s.client.Detail(ctx, base, kind, id, 1, seq)
+	var data remote.Detail
+	var err error
+	if s.current != nil {
+		data, err = s.client.History(ctx, base, kind, id, 1, seq, "30")
+	} else {
+		data, err = s.client.Detail(ctx, base, kind, id, 1, seq)
+	}
 	if err != nil {
 		return ImageResult{}, err
 	}

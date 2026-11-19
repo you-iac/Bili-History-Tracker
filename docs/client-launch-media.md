@@ -1,6 +1,6 @@
 # Agent自动打开网页与头像封面
 
-本次只更新本地客户端，服务器既有8182接口保持不变。
+当前资料和图片采用本地优先，历史与失败兜底使用8181公共入口，需配套更新 backend 和 Agent；职责见 [本地优先资料](local-first-metadata.md)。
 
 ## 启动与认证
 
@@ -18,7 +18,7 @@ go run ./agent/cmd/agent -open-browser=false
 
 ## 图片数据链路
 
-既有列表JSON不包含头像/封面字段，但历史快照已有 UP 的 `card.face`、视频的 `pic`。Agent按目标和版本读取既有快照，返回经过来源检查的URL，浏览器再加载图片。库卡片、总览小列表和详情页使用同一图片加载器；视频卡片和详情采用横向封面，UP采用圆形头像。
+当前卡片/详情直接使用本地B站资料中的头像/封面地址，失败时使用服务器轻量已有资料兜底；明确历史版本才读取服务器快照中的 `card.face` 或 `pic`。返回地址仍经过白名单检查，浏览器直连CDN。库卡片、总览和详情共用加载器；当前图片不会冒充明确历史版本的图片。
 
 ```text
 +-----------------------------+
@@ -32,7 +32,7 @@ go run ./agent/cmd/agent -open-browser=false
               | existing snapshot JSON
               v
 +-----------------------------+
-| 8182: recorded snapshots    |
+| Bilibili / 8181 fallback    |
 +-----------------------------+
 
 browser -- HTTPS image URL --> Bilibili image CDN
@@ -40,7 +40,7 @@ browser -- HTTPS image URL --> Bilibili image CDN
 
 本地新增 `GET /api/images/{kind}/{id}?seq=1`，`kind`为 `creator/video`，标识按既有UID/BV规则校验。返回 `url`、`seq`、`available`、`cached`，不返回整份快照，也不代理图片文件。所有请求沿用原本地会话和来源检查。当前本地共27个API，清单见 [Agent说明](../client/agent/README.md#api-接口)。
 
-已知版本通常只需一次既有详情请求；`seq=0`先读取当前版本，再读取对应快照。选中详情快照也会预热该版本的图片地址缓存。读取仅针对服务器已保存记录，不触发平台采集或公共跟踪。
+当前 `seq=0` 在本地优先查询资料；已知URL时浏览器不请求图片解析。明确 `seq>0` 使用服务器历史专用入口，一次读取该快照，不附带趋势/版本目录；选中快照也会预热该版本的图片缓存。服务器兜底不触发实时采集或公共跟踪。
 
 ## 缓存与边界
 

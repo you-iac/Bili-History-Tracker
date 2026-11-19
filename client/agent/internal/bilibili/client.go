@@ -1,6 +1,7 @@
-// Package bilibili 提供本地 Cookie 登录验证与 UP 主投稿分页。
+// Package bilibili 提供本地 Cookie 登录验证、UP 主投稿分页与当前视频/作者资料查询。
 // Cookie 显式传入，不读取环境变量、不回退公开合集发现、不返回原始响应。
 // 固定 HTTPS 地址且禁止重定向；设计与接口来源见 docs/client-discovery.md。
+// 当前资料的本地优先与服务器兜底职责见 docs/local-first-metadata.md。
 package bilibili
 
 import (
@@ -13,6 +14,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -49,7 +51,12 @@ type Page struct {
 }
 
 // Client 可并发复用，每次请求独立传入 Cookie，防止账号串用。
-type Client struct{ http *http.Client }
+type Client struct {
+	http         *http.Client
+	currentMu    sync.Mutex
+	currentNext  time.Time
+	currentSlots chan struct{}
+}
 
 func New(client *http.Client) *Client {
 	if client == nil {
@@ -57,7 +64,7 @@ func New(client *http.Client) *Client {
 	}
 	copy := *client
 	copy.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
-	return &Client{http: &copy}
+	return &Client{http: &copy, currentSlots: make(chan struct{}, 4)}
 }
 
 // NormalizeCookie 接受 Cookie 请求头的值和可选前缀，拒绝多行与重复名称。

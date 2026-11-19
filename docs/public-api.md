@@ -45,11 +45,18 @@
 | `GET /detail/{type}/{id}` | 数据库详情、`days=7/30/90/all` 指标、版本分页及可选 `seq` 快照 |
 | `GET /api/targets/status?kind=...&id=...` | 精确返回 `kind/id/recorded/tracking/status`；未知目标不等于下架 |
 | `GET /api/metrics/{type}/{id}?days=...` | 已有成功资料的目标指标历史；作者占位行返回 `DETAIL_NOT_RECORDED` 与真实任务状态，完整资料无样本时成功返回空数组；沿用真实 UTC 日采样口径 |
+| `POST /api/metrics/batch` | 每页最多24个不同ID的7日采样；仅 fallback_ids 指定的本地失败目标附带轻量资料兜底 |
+| `GET /api/history/{type}/{id}` | 历史版本分页与 days 指标；指定 seq 时只读取该快照，不读取当前资料或任务 |
+| `GET /api/metadata/{type}/{id}` | 本地无法读取当前资料时的单目标已有资料兜底，不请求上游 |
 | `POST /targets` | 单目标或有上限的批量申请，只接受 JSON，不接受后台表单或采集间隔 |
 | `GET /api/v1/platforms/{platform}/videos/{id}` | 保留原有实时上游查询及 `{data:...}` 应答，不写跟踪目标 |
 | `GET /api/v1/platforms/{platform}/creators/{id}` | 同上；实时查询也消耗统一入口额度 |
 
 8181 不提供 `/manage`、`/logs`、`/assets`、`/targets/delete`、`/targets/run`、`/targets/interval`、作者视频后台发现或导入任务接口。
+
+详情按目标读取一次摘要，再读取指标和版本；目标启停与运行状态另行确认。单次请求的观测字段来自该摘要，不提供跨 SQL 的事务快照，不跨请求缓存。接口字段与业务码保持不变，实测范围和列表剩余成本见 [详情查询性能](detail-query-performance.md)。
+
+新 Agent 使用本地当前资料与历史专用入口；公开目录带 `projection=identity` 时只返回已记录目标身份，普通分页不执行通用目录聚合。协议、边界、批量 JSON 示例与本地投稿口径见 [本地优先资料](local-first-metadata.md)。原目录与详情入口保留给旧调用方。
 
 ## 请求限制
 

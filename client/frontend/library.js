@@ -41,7 +41,7 @@ export function initLibrary({api,notify,onScan,navigate}) {
   async function localDashboard() {const data=await api('/api/overview');counts(data);return data;}
   function compact(items,container,empty) {
     const rows=document.createDocumentFragment();
-    for(const item of items||[]) {const row=node('div',null,'compact-item');const info=node('div',null,'compact-info');info.append(node('strong',item.name||item.id),node('span',`${item.kind==='creator'?'粉丝':'播放'} ${number(item.metric)} · ${item.id}`));const avatar=node('span',(item.name||item.id).slice(0,1),'avatar');images.show(avatar,{kind:item.kind,id:item.id,seq:item.seq});row.append(avatar,info);const link=node('a','查看 →','text-button');link.href=detailHref(item.kind,item.id,'public');row.append(link);rows.append(row);}
+    for(const item of items||[]) {const row=node('div',null,'compact-item');const info=node('div',null,'compact-info');info.append(node('strong',item.name||item.id),node('span',`${item.kind==='creator'?'粉丝':'播放'} ${number(item.metric)} · ${item.id}`));const avatar=node('span',(item.name||item.id).slice(0,1),'avatar');images.show(avatar,{kind:item.kind,id:item.id,seq:item.metadata_source?0:item.seq,url:item.cover||''});row.append(avatar,info);const link=node('a','查看 →','text-button');link.href=detailHref(item.kind,item.id,'public');row.append(link);rows.append(row);}
     if(!items?.length)rows.append(node('p',empty,'empty-copy'));$(container).replaceChildren(rows);
   }
   function renderOverview(value) {
@@ -63,18 +63,20 @@ export function initLibrary({api,notify,onScan,navigate}) {
   function context() {
     const state=views[kind],publicMode=state.scope==='public',creator=kind==='creator';
     if(publicMode&&state.sort==='added')state.sort='published';
+    if(publicMode&&creator&&['views','published'].includes(state.sort))state.sort='popular';
     $('library-title').textContent=publicMode?(creator?'服务器公开 UP 库':'服务器公开视频库'):(creator?'我的 UP 主库':'我的视频库');
-    $('library-description').textContent=publicMode?'仅搜索服务器已经收录的公开记录，关注后自动申请持续跟踪。':'个人关注保存在本机，资料来自服务器最近一次观测。';
+    $('library-description').textContent=publicMode?'搜索服务器已记录的目标，当前资料优先在本地查询 B站。':'个人关注保存在本机，当前资料优先查询 B站，历史变化由服务器提供。';
     $('scope-local').setAttribute('aria-pressed',String(!publicMode));$('scope-public').setAttribute('aria-pressed',String(publicMode));
     $('library-query').placeholder=creator?'搜索名称、UID 或 B站空间链接':'搜索标题、BV 号或 B站视频链接';
     $('library-sort').value=state.sort;
     $('library-sort').querySelector('[value="popular"]').textContent=creator?'粉丝数':'播放量';
-    $('library-sort').querySelector('[value="views"]').hidden=!creator;
+    $('library-sort').querySelector('[value="views"]').hidden=!creator||publicMode;
+    $('library-sort').querySelector('[value="published"]').hidden=creator&&publicMode;
     $('library-sort').querySelector('[value="added"]').hidden=publicMode;
     $('pending-filter-label').hidden=publicMode;$('pending-filter').checked=state.pending;
-    $('library-source').textContent=publicMode?'服务器已记录的公开内容':'个人关注保存在本机';
+    $('library-source').textContent=publicMode?'按服务器已记录目标筛选和排序；当前资料本地查询':'个人关注保存在本机';
     if(state.sort==='hot')$('library-source').textContent+=' · 最近热门按近7日观测增量，缺少采样的排在末尾';
-    if(creator&&state.sort==='views')$('library-source').textContent+=' · 播放量为已记录视频的播放合计';
+    if(creator&&state.sort==='views')$('library-source').textContent+=' · 播放量为本地已关注视频的播放合计';
     $('refresh-library').textContent=publicMode?'↻ 刷新搜索结果':'↻ 刷新本页资料';
     if(!publicMode)$('refresh-library').textContent='↻ 刷新库资料';
     summaryNote();
@@ -82,15 +84,15 @@ export function initLibrary({api,notify,onScan,navigate}) {
   function summaryKey(base,k){const view=views[k];return base+'|'+summaryEpoch+'|'+k+'|'+view.page+'|'+view.q+'|'+view.sort+'|'+view.pending;}
   function summaryNote(){const text=summaryNotes.get(summaryKey(server,kind))||'';$('library-read-note').textContent=text;$('library-read-note').hidden=views[kind].scope==='public'||!text;}
   function syncLocalSummaries(requestedKind,base,force=false,requestedIDs=null){
-    if(!base||base!==server)return Promise.resolve(null);
+    if(base!==server)return Promise.resolve(null);
     const noteKey=summaryKey(base,requestedKind),ids=requestedIDs||result.items.map(item=>item.id),key=noteKey+'|'+[...ids].sort().join(','),epoch=summaryEpoch;
     if(!ids.length)return Promise.resolve(null);
     if(summaryJobs.has(key))return summaryJobs.get(key);
     if(!force&&Date.now()-(summaryReads.get(key)||0)<60000)return Promise.resolve(null);
-    summaryReads.set(key,Date.now());summaryNotes.set(noteKey,'正在读取服务器已记录资料…');summaryNote();
+    summaryReads.set(key,Date.now());summaryNotes.set(noteKey,'正在更新本地资料与历史变化…');summaryNote();
     const job=(async()=>{
       try{if(!ids.length)return null;const params=new URLSearchParams({kind:requestedKind});for(const id of ids)params.append('id',id);const data=await post('/api/follows/refresh?'+params);summaryNotes.delete(noteKey);await localDashboard();return data;}
-      catch(error){summaryNotes.set(noteKey,'服务器资料暂未读取，已保留本地关注和最近资料。'+error.message);throw error;}
+      catch(error){summaryNotes.set(noteKey,'资料更新未完成，已保留可用资料与本地关注。'+error.message);throw error;}
       finally{summaryJobs.delete(key);summaryNote();if(epoch===summaryEpoch&&server===base&&kind===requestedKind&&views[kind].scope==='local'&&current===(kind==='creator'?'creators':'videos')&&!$('follow-rows').querySelector('details[open]'))await load(false);}
     })();
     summaryJobs.set(key,job);return job;

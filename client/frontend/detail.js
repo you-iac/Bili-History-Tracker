@@ -21,10 +21,10 @@ export function initDetail({api,notify,onAdd,onChanged,onScan,onSyncSummaries,im
   function render(d){
     const creator=route.kind==='creator',item=d.item,local=d.local_follow;shownDays=days;
     $('detail-name').textContent=item.name||route.id;$('detail-identity').textContent=`${creator?'UID ':''}${route.id}${!creator&&item.owner_name?` · ${item.owner_name}`:''}`;
-    $('detail-avatar').textContent=creator?(item.name||route.id).slice(0,1):'▷';$('detail-avatar').classList.toggle('detail-cover',!creator);$('detail-avatar').closest('section').classList.toggle('video-hero',!creator);images.show($('detail-avatar'),{kind:route.kind,id:route.id,seq:item.seq});$('detail-record-status').textContent=cardStatus(item);$('detail-record-status').dataset.state=item.status||'unknown';
+    $('detail-avatar').textContent=creator?(item.name||route.id).slice(0,1):'▷';$('detail-avatar').classList.toggle('detail-cover',!creator);$('detail-avatar').closest('section').classList.toggle('video-hero',!creator);images.show($('detail-avatar'),{kind:route.kind,id:route.id,seq:item.metadata_source?0:item.seq,url:item.cover||''});$('detail-record-status').textContent=cardStatus(item);$('detail-record-status').dataset.state=item.status||'unknown';
     $('detail-local-state').textContent=local?`已本地关注 · ${followState(local)}`:'尚未本地关注';
     $('detail-follow').textContent=local?(local.needs_attention?'重新核对':local.pending_submission?'重试提交':'已本地关注'):'关注并跟踪';$('detail-unfollow').hidden=!local;$('detail-scan').hidden=!creator;
-    $('detail-source').textContent=`数据来自 ${d.server_url} · 最近观测 ${date(item.observed_at)}`;
+    $('detail-source').textContent=item.metadata_source?`当前资料：${item.metadata_source==='bilibili'?'B站本地查询':item.metadata_source==='server'?'服务器已有记录兜底':'本地查询与服务器兜底'} · 历史：${d.server_url||'未配置服务器'} · 历史最近观测 ${date(item.observed_at)}`:`数据来自 ${d.server_url} · 最近观测 ${date(item.observed_at)}`;
     $('detail-external').href=creator?`https://space.bilibili.com/${route.id}`:`https://www.bilibili.com/video/${route.id}`;
     $('detail-metric-label').textContent=creator?'最新粉丝数':'最新播放量';$('detail-latest').textContent=compactNumber(item.metric);$('detail-latest').title=item.metric?.toLocaleString('zh-CN')||'未知';
     $('detail-total-versions').textContent=compactNumber(d.version_total??item.seq);$('detail-published').textContent=creator?(local?'已关注':'未关注'):publishedAt(item.published_at);
@@ -51,7 +51,7 @@ export function initDetail({api,notify,onAdd,onChanged,onScan,onSyncSummaries,im
       let before=null,previousError='';
       if(seq>1){try{before=(await api(url(seq-1))).snapshot;}catch(error){previousError=error.message;}}
       if(token!==snapshotSequence||generation!==sequence)return;
-      if(seq===data?.item.seq){const cover=snapshotImageURL(route.kind,after.snapshot);if(cover)images.show($('detail-avatar'),{kind:route.kind,id:route.id,seq,url:cover});}
+      if(!data?.item.metadata_source&&seq===data?.item.seq){const cover=snapshotImageURL(route.kind,after.snapshot);if(cover)images.show($('detail-avatar'),{kind:route.kind,id:route.id,seq,url:cover});}
       selected=seq;markSelected();$('detail-snapshot-title').textContent=`v${seq} 的内容变化`;$('detail-snapshot').textContent=JSON.stringify(after.snapshot??{},null,2);
       const changes=snapshotChanges(route.kind,before,after.snapshot),fragment=document.createDocumentFragment();
       if(seq===1){$('detail-snapshot-note').textContent='首次记录作为后续对比基线；计数变化不生成内容版本。';}

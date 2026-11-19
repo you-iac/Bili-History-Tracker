@@ -36,6 +36,9 @@ func setSummary(f *Follow, item remote.Item, base string, at time.Time) bool {
 // 最多20秒；相同服务器代际/目标集合的并发同步合并，不扫描公共全库。
 // 中途失败仍保存摘要和旧缓存；浏览核对可申请跟踪，实际采集仍由服务器管理。
 func (s *Service) SyncSummaries(ctx context.Context, kind string, ids ...string) (int, error) {
+	if s.current != nil {
+		return s.syncLocalSummaries(ctx, kind, ids)
+	}
 	if kind != "creator" && kind != "video" {
 		return 0, &Error{Message: "资料类型无效。", Status: 400}
 	}

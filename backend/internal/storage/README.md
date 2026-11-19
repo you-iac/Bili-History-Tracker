@@ -2,6 +2,8 @@
 
 SQLite 持久化：打开库、迁移、算指纹、读写五表与调度目标，并为观察台提供只读聚合。单写者连接。
 
+本地优先客户端使用 [client_history.go](client_history.go) 的批量采样/历史头/资料兜底，以及 [catalog_identity.go](catalog_identity.go) 的轻量目标目录，避免列表刷新进入投稿聚合。职责和验证见 [本地优先资料](../../../docs/local-first-metadata.md)。
+
 > 与 [doc.go](doc.go) 的包注释保持一致；架构总览见 [docs/architecture.md](../../../docs/architecture.md)。
 
 ## 子模块协作
@@ -38,6 +40,8 @@ SQLite 持久化：打开库、迁移、算指纹、读写五表与调度目标�
 ```
 
 `repo.go` 是写入五表和调度目标的 SQL 出口；`db.go` 只管连接、PRAGMA 和迁移；`dashboard.go` 是只读出口，供观察台做概览、分页列表、日指标、版本动态和快照读取。看板查询只取列表需要的当前字段和封面表达式，不返回整份 payload；口径见 [观察台](../../../docs/dashboard.md)。
+
+[content.go](content.go) 的 `Content` 按单目标主键与指标窗口读取摘要，不复用目录计数；与 `dashboard.go` 共享字段和状态推导。兼容回归见 [content_test.go](content_test.go)，基准与执行计划见 [content_benchmark_test.go](content_benchmark_test.go)，详情链路及列表剩余成本见 [性能说明](../../../docs/detail-query-performance.md)。
 
 ## 输入 / 输出 / 边界
 

@@ -32,6 +32,7 @@ func (s *Service) RunPending(ctx context.Context) {
 			}
 		}
 		s.mu.Unlock()
+		refreshed := map[string][]string{}
 		for _, f := range pending {
 			if ctx.Err() != nil {
 				return
@@ -40,8 +41,19 @@ func (s *Service) RunPending(ctx context.Context) {
 			_, err := s.Reconcile(attempt, f.Kind, f.ID, false)
 			cancel()
 			if err == nil {
+				if s.current != nil {
+					refreshed[f.Kind] = append(refreshed[f.Kind], f.ID)
+					continue
+				}
 				refresh, cancel := context.WithTimeout(ctx, refreshTimeout)
 				_, _ = s.Refresh(refresh, f.Kind, f.ID)
+				cancel()
+			}
+		}
+		for _, kind := range []string{"creator", "video"} {
+			if ids := refreshed[kind]; len(ids) > 0 && ctx.Err() == nil {
+				refresh, cancel := context.WithTimeout(ctx, refreshTimeout)
+				_, _ = s.SyncSummaries(refresh, kind, ids...)
 				cancel()
 			}
 		}

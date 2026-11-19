@@ -3,6 +3,8 @@
 // 不导入 admin，不暴露管理表单、日志或批量导入，不接收本地 Cookie。
 // 正常业务HTTP200并检查JSON结果；入口限制不等于长期预算或认证。见 docs/public-response.md、docs/architecture.md。
 // 申请阶段预算及有界收尾见 docs/request-stages.md。
+// 详情复用请求内摘要，独立确认任务状态；查询边界见 docs/detail-query-performance.md。
+// 本地优先客户端使用批量采样、历史专用和资料兜底入口，见 docs/local-first-metadata.md。
 package publicapi
 
 import (
@@ -29,10 +31,24 @@ type targetLookup interface {
 	TrackingTarget(ctx context.Context, platform, kind, id string) (storage.Target, bool, error)
 }
 
+// historyReader 只读已有资料，与任务启停查询分开；详情可复用同一次资料读取。
+type historyReader interface {
+	CatalogIdentity(context.Context, string, storage.CatalogFilter, time.Time) (storage.ContentPage, error)
+	HistoryHead(context.Context, string, string, string) (storage.ContentItem, error)
+	MetricsBatch(context.Context, string, string, []string, int, time.Time) (map[string]storage.MetricSeries, error)
+	MetadataBatch(context.Context, string, string, []string) (map[string]storage.ContentItem, error)
+	Summary(context.Context, string, time.Time) (storage.DashboardSummary, error)
+	Catalog(context.Context, string, storage.CatalogFilter, time.Time) (storage.ContentPage, error)
+	Content(context.Context, string, string, string, time.Time) (storage.ContentItem, error)
+	Versions(context.Context, string, string, string, string, int, int, int) (storage.VersionPage, error)
+	Metrics(context.Context, string, string, string, int, time.Time) (storage.MetricSeries, error)
+	ReadSnapshot(context.Context, string, string, string, int64) (storage.Snapshot, error)
+}
+
 // Server 与后台共享存储和采集实例，只注册明确允许公开的操作。
 type Server struct {
 	store            targetLookup
-	reader           *storage.Store
+	reader           historyReader
 	tracker          *tracker.Tracker
 	platform         string
 	legacy           http.Handler
@@ -75,6 +91,9 @@ func (s *Server) Handler() http.Handler {
 	})
 	mux.HandleFunc("GET /api/targets/status", s.clientTargetStatus)
 	mux.HandleFunc("GET /api/metrics/{type}/{id}", s.metrics)
+	mux.HandleFunc("POST /api/metrics/batch", s.batchMetrics)
+	mux.HandleFunc("GET /api/metadata/{type}/{id}", s.metadata)
+	mux.HandleFunc("GET /api/history/{type}/{id}", s.history)
 	mux.HandleFunc("POST /targets", s.requestTarget)
 	mux.HandleFunc("/api/v1/", s.legacyJSON)
 	return newGate(s.config.RequestsPerSecond).wrap(mux)

@@ -98,7 +98,10 @@ AND NOT EXISTS (SELECT 1 FROM creators c WHERE t.target_type='creator' AND c.pla
 SELECT subject_type,subject_id,metric,MIN(sampled_at) first_at,MAX(sampled_at) last_at,COUNT(*) samples
 FROM metric_samples WHERE platform=:platform AND sampled_at>=:since AND sampled_at<=:now AND metric IN ('view','follower')
 GROUP BY subject_type,subject_id,metric
-), enriched AS (
+) ` + contentEnrichmentCTE
+
+// contentEnrichmentCTE 共享目录与单目标的字段口径；调用方决定 items 和 windows 的范围。
+const contentEnrichmentCTE = `, enriched AS (
 SELECT i.*,COALESCE(t.enabled,0) following,COALESCE(t.interval_seconds,0) interval_seconds,
 COALESCE(t.next_run_at,0) next_run,COALESCE(t.last_run_at,0) last_run,COALESCE(t.last_result,'') last_result,
 COALESCE(t.last_success_at,NULLIF(i.observed,0),0) last_success,COALESCE(t.failure_count,0) failures,
@@ -220,7 +223,7 @@ LEFT JOIN creator_versions c ON p.kind='creator' AND c.platform=:platform AND c.
 	return page, rows.Err()
 }
 
-func scanContent(rows *sql.Rows, now time.Time) (ContentItem, error) {
+func scanContent(rows interface{ Scan(...any) error }, now time.Time) (ContentItem, error) {
 	var i ContentItem
 	var metric, growth, videoViews, recentVideos sql.NullInt64
 	err := rows.Scan(&i.Kind, &i.ID, &i.Name, &i.OwnerID, &i.OwnerName, &metric, &i.Seq, &i.VideoCount, &i.FirstSeenAt, &i.ObservedAt, &i.PublishedAt, &i.Recorded,
@@ -237,33 +240,29 @@ func scanContent(rows *sql.Rows, now time.Time) (ContentItem, error) {
 	if growth.Valid {
 		i.Growth = &growth.Int64
 	}
-	i.Status = "ok"
-	if !i.Following {
-		i.Status = "unfollowed"
-	} else if i.LastResult != "" && i.LastResult != "ok" {
-		i.Status = "error"
-	} else if i.LastSuccessAt == 0 {
-		i.Status = "pending"
-	} else if now.UnixMilli()-i.LastSuccessAt > (max(i.IntervalSeconds*2, 1800)+1800)*1000 {
-		i.Status = "stale"
-	} else if i.RecoveredAt > 0 {
-		i.Status = "recovered"
-	}
-	if i.Kind == "creator" && i.Seq == 0 && i.Status == "unfollowed" {
-		i.Status = "profile_pending"
-	}
+	i.Status = i.ObservationStatus(now)
 	return i, err
 }
 
-func (s *Store) Content(ctx context.Context, platform, kind, id string, now time.Time) (ContentItem, error) {
-	p, err := s.Catalog(ctx, platform, CatalogFilter{Kind: kind, ID: id, Limit: 1}, now)
-	if err != nil {
-		return ContentItem{}, err
+// ObservationStatus 按当前摘要中的任务与观测字段推导状态，不查询数据库。
+// 复用摘要组装实时任务状态时，调用方须先更新 Following 和 IntervalSeconds。
+func (i ContentItem) ObservationStatus(now time.Time) string {
+	status := "ok"
+	if !i.Following {
+		status = "unfollowed"
+	} else if i.LastResult != "" && i.LastResult != "ok" {
+		status = "error"
+	} else if i.LastSuccessAt == 0 {
+		status = "pending"
+	} else if now.UnixMilli()-i.LastSuccessAt > (max(i.IntervalSeconds*2, 1800)+1800)*1000 {
+		status = "stale"
+	} else if i.RecoveredAt > 0 {
+		status = "recovered"
 	}
-	if len(p.Items) == 0 {
-		return ContentItem{}, sql.ErrNoRows
+	if i.Kind == "creator" && i.Seq == 0 && status == "unfollowed" {
+		status = "profile_pending"
 	}
-	return p.Items[0], nil
+	return status
 }
 
 func (s *Store) Summary(ctx context.Context, platform string, now time.Time) (DashboardSummary, error) {

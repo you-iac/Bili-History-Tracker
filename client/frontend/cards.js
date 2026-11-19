@@ -2,17 +2,17 @@
 import {compactNumber,signedNumber,detailHref,publishedAt} from './view.mjs';
 
 const statusNames={ok:'观测正常',running:'正在采集',pending:'等待采集',recovered:'已恢复',stale:'数据较旧',paused:'已暂停',unavailable:'暂不可用',not_recorded:'尚未记录'};
-export function cardStatus(item) {return item?statusNames[item.status]||(item.tracking?'服务器跟踪中':'未在公共跟踪'):'待获取资料';}
+export function cardStatus(item) {return item?statusNames[item.status]||(item.metadata_source?'当前资料已获取':item.tracking?'服务器跟踪中':'未在公共跟踪'):'待获取资料';}
 export function renderCards({container,data,kind,publicMode,button,images,onAdd,onRefresh,onRetry,onRemove,onScan}) {
   const node=(tag,text,className)=>{const el=document.createElement(tag);if(text!=null)el.textContent=text;if(className)el.className=className;return el;};
   const fragment=document.createDocumentFragment();
   for(const follow of data.items) {
     const item=publicMode?follow:(follow.summary||follow.data?.item),followed=publicMode?follow.followed:true,creator=kind==='creator';
-    const external=kind==='video'&&item?.recorded===false;
+    const external=publicMode&&!followed&&kind==='video'&&item?.recorded===false;
     const href=external?'https://www.bilibili.com/video/'+follow.id:detailHref(kind,follow.id,publicMode?'public':'');
     const card=node('article',null,'entity-card '+kind+'-card'),top=node('div',null,'entity-top'+(creator?'':' video-top'));
     const avatar=node('span',creator?(item?.name||follow.id).slice(0,1):'▷','entity-avatar'+(creator?'':' video-placeholder'));
-    images.show(avatar,{kind,id:follow.id,seq:item?.seq||0,url:item?.cover||''});top.append(avatar);
+    images.show(avatar,{kind,id:follow.id,seq:item?.metadata_source?0:item?.seq||0,url:item?.cover||''});top.append(avatar);
     const title=node('a',item?.name||follow.id,'entity-title');title.href=href;
     if(external){title.target='_blank';title.rel='noopener noreferrer';}
     const identity=node('p',(creator?'UID ':'')+follow.id+(item?.owner_name?' · '+item.owner_name:''),'entity-id');
@@ -23,9 +23,12 @@ export function renderCards({container,data,kind,publicMode,button,images,onAdd,
       strong.title=Number.isFinite(value)?value.toLocaleString('zh-CN'):'暂无数据';cell.append(strong,node('span',label));stats.append(cell);
     }
     const extra=node('div',null,'entity-extra');
-    if(creator){extra.append(node('span','近7日新投稿 '+compactNumber(item?.recent_videos)),node('small','服务器已记录范围'));}
+    if(creator){extra.append(node('span','近7日投稿 '+compactNumber(item?.recent_videos)),node('small','本地已关注视频范围'));}
     extra.append(node('span',(creator?'最近投稿 ':'发布于 ')+publishedAt(item?.published_at)));
-    if(creator)extra.append(node('span','已记录视频播放 '+compactNumber(item?.video_views)));
+    if(creator)extra.append(node('span','本地已关注视频播放合计 '+compactNumber(item?.video_views)));
+    if(item?.metadata_source==='server'||item?.metadata_source==='bilibili+server')extra.append(node('small','当前资料含服务器已有记录兜底'));
+    if(item?.history_error)extra.append(node('small',item.history_error));
+    if(item?.metadata_error)extra.append(node('small',item.metadata_error));
     const actions=node('div',null,'entity-actions'),details=node('a',external?'在 B站打开 ↗':'查看详情 →','text-button');details.href=href;
     if(external){details.target='_blank';details.rel='noopener noreferrer';}actions.append(details);
     if(!followed)actions.append(button('关注',()=>onAdd(kind,follow.id),'button primary'));

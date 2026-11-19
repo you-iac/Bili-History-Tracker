@@ -72,7 +72,13 @@ func (s *Server) clientLibrary(w http.ResponseWriter, r *http.Request, kind stri
 	f.Kind = kind
 	f.ID = r.URL.Query().Get("id")
 	f.OwnerID = r.URL.Query().Get("owner")
-	page, err := s.reader.Catalog(ctx, s.platform, f, time.Now())
+	var page storage.ContentPage
+	var err error
+	if r.URL.Query().Get("projection") == "identity" {
+		page, err = s.reader.CatalogIdentity(ctx, s.platform, f, time.Now())
+	} else {
+		page, err = s.reader.Catalog(ctx, s.platform, f, time.Now())
+	}
 	if err != nil {
 		writeJSON(w, 500, map[string]string{"error": "无法读取服务器资料。"})
 		return
@@ -90,7 +96,7 @@ func (s *Server) clientDetail(w http.ResponseWriter, r *http.Request, kind, id s
 	defer cancel()
 	i, err := s.reader.Content(ctx, s.platform, kind, id, time.Now())
 	if errors.Is(err, sql.ErrNoRows) {
-		s.missingDetail(w, r, kind, id)
+		s.missingDetail(ctx, w, kind, id, i)
 		return
 	}
 	if err != nil {
@@ -98,7 +104,7 @@ func (s *Server) clientDetail(w http.ResponseWriter, r *http.Request, kind, id s
 		return
 	}
 	if !hasRecordedContent(i) {
-		s.missingDetail(w, r, kind, id)
+		s.missingDetail(ctx, w, kind, id, i)
 		return
 	}
 	days := 30
@@ -127,7 +133,7 @@ func (s *Server) clientDetail(w http.ResponseWriter, r *http.Request, kind, id s
 	for _, v := range versions.Items {
 		entries = append(entries, map[string]any{"seq": v.Seq, "at": v.At, "name": v.Name})
 	}
-	target, stateErr := s.targetStatus(ctx, kind, id)
+	target, stateErr := s.targetStatusWithContent(ctx, kind, id, &i)
 	if stateErr != nil {
 		writeJSON(w, 500, map[string]string{"error": "无法读取目标状态。"})
 		return
@@ -188,14 +194,14 @@ func (s *Server) metrics(w http.ResponseWriter, r *http.Request) {
 	i, err := s.reader.Content(ctx, s.platform, kind, id, time.Now())
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			s.missingDetail(w, r, kind, id)
+			s.missingDetail(ctx, w, kind, id, i)
 		} else {
 			writeJSON(w, 500, map[string]string{"error": "无法读取目标。"})
 		}
 		return
 	}
 	if !hasRecordedContent(i) {
-		s.missingDetail(w, r, kind, id)
+		s.missingDetail(ctx, w, kind, id, i)
 		return
 	}
 	series, err := s.reader.Metrics(ctx, s.platform, kind, id, days, time.Now())

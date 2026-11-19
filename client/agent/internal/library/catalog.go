@@ -5,6 +5,7 @@ package library
 import (
 	"sort"
 	"strings"
+	"time"
 
 	"bili-history-tracker/client/agent/internal/bilibili"
 	"bili-history-tracker/client/agent/internal/remote"
@@ -111,6 +112,10 @@ func (s *Service) ListCatalog(kind, q string, page int, pendingOnly bool, order,
 	}
 	q = strings.ToLower(strings.TrimSpace(q))
 	items := []Follow{}
+	stats := map[string]creatorStats{}
+	if s.current != nil {
+		stats = localCreatorStats(s.state.Follows, time.Now())
+	}
 	known := map[string]bilibili.Video{}
 	if owner != "" && len(scanned) > 0 {
 		for _, v := range scanned[0] {
@@ -124,8 +129,13 @@ func (s *Service) ListCatalog(kind, q string, page int, pendingOnly bool, order,
 			result.Videos++
 		}
 		i := followItem(f)
+		if s.current != nil && f.Kind == "creator" {
+			i = applyLocalStats(i, stats)
+			copy := i
+			f.Summary = &copy
+		}
 		if v, ok := known[f.ID]; ok && f.Kind == "video" {
-			if f.Data == nil {
+			if f.Data == nil && f.Summary == nil {
 				i = remote.Item{Kind: "video", ID: f.ID, Name: v.Title, PublishedAt: v.PublishedAt, Metric: v.Views, Cover: v.Cover}
 			}
 			i.OwnerID = owner

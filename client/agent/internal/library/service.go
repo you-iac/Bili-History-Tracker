@@ -3,6 +3,7 @@
 // 摘要同步独立于关注提交，范围匹配的详情才可作为离线缓存。
 // 浏览/后台核对、JSON业务失败和有界重试见 docs/public-response.md。
 // 自动关注、公开查询和退避队列见 docs/client-workspace.md；独立详情与匹配缓存见 docs/client-catalog.md；图片地址缓存见 docs/client-launch-media.md。
+// 正常Agent注入CurrentSource，当前资料本地查询、历史批读与UP本地汇总见 docs/local-first-metadata.md。
 package library
 
 import (
@@ -76,21 +77,31 @@ type Page struct {
 	Videos   int      `json:"videos"`
 }
 type Service struct {
-	summaryCalls map[string]*summaryCall
-	serverEpoch  uint64
-	imageCalls   map[string]*imageCall
-	imageErrors  map[string]imageFailure
-	imageSlots   chan struct{}
-	mu           sync.Mutex
-	store        Storage
-	client       *remote.Client
-	state        state
-	inFlight     map[string]bool
-	wake         chan struct{}
+	current         CurrentSource
+	currentCache    map[string]currentRecord
+	currentCalls    map[string]*currentCall
+	currentCooldown time.Time
+	summaryCalls    map[string]*summaryCall
+	serverEpoch     uint64
+	imageCalls      map[string]*imageCall
+	imageErrors     map[string]imageFailure
+	imageSlots      chan struct{}
+	mu              sync.Mutex
+	store           Storage
+	client          *remote.Client
+	state           state
+	inFlight        map[string]bool
+	wake            chan struct{}
 }
 
-func New(store Storage, client *remote.Client) (*Service, error) {
+// New 可注入当前资料源；命令入口始终传入scanner，省略时保留旧接入方的服务器读取行为。
+func New(store Storage, client *remote.Client, sources ...CurrentSource) (*Service, error) {
 	s := &Service{store: store, client: client, state: state{Version: 1, Follows: []Follow{}}, inFlight: map[string]bool{}, wake: make(chan struct{}, 1), imageCalls: map[string]*imageCall{}, imageErrors: map[string]imageFailure{}, imageSlots: make(chan struct{}, 4), summaryCalls: map[string]*summaryCall{}}
+	s.currentCache = map[string]currentRecord{}
+	s.currentCalls = map[string]*currentCall{}
+	if len(sources) > 0 {
+		s.current = sources[0]
+	}
 	if err := store.LoadLibrary(&s.state); err != nil {
 		return nil, errors.New("关注库无法读取，请先备份 library.json 后检查文件")
 	}
@@ -177,7 +188,20 @@ func (s *Service) Configure(input string) error {
 	next.Overview = nil
 	next.Images = nil
 	for i := range next.Follows {
+		var localCurrent *remote.Item
+		if s.current != nil && next.Follows[i].Summary != nil && next.Follows[i].Summary.MetadataSource == "bilibili" {
+			item := *next.Follows[i].Summary
+			item.Growth = nil
+			item.GrowthFrom, item.GrowthTo, item.Seq, item.ObservedAt = 0, 0, 0, 0
+			item.Recorded, item.Tracking = false, false
+			item.Status = ""
+			item.HistoryError = "服务器已切换，等待更新历史变化。"
+			localCurrent = &item
+		}
 		next.Follows[i].Summary = nil
+		if localCurrent != nil {
+			next.Follows[i].Summary = localCurrent
+		}
 		next.Follows[i].SummaryAt = nil
 		next.Follows[i].Status = nil
 		next.Follows[i].Data = nil
@@ -274,6 +298,14 @@ func (s *Service) update(original Follow, base string, change func(*Follow)) (Fo
 func (s *Service) Refresh(ctx context.Context, kind, id string) (Follow, error) {
 	ctx, cancel := context.WithTimeout(ctx, refreshTimeout)
 	defer cancel()
+	if s.current != nil {
+		_, readErr := s.SyncSummaries(ctx, kind, id)
+		f, _, findErr := s.find(kind, id)
+		if findErr != nil {
+			return f, findErr
+		}
+		return f, readErr
+	}
 	f, base, err := s.find(kind, id)
 	if err != nil {
 		return f, err
@@ -355,22 +387,51 @@ func (s *Service) Search(ctx context.Context, kind, q string, page int, options 
 	if normalized, err := Normalize(kind, q); err == nil {
 		id = normalized
 	}
-	base := s.Connection()
+	s.mu.Lock()
+	base, epoch := s.state.ServerURL, s.serverEpoch
+	s.mu.Unlock()
+	if s.current != nil {
+		if len(options) == 0 {
+			options = []remote.CatalogOptions{{Identity: true}}
+		} else {
+			options[0].Identity = true
+		}
+	}
 	data, err := s.client.Catalog(ctx, base, kind, q, id, page, options...)
 	if err != nil {
 		return PublicPage{}, err
 	}
+	if s.current != nil && len(data.Items) > 0 {
+		ids, seeds := []string{}, map[string]remote.Item{}
+		for _, item := range data.Items {
+			ids = append(ids, item.ID)
+			seeds[item.ID] = item
+		}
+		fresh, _ := s.currentItems(ctx, base, kind, ids, seeds)
+		for index, item := range data.Items {
+			if updated, ok := fresh[item.ID]; ok {
+				data.Items[index] = updated
+			}
+		}
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if base != s.state.ServerURL {
+	if base != s.state.ServerURL || epoch != s.serverEpoch {
 		return PublicPage{}, &Error{Message: "服务器已切换，请重新搜索。", Status: 409}
 	}
 	followed := map[string]bool{}
+	stats := map[string]creatorStats{}
+	if s.current != nil {
+		stats = localCreatorStats(s.state.Follows, time.Now())
+	}
 	for _, f := range s.state.Follows {
 		followed[f.Kind+":"+f.ID] = true
 	}
 	result := PublicPage{Items: []PublicItem{}, Page: data.Page, Limit: data.Limit, Total: data.Total}
 	for _, item := range data.Items {
+		if s.current != nil && kind == "creator" {
+			item = applyLocalStats(item, stats)
+		}
 		result.Items = append(result.Items, PublicItem{Item: item, Followed: followed[item.Kind+":"+item.ID]})
 	}
 	return result, nil
@@ -401,13 +462,35 @@ func (s *Service) Dashboard() Dashboard {
 	return d
 }
 func (s *Service) RefreshOverview(ctx context.Context) (Dashboard, error) {
-	base := s.Connection()
-	data, err := s.client.Overview(ctx, base)
+	s.mu.Lock()
+	base, epoch := s.state.ServerURL, s.serverEpoch
+	s.mu.Unlock()
+	data, err := s.client.Overview(ctx, base, s.current != nil)
 	if err != nil {
 		return s.Dashboard(), err
 	}
+	if s.current != nil {
+		for _, group := range []struct {
+			kind  string
+			items *[]remote.Item
+		}{{"creator", &data.Creators}, {"video", &data.Videos}} {
+			ids, seeds := []string{}, map[string]remote.Item{}
+			for _, item := range *group.items {
+				ids = append(ids, item.ID)
+				seeds[item.ID] = item
+			}
+			if len(ids) > 0 {
+				updated, _ := s.currentItems(ctx, base, group.kind, ids, seeds)
+				for index, item := range *group.items {
+					if fresh, ok := updated[item.ID]; ok {
+						(*group.items)[index] = fresh
+					}
+				}
+			}
+		}
+	}
 	s.mu.Lock()
-	if base != s.state.ServerURL {
+	if base != s.state.ServerURL || epoch != s.serverEpoch {
 		s.mu.Unlock()
 		return Dashboard{}, &Error{Message: "服务器已切换，请刷新总览。", Status: 409}
 	}
@@ -448,9 +531,15 @@ func (s *Service) Detail(ctx context.Context, kind, id string, page int, seq int
 	}
 	s.mu.Unlock()
 	readStarted := time.Now()
-	data, readErr := s.client.Detail(ctx, base, kind, normalized, page, seq, days)
+	var data remote.Detail
+	var readErr error
+	if s.current != nil {
+		data, readErr = s.localDetail(ctx, base, kind, normalized, page, seq, days)
+	} else {
+		data, readErr = s.client.Detail(ctx, base, kind, normalized, page, seq, days)
+	}
 	var failure *remote.Error
-	if original != nil && (data.Target != nil || errors.As(readErr, &failure) && failure.Code == "DETAIL_NOT_RECORDED") {
+	if s.current == nil && original != nil && (data.Target != nil || errors.As(readErr, &failure) && failure.Code == "DETAIL_NOT_RECORDED") {
 		// 新鲜服务器结果可推翻旧确认的TTL；失败后的退避与人工处理仍须遵守。
 		hint := data.Target
 		if failure != nil {
@@ -482,8 +571,11 @@ func (s *Service) Detail(ctx context.Context, kind, id string, page int, seq int
 		return DetailView{}, &Error{Message: "服务器已切换，请重新读取详情。", Status: 409}
 	}
 	view := DetailView{Detail: data, ServerURL: base}
+	if data.Item.MetadataError != "" {
+		view.ReadError = data.Item.MetadataError
+	}
 	if readErr == nil {
-		if original != nil {
+		if original != nil && (s.current == nil || seq == 0) {
 			next := s.copyState()
 			for index, f := range next.Follows {
 				if f.Kind == kind && f.ID == normalized && sameFollow(f, *original) {
@@ -512,6 +604,19 @@ func (s *Service) Detail(ctx context.Context, kind, id string, page int, seq int
 		}
 	}
 	if readErr != nil {
+		if s.current != nil && seq == 0 && original != nil && data.Item.MetadataSource != "" {
+			next := s.copyState()
+			for index, f := range next.Follows {
+				if f.Kind == kind && f.ID == normalized && sameFollow(f, *original) {
+					if setSummary(&next.Follows[index], data.Item, base, time.Now().UTC()) {
+						if err := s.save(next); err != nil {
+							view.CacheError = err.Error()
+						}
+					}
+					break
+				}
+			}
+		}
 		code := "REMOTE_ERROR"
 		var remoteFailure *remote.Error
 		if errors.As(readErr, &remoteFailure) {
@@ -526,9 +631,21 @@ func (s *Service) Detail(ctx context.Context, kind, id string, page int, seq int
 		if f != nil && f.Data != nil && f.ServerURL == base && page == 1 && seq == 0 && (days == "" || days == "30") {
 			target := view.Target
 			view.Detail = *f.Data
+			if s.current != nil && data.Item.MetadataSource != "" {
+				view.Item = mergeCurrent(view.Item, data.Item)
+			}
 			view.Target = target
 			f.Data = nil
 			view.Cached, view.ReadError = true, readErr.Error()
+			return view, nil
+		}
+		if s.current != nil && seq == 0 && data.Item.MetadataSource != "" {
+			view.Detail = data
+			view.Metrics.Points = []remote.Point{}
+			view.Versions = []remote.Version{}
+			view.VersionPage = 1
+			view.VersionLimit = 10
+			view.ReadError = readErr.Error()
 			return view, nil
 		}
 		if code == "DETAIL_NOT_RECORDED" && seq == 0 {

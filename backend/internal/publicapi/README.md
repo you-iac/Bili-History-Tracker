@@ -2,6 +2,8 @@
 
 8181 的唯一组装入口：公共历史查询、目标状态与有界申请，以及原实时查询 API。完整协议和部署见 [公共接口说明](../../../docs/public-api.md)，模块导航见 [架构说明](../../../docs/architecture.md#module-navigation)。
 
+[client_history.go](client_history.go) 提供有界批量7日历史、历史专用读取与本地失败兜底；目录可只枚举身份，不为当前资料查询上游。客户端/服务器分工见 [本地优先资料](../../../docs/local-first-metadata.md)。
+
 ```text
 +------------------------+      request      +------------------------+
 | Agent / API caller     | ----------------> | limit.go               |
@@ -28,5 +30,7 @@
 本包不依赖 `admin`，不暴露管理表单或日志，不处理私人 Cookie，也不提供账号/令牌。长期跟踪负载仍由调度器承担，入口限流不等于存储或目标总量预算。
 
 业务协议见 [JSON应答](../../../docs/public-response.md)；[response.go](response.go) 提供目标/资料独立状态，[legacy.go](legacy.go) 只适配实时上游业务结果，数据库内部故障保留500。
+
+详情只读取一次目标摘要，复用请求内资料组装应答，同时重新确认任务启停和运行状态；观测字段沿用本次摘要，不跨请求缓存。调用与 SQL 成本见 [详情性能](../../../docs/detail-query-performance.md)，回归见 [detail_query_test.go](detail_query_test.go)。
 
 测试入口：[业务组合与整数精度](response_test.go)、[路由隔离与旧 API](routes_test.go)、[限流并发与滚动窗口](limit_test.go)、[截断、应答和副作用](targets_test.go)、[只读协议](read_test.go)。

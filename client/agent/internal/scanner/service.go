@@ -1,6 +1,7 @@
 // Package scanner 管理本地 Cookie 配置和单个可恢复的 UP 主视频 ID 扫描任务。
 // 平台请求在互斥锁外执行，任务不绑定网页请求；每页结果与续页位置一起落盘。
 // 只枚举当前可见投稿，不创建服务器跟踪、自动规则或下载。见 docs/client-discovery.md。
+// metadata.go 将同一本地Cookie受控用于明确目标的当前资料查询，见 docs/local-first-metadata.md。
 package scanner
 
 import (

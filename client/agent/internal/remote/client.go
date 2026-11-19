@@ -40,25 +40,29 @@ func (e *Error) Error() string { return e.Message }
 func (e *Error) Unwrap() error { return e.Cause }
 
 type Item struct {
-	Kind         string `json:"kind"`
-	ID           string `json:"id"`
-	Name         string `json:"name"`
-	OwnerID      string `json:"owner_id"`
-	OwnerName    string `json:"owner_name"`
-	Metric       *int64 `json:"metric"`
-	Growth       *int64 `json:"growth"`
-	VideoViews   *int64 `json:"video_views"`
-	RecentVideos *int64 `json:"recent_videos"`
-	VideoCount   *int64 `json:"video_count"`
-	Cover        string `json:"cover,omitempty"`
-	GrowthFrom   int64  `json:"growth_from"`
-	GrowthTo     int64  `json:"growth_to"`
-	Seq          int64  `json:"seq"`
-	ObservedAt   int64  `json:"observed_at"`
-	PublishedAt  int64  `json:"published_at"`
-	Recorded     bool   `json:"recorded"`
-	Tracking     bool   `json:"tracking"`
-	Status       string `json:"status"`
+	MetadataSource string `json:"metadata_source,omitempty"`
+	MetadataAt     int64  `json:"metadata_at,omitempty"`
+	HistoryError   string `json:"history_error,omitempty"`
+	MetadataError  string `json:"metadata_error,omitempty"`
+	Kind           string `json:"kind"`
+	ID             string `json:"id"`
+	Name           string `json:"name"`
+	OwnerID        string `json:"owner_id"`
+	OwnerName      string `json:"owner_name"`
+	Metric         *int64 `json:"metric"`
+	Growth         *int64 `json:"growth"`
+	VideoViews     *int64 `json:"video_views"`
+	RecentVideos   *int64 `json:"recent_videos"`
+	VideoCount     *int64 `json:"video_count"`
+	Cover          string `json:"cover,omitempty"`
+	GrowthFrom     int64  `json:"growth_from"`
+	GrowthTo       int64  `json:"growth_to"`
+	Seq            int64  `json:"seq"`
+	ObservedAt     int64  `json:"observed_at"`
+	PublishedAt    int64  `json:"published_at"`
+	Recorded       bool   `json:"recorded"`
+	Tracking       bool   `json:"tracking"`
+	Status         string `json:"status"`
 }
 type Status struct {
 	TrackingState string `json:"tracking_state,omitempty"`
@@ -127,6 +131,7 @@ type Catalog struct {
 
 // CatalogOptions 仅选择已有公开记录的顺序和 UP 归属；不触发平台采集。
 type CatalogOptions struct {
+	Identity      bool
 	Sort, OwnerID string
 }
 
@@ -156,6 +161,9 @@ func (c *Client) Catalog(ctx context.Context, base, kind, q, id string, page int
 	}
 	query := url.Values{"q": {q}, "page": {strconv.Itoa(page)}}
 	if len(options) > 0 {
+		if options[0].Identity {
+			query.Set("projection", "identity")
+		}
 		query.Set("sort", options[0].Sort)
 		if options[0].OwnerID != "" {
 			query.Set("owner", options[0].OwnerID)
@@ -173,14 +181,18 @@ func (c *Client) Catalog(ctx context.Context, base, kind, q, id string, page int
 }
 
 // Overview 只读两种公开库的第一页与total，不抓取HTML或推算全局跟踪/版本统计。
-func (c *Client) Overview(ctx context.Context, base string) (Overview, error) {
+func (c *Client) Overview(ctx context.Context, base string, identity ...bool) (Overview, error) {
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
-	creators, err := c.Catalog(ctx, base, "creator", "", "", 1)
+	options := []CatalogOptions{}
+	if len(identity) > 0 && identity[0] {
+		options = append(options, CatalogOptions{Identity: true})
+	}
+	creators, err := c.Catalog(ctx, base, "creator", "", "", 1, options...)
 	if err != nil {
 		return Overview{}, err
 	}
-	videos, err := c.Catalog(ctx, base, "video", "", "", 1)
+	videos, err := c.Catalog(ctx, base, "video", "", "", 1, options...)
 	if err != nil {
 		return Overview{}, err
 	}
