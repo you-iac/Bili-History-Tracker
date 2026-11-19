@@ -11,3 +11,7 @@
 /backend/*.db
 /backend/*.db-wal
 /backend/*.db-shm
+
+# AOCI agent host integration (machine-bound; do not commit)
+.codex/config.toml
+.codex/config.toml.backup.*

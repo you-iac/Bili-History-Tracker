@@ -1,0 +1,228 @@
+#AOCI-CODE-VOLUME: 1
+
+===/<repository>/===
+.gitattributes[FV5T]: F:规定文本检出为LF以稳定AOCI原始字节基线 | R:- | A:- | S:二进制由Git自动识别，保持原字节
+.gitignore[FV4T]: F:排除本机构建、缓存、数据库与机器绑定的Codex配置 | R:- | A:- | S:-
+AGENTS.md[SQ7S]: F:规定仓库开发验证、中文模块文档、计划归档、AI署名及AOCI认知生命周期 | R:code:PLANs/README.md | A:- | S:上下文压缩后必须重新加载完整Overview；不得用历史认知替代当前证据
+README.md[SG7S]: F:介绍项目运行方式、端口配置、数据模型、客户端与验证入口 | R:code:docs/architecture.md,code:client/README.md | A:- | S:8182默认回环且无鉴权；查询不到不等于内容删除
+perf-creator-32.json[TP4L]: F:保存32并发60秒UP详情容量压测的逐秒吞吐延迟及窗口收尾结果 | R:code:scripts/perf/README.md | A:- | S:该次窗口成功吞吐约49.07次每秒，不代表在线用户数
+perf-creator-profile.json[TP4L]: F:保存32并发90秒UP详情采样期压测的请求操作与逐秒统计 | R:code:docs/performance-analysis-2026-11-18.md | A:- | S:窗口成功吞吐约39.78次每秒，结果须结合采样负载解释
+perf-http-baseline.json[TP4L]: F:保存32并发60秒health基线的HTTP延迟与吞吐测量结果 | R:code:scripts/perf/README.md | A:- | S:约5411.35次每秒；不访问数据库，不能等同业务容量
+perf-read-32.json[TP4L]: F:保存32并发60秒混合只读负载的请求及完整业务操作统计 | R:code:scripts/perf/README.md | A:- | S:请求约48.23次每秒与操作约34.18次每秒口径不同
+perf-video-32.json[TP4L]: F:保存32并发60秒视频详情负载的吞吐、延迟和逐秒统计 | R:code:scripts/perf/README.md | A:- | S:窗口成功吞吐约48.35次每秒，仅代表该数据与配置
+
+===/<repository>/PLANs/===
+2026-11-07-data-fingerprint.md[SD4T]: F:记录将B站字段投影与指纹责任从storage移到适配器的待实施计划 | R:code:backend/internal/storage/fingerprint.go | A:- | S:统计变化与图片URL参数变化不应制造内容版本
+2026-11-07-storage-dependencies.md[SD4T]: F:记录评估调度、跟踪与后台对具体Store依赖的方案 | R:code:backend/internal/storage/repo.go | A:- | S:尚待评估，不代表已完成接口解耦
+2026-11-08-extension-manual-import.md[SB4T]: F:规划浏览器扩展与手动BV导入作为平台发现之外的补充 | R:code:docs/video-discovery.md | A:- | S:只传视频标识，不传Cookie；归属须由公开view校验
+2026-11-10-client-agent.md[SU5T]: F:维护本地Agent与界面的整体功能计划和部分交付状态 | R:code:client/README.md | A:- | S:下载、完整准入、档案备份和云盘仍待实施
+2026-11-15-qt-client.md[SU5T]: F:记录未来C++与Qt一体化桌面客户端的迁移方案与验收 | R:code:client/README.md | A:- | S:待实施；现有Go与浏览器版本保持可用，验收后才替换
+2026-11-16-agent-ui-unresponsive.md[SU5T]: F:保留本地工作台无响应的MJS响应类型证据及待修复验收 | R:code:docs/client-workspace.md | A:- | S:现有静态资源检查不能替代受影响浏览器复测
+2026-11-16-client-ui-content.md[SU5T]: F:记录UP详情、双库卡片及独立摘要同步的UI实现与体验验收 | R:code:docs/client-catalog.md | A:- | S:真实Cookie扫描与完整体验仍待验收
+2026-11-17-backend-api-freeze-review.md[SN6M]: F:汇总后端API冻结前的五项审查发现、修复状态和验收边界 | R:code:docs/public-response.md,code:docs/request-stages.md | A:- | S:管理跨站写入与发现任务完整退出仍待解决；不新增账号或Token
+2026-11-18-agent-reconciliation-fairness.md[SW5T]: F:记录关注后台队列从头选取导致尾部饥饿的待修复方案 | R:code:client/agent/internal/library/pending.go | A:- | S:模拟队列证据不代表真实Agent连续运行结果
+2026-11-18-agent-throughput.md[SP4T]: F:记录多Agent混合业务吞吐压测脚本的实现与本地验证 | R:code:scripts/perf/README.md | A:- | S:未对真实VM压测，不宣称真实容量
+2026-11-18-detail-throughput.md[SP4T]: F:记录按ID详情压测、固定目标及独立health基线改造 | R:code:scripts/perf/README.md | A:- | S:health与详情吞吐差不能直接归因于HTTP开销
+2026-11-18-server-profiling.md[SO4T]: F:记录独立回环pprof入口、采样与验证的完成历史 | R:code:docs/performance-profiling.md | A:- | S:尚未采集真实VM profile
+README.md[SQ5T]: F:定义独立计划的命名、时间精度、完成摘要与归档规则 | R:code:AGENTS.md,code:PLANs/archive/README.md | A:- | S:未完成验收不得归档；移动时保留正文并修正相对链接
+2026-11-19-client-detail-data-sources.md[SU5T]: F:记录详情平台资料优先、服务器历史与失败回退的分阶段实施任务及验收 | R:code:docs/client-detail-data-sources.md | A:- | S:文档建立不等于实施完成；实现和必要验收通过后才记录完成时间并归档
+
+===/<repository>/PLANs/archive/===
+2026-11-07-video-snapshot.md[SD3T]: F:保留视频快照过滤顶层ugc_season与删除版本列的完成记录 | R:code:docs/database.md | A:- | S:原方案已不可得，仅保留历史摘要
+2026-11-08-admin-dashboard.md[SU3T]: F:保留观察台页面重构、状态口径与图表验证记录 | R:code:docs/dashboard.md | A:- | S:原方案已不可得，仅保留历史摘要
+2026-11-08-creator-video-discovery.md[SB3T]: F:保留作者视频融合、按需关注和批量任务的完成记录 | R:code:docs/video-discovery.md | A:- | S:发现不保证全部投稿，会话仅在内存保留20分钟
+2026-11-11-client-directory.md[SU3T]: F:保留客户端前后端目录归并与统一需求文档的完成记录 | R:code:client/README.md | A:- | S:仅目录与文档调整，不等于功能交付
+2026-11-11-cookie-video-scan.md[SI3T]: F:保留Cookie配置、DPAPI与投稿扫描的完成及验证边界 | R:code:docs/client-discovery.md | A:- | S:平台全量验收使用模拟API，未用真实Cookie
+2026-11-12-agent-server-integration.md[SB3T]: F:保留本地关注、服务器资料接入及缓存隔离的交付记录 | R:code:docs/client-library.md | A:- | S:历史8182可信接入不等于完整公网准入
+2026-11-12-local-data-management.md[SD3T]: F:保留本地档案与用户自选云盘设计的完成记录 | R:code:docs/client-data-management.md | A:- | S:仅完成设计，备份与云盘代码待实现
+2026-11-12-remote-local-responsibilities.md[SB3T]: F:保留服务器长期跟踪与Agent按需本地操作的职责设计 | R:code:docs/client-server-architecture.md | A:- | S:该历史条目只完成设计
+2026-11-12-shared-public-data.md[SD3T]: F:保留公共数据池与本地私人关注的无账户协作设计 | R:code:client/README.md | A:- | S:本地取消不停止公共采集
+2026-11-15-client-workspace.md[SU3T]: F:保留侧栏工作台、自动关注提交和目录迁移的完成记录 | R:code:docs/client-workspace.md | A:- | S:模拟上游联调未代表用户远端部署
+2026-11-16-agent-follow-reconciliation.md[SB4T]: F:保留精确关注核对、退避、暂停保护与代际隔离的实施历史 | R:code:docs/public-response.md | A:- | S:新授权已扩展原来仅Agent的修改边界
+2026-11-16-public-api-routing.md[SN4T]: F:保留8181公共协议与8182管理路由分离的方案及验证 | R:code:docs/public-api.md | A:- | S:未推送部署；不引入账户或访问令牌
+2026-11-17-public-json-response.md[SN4T]: F:保留业务JSON统一应答与Agent核对的方案及实施验证 | R:code:docs/public-response.md | A:- | S:业务失败可为HTTP200，仍须核对ok和code
+README.md[SQ4T]: F:说明已完成计划的完整保留、链接基准和归档边界 | R:code:PLANs/README.md | A:- | S:归档不表示重新执行历史验证
+
+===/<repository>/backend/cmd/server/===
+README.md[SG5T]: F:说明服务器组装点、依赖生命周期、环境配置和停机边界 | R:code:backend/cmd/server/main.go,code:backend/cmd/server/profiling.go | A:- | S:发现后台分页完整等待与Linux活跃任务退出仍待验收
+main.go[AG8M]: F:组装平台查询、SQLite、双HTTP入口、调度器和可选诊断服务并协调退出 | R:code:backend/internal/tracker/tracker.go,code:backend/internal/publicapi/server.go | A:main | S:公共监听默认0.0.0.0:8181，管理回环8182；关闭接纳与HTTP后等待tracker和调度退出才关闭存储
+profiling.go[RO7T]: F:校验pprof配置并组装独立回环诊断HTTP服务 | R:code:backend/cmd/server/main.go | A:profilingOptions,newProfilingServer | S:默认关闭；只接受回环IP，CPU与trace不套业务写入时限，采样显式开启
+
+===/<repository>/backend/===
+go.mod[FV6T]: F:声明后端Go模块、Go1.26及SQLite纯Go依赖版本 | R:code:backend/internal/storage/db.go | A:- | S:-
+
+===/<repository>/backend/internal/===
+README.md[SG5T]: F:导航后端职责分包、依赖规则与运行读写链路 | R:code:backend/cmd/server/README.md | A:- | S:httpapi实时查询不读写SQLite；持久化写入经tracker
+
+===/<repository>/backend/internal/admin/===
+README.md[SU5T]: F:说明8182观察台页面、管理命令、内部JSON交互和状态口径 | R:code:backend/internal/admin/doc.go | A:- | S:默认回环且无登录权限；不再提供Agent协议
+chart_test.cjs[TU5T]: F:验证趋势缺失日、空值、单点、负增长和零增量语义 | R:code:backend/internal/admin/assets/app.js | A:- | S:-
+discovery.go[EN7S]: F:将作者视频续页、导入及任务控制暴露为管理内部JSON接口 | R:code:backend/internal/discovery/service.go,code:backend/internal/discovery/jobs.go | A:sameOriginJSON,decodeJSON | S:写入要求JSON并检查来源；64KiB且拒绝未知字段和尾随JSON，与普通管理表单保护不同
+discovery_test.cjs[TU5T]: F:验证发现选择跨页保留、成功项移除及严格标识解析 | R:code:backend/internal/admin/assets/discovery.js | A:- | S:-
+doc.go[SU5T]: F:定义观察台包职责、存储读写和异步查询边界 | R:code:backend/internal/admin/server.go | A:- | S:无登录权限，应保持本机管理可达
+pages.go[AU7L]: F:编排总览、双库、详情、版本、指标、管理状态和日志页面 | R:code:backend/internal/storage/dashboard.go,code:backend/internal/admin/views.go | A:dashboardReader | S:常规页面只读本地；running来自本进程在途状态，日志最多500条
+server.go[EU8M]: F:注册观察台路由、内嵌模板资源并处理跟踪目标管理表单 | R:code:backend/internal/admin/pages.go,code:backend/internal/tracker/tracker.go | A:New,Handler,Close | S:普通管理表单未做同源校验；重复添加会更新间隔并RunNow，与公共申请复用语义不同
+views.go[CU6M]: F:定义观察台视图、数值时间状态格式化和内容字段差异 | R:code:backend/internal/storage/fingerprint.go | A:contentChanges,templateFunctions | S:差异忽略计数和图片参数；仅固定图标代码转为可信HTML，上游文本不作HTML
+
+===/<repository>/backend/internal/admin/assets/===
+app.css[FU4T]: F:定义观察台导航、卡片、图表、导入进度及移动布局样式 | R:code:backend/internal/admin/templates/partials.html | A:- | S:-
+app.js[EU6S]: F:渲染SVG指标趋势并增强表单、导航、范围切换与状态轮询 | R:code:backend/internal/admin/pages.go | A:segments,summary | S:缺失日切线、单点无增长；轮询只读不触发采集
+discovery.js[EU6S]: F:管理作者视频跨页选择、显式导入、任务轮询和取消重试 | R:code:backend/internal/admin/discovery.go | A:Selection,parseTarget | S:默认不选视频，partial不自动重试；添加全部由服务器枚举
+
+===/<repository>/backend/internal/admin/templates/===
+activity.html[FU4T]: F:显示内容版本变化、当前采集问题和近期恢复的活动页 | R:code:backend/internal/admin/pages.go | A:- | S:采集失败不代表视频下架
+content.html[FU5T]: F:展示对象资料、日指标、版本差异、快照和作者相关视频 | R:code:backend/internal/admin/pages.go | A:- | S:未知指标不补零，单点不计算增长，历史自首次记录开始
+creator_videos.html[FU5T]: F:提供作者待添加视频选择、分页和批量任务进度模板 | R:code:backend/internal/admin/assets/discovery.js | A:- | S:添加全部只覆盖本次发现范围，不自动关注未来投稿
+library.html[FU4T]: F:按创作者或视频渲染可筛选分页内容库 | R:code:backend/internal/admin/templates/partials.html | A:- | S:-
+logs.html[FU4T]: F:渲染最近采集日志的筛选和分页表格 | R:code:backend/internal/admin/pages.go | A:- | S:仅展示最近500条日志
+manage.html[FU5T]: F:渲染关注管理、添加入口及间隔刷新停止操作 | R:code:backend/internal/admin/server.go | A:- | S:停止跟踪保留已采集历史
+overview.html[FU5T]: F:渲染记录统计、累计趋势、排行榜、版本动态与问题概览 | R:code:backend/internal/admin/pages.go | A:- | S:只显示已记录数据，不补造历史
+partials.html[FU5T]: F:定义观察台共享页框、导航、卡片、过滤器和分页组件 | R:code:backend/internal/admin/views.go | A:- | S:-
+
+===/<repository>/backend/internal/discovery/===
+README.md[SB5T]: F:说明作者视频融合、会话分页和显式导入任务的限制 | R:code:backend/internal/discovery/service.go | A:- | S:会话与任务20分钟过期，服务重启需重新加载
+jobs.go[AW7M]: F:执行选中或全部视频导入，保存逐项结果并支持幂等取消与恢复 | R:code:backend/internal/discovery/service.go,code:backend/internal/tracker/ingest.go | A:Start,Retry,Progress | S:跨任务共用串行导入门；拒绝项不重试，取消不回滚成功项；任务只在内存保留20分钟
+service.go[AB7M]: F:融合本地与平台作者视频，去重过滤关注并管理有界分页会话 | R:code:backend/internal/source/source.go,code:backend/internal/storage/creator_videos.go | A:List,Recorded,Close | S:最多64会话、1000步及10000视频；空pending页仍可续页，Close只取消不等待后台完成
+
+===/<repository>/backend/internal/httpapi/===
+README.md[SN4T]: F:说明实时查询内核的路由、超时和不持久化边界 | R:code:backend/internal/httpapi/handler.go | A:- | S:-
+handler.go[EN7S]: F:通过Querier暴露实时视频作者查询并映射HTTP错误 | R:code:backend/internal/source/source.go | A:New | S:查询12秒预算且不落库；不透传上游正文，公共入口还经legacyJSON转换
+
+===/<repository>/backend/internal/provider/===
+README.md[SE5T]: F:说明平台适配器扩展步骤与数据库调度边界 | R:code:backend/internal/source/source.go | A:- | S:storage指纹仍含B站字段，新增平台需同步处理
+
+===/<repository>/backend/internal/provider/bilibili/===
+README.md[SI5T]: F:说明B站适配器请求、快照、资料与发现边界 | R:code:backend/internal/provider/bilibili/bilibili.go | A:- | S:网页端点无稳定性承诺，发现不保证全量
+bilibili.go[IB8S]: F:实现B站Provider、BV元数据校验、快照准备和平台错误映射 | R:code:backend/internal/provider/bilibili/http.go,code:backend/internal/provider/bilibili/snapshot.go | A:New,GetVideo | S:固定端点且不跟随重定向；响应身份须匹配，统计未知保留nil，查询成功不等于可播放
+creator.go[IB7T]: F:按规范UID查询并校验作者资料，保留原始业务快照 | R:code:backend/internal/provider/bilibili/http.go | A:GetCreator | S:UID必须正int64十进制且无前导零；使用json.Number避免大整数精度损失，粉丝缺失为nil
+http.go[IN7T]: F:执行B站GET请求并校验状态、业务码和受限大小JSON信封 | R:code:backend/internal/provider/bilibili/bilibili.go | A:getRequest | S:响应上限2MiB；credentials=false明确不附Cookie；HTTP404不等于资源不存在
+list.go[IB6S]: F:提供兼容的有限作者视频列表，优先凭据空间页并回退合集 | R:code:backend/internal/provider/bilibili/http.go | A:GetCreatorVideos | S:这是旧VideoLister路径；有Cookie可调用空间列表且最多120条，不能混同无凭据新续页
+list_page.go[IB8M]: F:遍历B站公开合集目录和成员并输出扁平视频续页 | R:code:backend/internal/provider/bilibili/http.go,code:backend/internal/source/source.go | A:GetCreatorVideoPage | S:不带Cookie也不调用空间投稿；目录以空页结束，重复页或游标拒绝；临时错误最多3次，-799与访问限制不重试
+snapshot.go[ID7T]: F:定义视频业务快照过滤，只移除顶层跨视频合集详情 | R:code:backend/internal/provider/bilibili/bilibili.go | A:videoSnapshot | S:保留分P、嵌套同名字段和大整数；过滤版本仅代码选择，不持久化或回填旧快照
+
+===/<repository>/backend/internal/publicapi/===
+README.md[SN5T]: F:说明8181公共路由、全局限流、有界申请和安全边界 | R:code:backend/internal/publicapi/server.go | A:- | S:准入限流不等于认证或长期目标预算
+input.go[EN7S]: F:编码公共JSON信封并验证JSON请求来源、体积及目标标识 | R:code:backend/internal/publicapi/response.go | A:sameOriginJSON,decodeJSON | S:用RawMessage补协议字段保留大整数；64KiB、未知字段和额外JSON拒绝
+legacy.go[EN6T]: F:适配实时查询内核的旧响应为公共业务JSON | R:code:backend/internal/httpapi/handler.go | A:legacyJSON | S:非400且含error的JSON转HTTP200业务失败；非法请求仍保留HTTP语义
+limit.go[MN7T]: F:以进程共享门限制滚动一秒接纳数和在途请求数 | R:code:backend/internal/publicapi/server.go | A:gate | S:不排队不按IP分额；超限为HTTP200且ok=false、RATE_LIMITED，并带Retry-After
+read.go[EN8M]: F:提供已有公共资料的总览、目录、详情、版本快照和指标读取 | R:code:backend/internal/storage/dashboard.go,code:backend/internal/publicapi/response.go | A:hasRecordedContent | S:作者占位行Seq=0不算成功资料；无资料或快照为业务失败，不采集补齐，缺指标不补零
+response.go[EN8T]: F:定义公共目标状态与业务失败JSON信封 | R:code:backend/internal/publicapi/read.go,code:backend/internal/storage/target_lookup.go | A:targetStatus,business | S:任务active/paused/absent与资料recorded分开；读取失败不伪造缺失；业务失败HTTP200且ok=false
+server.go[EN8S]: F:组装8181公共读写路由、实时查询适配和共享入口限流 | R:code:backend/internal/publicapi/targets.go,code:backend/internal/publicapi/limit.go | A:New,Handler | S:Handler应只组装一次供连接共享限额；不挂载admin，默认20RPS及批量前10项
+targets.go[AN8S]: F:处理单个及有界批量跟踪申请并确认最终任务状态 | R:code:backend/internal/tracker/request.go,code:backend/internal/publicapi/response.go | A:requestTarget | S:整批25秒接纳预算，最终确认独立3秒；只处理前N项，无确认时省略tracking，超时结果不能当未写入
+
+===/<repository>/backend/internal/source/===
+README.md[SE5T]: F:说明平台无关数据契约、能力接口和查询分发职责 | R:code:backend/internal/source/source.go | A:- | S:-
+source.go[LB8M]: F:定义平台无关资料、视频页、错误与可选能力并按平台注册分发 | R:code:backend/internal/provider/bilibili/bilibili.go | A:NewService,Provider,CreatorVideoPager | S:注册表构造后不可变；Raw只供存档不输出JSON，nil统计为未知，空页须以NextCursor判断结束
+
+===/<repository>/backend/internal/storage/===
+README.md[SD5T]: F:说明SQLite模块读写、指纹、迁移及看板查询的职责边界 | R:code:backend/internal/storage/doc.go | A:- | S:读写共用单连接；版本、当前行与指针事务一致
+creator_videos.go[PD7S]: F:按视频ID稳定续页作者视频并批量读取内容与跟踪状态 | R:code:backend/internal/discovery/service.go | A:CreatorVideos,VideoStates | S:续页不按关注集合偏移；Subscribed当前映射全局启用跟踪，批量最多200项
+dashboard.go[PD8L]: F:聚合已有资料的目录、状态、排行、版本、指标和快照读取 | R:code:backend/internal/storage/repo.go | A:Catalog,Metrics,ReadSnapshot | S:指标UTC日窗最多5000点且缺失不补零；列表分页后才取封面；作者占位Seq=0；较旧阈值为max(2倍间隔,30分钟)+30分钟
+db.go[PD8S]: F:打开单连接SQLite、设置PRAGMA并按版本事务执行内嵌迁移 | R:code:backend/internal/storage/migrations/0001_init.sql | A:Open,Close | S:WAL仍只开1连接，读写同队列；库版本高于程序拒绝启动；每迁移与user_version原子提交
+doc.go[SD5T]: F:定义持久化包职责、输入输出和已知平台耦合边界 | R:code:backend/internal/storage/db.go | A:- | S:指纹仍按B站字段投影，存储不发网络请求
+fingerprint.go[KD8S]: F:投影稳定内容并规范化后计算8字节内容指纹 | R:code:backend/internal/storage/repo.go | A:VideoFingerprint,CreatorFingerprint | S:规则v1使用SHA256前8字节且只比相邻版本；统计不参与，图片参数去除、分P排序；仍耦合B站字段
+repo.go[PD9L]: F:事务写入视频作者当前资料和内容版本，并维护指标与调度目标 | R:code:backend/internal/storage/fingerprint.go,code:backend/internal/storage/db.go | A:SaveVideo,SaveCreator,RecordMetric,AddTarget | S:迟到观测整次丢弃；内容不变不追加版本也不更新payload；资料事务与指标写入分开；RemoveTarget删除调度行但保留历史
+target_lookup.go[PD8T]: F:精确区分缺失暂停目标并以仅新增方式接纳公共调度 | R:code:backend/internal/tracker/request.go | A:TrackingTarget,AddRequestedTarget | S:冲突DO NOTHING，不改间隔、启停或下次时间；新目标记本次运行并安排一个间隔后执行
+
+===/<repository>/backend/internal/storage/migrations/===
+0001_init.sql[FD8S]: F:创建当前内容、版本、指标和调度六表及初始索引约束 | R:code:backend/internal/storage/db.go | A:- | S:版本按对象序号主键且观测时间唯一，指纹8字节；作者可仅为引用占位，内容外键禁止级联删除
+0002_video_snapshot_version.sql[FD5T]: F:在历史schema2增加视频快照过滤版本元数据列 | R:code:backend/internal/storage/migrations/0003_drop_video_snapshot_version.sql | A:- | S:迁移必须保留；默认0且不裁剪已有payload
+0003_drop_video_snapshot_version.sql[FD6T]: F:在schema3删除快照过滤版本列并保留既有内容 | R:code:backend/internal/storage/db.go | A:- | S:不修改payload、内容指纹或版本序号
+0004_observation_status.sql[FD7T]: F:为调度目标增加最近采集失败恢复状态并回填成功时间及读索引 | R:code:backend/internal/storage/dashboard.go | A:- | S:只记录最近状态；内容快照与UTC采样不变
+
+===/<repository>/backend/internal/tracker/===
+README.md[SW5T]: F:说明目标采集、调度、日志和显式归属验证导入的协作 | R:code:backend/internal/tracker/doc.go | A:- | S:作者采集不自动发现或关注视频
+doc.go[SW5T]: F:定义tracker查询用例、副作用、平台及持久化边界 | R:code:backend/internal/tracker/tracker.go | A:- | S:查询失败保留历史，不推断删除
+ingest.go[AB7T]: F:校验视频作者归属后复用指纹、版本、指标保存并关注 | R:code:backend/internal/tracker/tracker.go,code:backend/internal/storage/repo.go | A:IngestVideo,persistVideo | S:同目标互斥；归属不匹配拒绝，已跟踪且有记录直接复用；作者资料查询不会自动走此链
+log.go[RO6S]: F:提供并发安全的最近查询日志及可选JSONL追加与尾部恢复 | R:code:backend/internal/admin/pages.go | A:NewLog,Add,Recent | S:只恢复文件尾2MiB有效行并保留默认500条；文件追加错误被忽略，日志不等于业务状态权威
+request.go[AB9S]: F:分阶段校验接纳公共跟踪申请并保留可能的部分写入 | R:code:backend/internal/tracker/request_policy.go,code:backend/internal/storage/target_lookup.go | A:RequestTarget | S:已有启用目标直接复用，暂停不恢复；查询可取消，有效结果进入保存后脱离请求取消并用独立预算；阶段间非全局事务，失败先核对后重试
+request_policy.go[CR8T]: F:定义显式申请分阶段预算、存储能力和可解包错误链 | R:code:backend/internal/tracker/request.go | A:DefaultRequestBudgets,RequestError | S:检查2秒、查询12秒、保存5秒、建任务3秒；unknown不能补偿删除，仅ErrTxDone补阶段取消原因
+scheduler.go[AW7T]: F:周期读取到期目标并串行采集后推进调度 | R:code:backend/internal/tracker/tracker.go,code:backend/internal/storage/repo.go | A:Run | S:启动立即执行，默认30秒每轮最多10项；每目标2分钟，失败也推进next_run_at
+tracker.go[AB8M]: F:协调单目标采集、去重、存储、日指标与工作停止等待 | R:code:backend/internal/storage/repo.go,code:backend/internal/source/source.go | A:RunTarget,RunNow,Stop,Wait | S:同目标互斥；显式申请在途上限16，RunNow先登记再启动；Stop后Wait才可关库，running不持久化；指标按UTC日覆盖
+
+===/<repository>/client/===
+README.md[SU6S]: F:维护客户端当前功能、共享需求、私人数据归属和后续Qt路线 | R:code:client/agent/README.md,code:client/frontend/README.md | A:- | S:Qt迁移未启动；下载、完整备份和云盘未实现；本地关注不等于公共跟踪
+go.mod[FV5T]: F:声明独立客户端Go模块和Go1.26工具链要求 | R:code:client/agent/cmd/agent/main.go | A:- | S:-
+package.json[FV5T]: F:声明原生ES模块客户端及Node语法检查和三套测试入口 | R:code:client/frontend/view.test.mjs | A:- | S:lint为node --check，无第三方前端依赖
+
+===/<repository>/client/agent/===
+README.md[SU5T]: F:导航Agent服务、27项API、任务生命周期与本地远端边界 | R:code:client/agent/cmd/agent/main.go | A:- | S:关闭网页不停止后台扫描，Cookie不传公共服务器
+
+===/<repository>/client/agent/cmd/agent/===
+browser_other.go[IU5T]: F:在非Windows平台用系统程序打开默认浏览器并异步回收子进程 | R:code:client/agent/cmd/agent/startup.go | A:openBrowser | S:参数直接传程序，不拼Shell；macOS用open，其余用xdg-open
+browser_windows.go[IU6T]: F:在Windows同一OS线程初始化COM并调用默认URL处理程序 | R:code:client/agent/cmd/agent/startup.go | A:openBrowser | S:ShellExecuteW不经过命令Shell；启动认证使用URL片段
+main.go[AG8T]: F:组装本地状态、扫描、关注库、回环HTTP与浏览器启动生命周期 | R:code:client/agent/internal/httpapi/server.go,code:client/agent/internal/scanner/service.go | A:run | S:仅监听回环IP，监听成功后才打开浏览器；HTTP写入95秒，关闭扫描会等待结果保存
+startup.go[IU6T]: F:在监听后公告本地地址并以片段密钥打开浏览器 | R:code:client/agent/cmd/agent/main.go | A:announceStartup | S:自动打开成功时输出隐藏密钥；禁用或失败才显示本次完整手动链接
+
+===/<repository>/client/agent/internal/bilibili/===
+client.go[IB8M]: F:校验本地Cookie与账号并使用WBI读取当前可见投稿分页 | R:code:client/agent/internal/bilibili/wbi.go | A:NormalizeCookie,Login,Videos | S:Cookie每请求显式传入；禁止重定向与合集回退；页大小30，合作投稿不按主作者过滤，风险响应停止
+wbi.go[IN7T]: F:从nav图片URL材料生成WBI密钥并签名投稿查询参数 | R:code:client/agent/internal/bilibili/client.go | A:NewKeys,Sign | S:不下载图片；签名复制参数并过滤特殊字符，空格编码%20，MD5只用于协议签名
+
+===/<repository>/client/agent/internal/httpapi/===
+library.go[EU7M]: F:以既有本地会话提供关注、远端查询、图片地址与目录操作API | R:code:client/agent/internal/httpapi/server.go,code:client/agent/internal/library/service.go | A:libraryRoutes | S:浏览投稿只组合已有扫描结果；关注前捕获扫描上下文避免跨任务污染，不将Cookie传远端
+server.go[ES9M]: F:保护回环网页和API，交换启动密钥会话并提供配置扫描接口 | R:code:client/agent/internal/scanner/service.go,code:client/frontend/assets.go | A:New,ServeHTTP | S:精确Host、Origin、HttpOnly会话及CSRF独立校验；最多32个12小时会话；Cookie不回网页；JS/MJS显式MIME配合nosniff
+
+===/<repository>/client/agent/internal/library/===
+catalog.go[DB7M]: F:对本地关注与扫描投稿先筛选排序后分页并保存发现上下文 | R:code:client/agent/internal/library/service.go | A:ListCatalog,ScanCatalog | S:未知指标排末尾；合作投稿归属保留扫描UP上下文，不把服务器跟踪当私人关注
+images.go[AD7S]: F:按目标版本合并请求并缓存既有快照的图片URL | R:code:client/agent/internal/remote/image.go | A:Image | S:最多4并发与2000条；当前版本缓存15分钟，失败退避1分钟；仅解析地址不代理字节，切服拒旧结果
+pending.go[AW7T]: F:每轮选择到期关注核对并退避重试公共跟踪申请 | R:code:client/agent/internal/library/reconciliation.go | A:RunPending | S:固定从关注开头每轮最多3项，轮后30秒，确认15分钟后到期；大队列存在尾部饥饿待修复
+reconciliation.go[AB8S]: F:精确核对本地关注对应的服务器任务并在明确缺失时补申请 | R:code:client/agent/internal/library/service.go,code:client/agent/internal/remote/client.go | A:Reconcile | S:同目标合并且核验服务器代际和随机关注身份；暂停不恢复；失败1至15分钟退避，6次转人工；查询成功不清申请失败计数
+service.go[AD9L]: F:管理私人关注、服务器配置、公共读取、详情缓存及一致性写回 | R:code:client/agent/internal/localstate/store.go,code:client/agent/internal/library/reconciliation.go | A:Follow,Configure,Detail | S:先落盘才更新内存，网络锁外；取关仅本地；切服清缓存并递增代际，随机关注身份隔离重关注旧响应；仅默认30日第一页作离线详情回退
+summaries.go[AD8S]: F:独立同步当前页关注摘要并合并并发读取和保护写回 | R:code:client/agent/internal/library/service.go,code:client/agent/internal/remote/client.go | A:SyncSummaries,setSummary | S:每轮最多24项且20秒；只按ID精确查不扫全库，部分成功保留；不能倒退观测或版本，不改变申请退避
+
+===/<repository>/client/agent/internal/localstate/===
+directory.go[PD8T]: F:在存储锁内复制已知状态并原子切换活动目录指向 | R:code:client/agent/internal/localstate/store.go | A:SwitchDirectory | S:目标必须空绝对目录且不能在原目录内；保留原文件，失败可能留部分副本但不切换；只复制三种状态文件
+protect_other.go[PS7T]: F:在非Windows平台禁用Cookie持久化保护接口 | R:code:client/agent/internal/localstate/store.go | A:persistentCookie | S:未接系统凭据库时仅内存保留Cookie，绝不明文回退
+protect_windows.go[PS8T]: F:以Windows当前用户DPAPI保护和解密本地Cookie | R:code:client/agent/internal/localstate/store.go | A:protect,unprotect | S:不启用LOCAL_MACHINE，不读取浏览器凭据库；密文不能视为跨用户可迁移备份
+store.go[PD8S]: F:持久化关注、扫描与受保护Cookie并解析活动目录指向 | R:code:client/agent/internal/localstate/directory.go,code:client/agent/internal/localstate/protect_windows.go | A:New,SaveLibrary,SaveScan | S:存储与迁移共用锁；临时文件0600同步后Rename；指向最多8层且防环，Cookie无明文回退，状态读取有界
+
+===/<repository>/client/agent/internal/remote/===
+client.go[IN8L]: F:实现8181固定路径公共协议、目标校验、错误兼容与共享节流 | R:code:client/agent/internal/library/reconciliation.go,code:backend/internal/publicapi/response.go | A:Status,Submit,Detail,Catalog | S:不转发Cookie会话且拒重定向；8MiB响应上限；150毫秒启动节流并共享冷却；提交55秒、状态8秒；HTTP200仍检查业务失败，POST超时结果未知
+image.go[IS7T]: F:从已有视频作者快照提取并规范化白名单CDN图片地址 | R:code:client/agent/internal/library/images.go | A:NormalizeImageURL,SnapshotImageURL | S:只许hdslb.com或biliimg.com及子域；升级HTTPS，禁止凭据端口其他协议，不下载图片
+
+===/<repository>/client/agent/internal/scanner/===
+service.go[AW8L]: F:管理单个可恢复投稿扫描任务、Cookie验证和逐页检查点 | R:code:client/agent/internal/bilibili/client.go,code:client/agent/internal/localstate/store.go | A:Start,Cancel,Close | S:不绑定网页请求；只保留最近扫描，恢复须同账号；数量变化、重复页与未覆盖空页为partial；成功页逐页落盘，重启改interrupted而不自动重放
+
+===/<repository>/client/frontend/===
+README.md[SU5T]: F:导航原生浏览器客户端模块、同源API与当前交付范围 | R:code:client/frontend/app.js | A:- | S:资源内嵌Agent，修改后须重构建；完整数据管理仍待实施
+app.css[FU4T]: F:定义本地工作台导航、关注、发现、配置和响应式基础样式 | R:code:client/frontend/index.html | A:- | S:-
+app.js[EU7S]: F:协调本地会话、Cookie配置、扫描轮询、结果分页复制与导出 | R:code:client/frontend/library.js,code:client/frontend/view.mjs | A:- | S:启动密钥从片段取出即移除；Cookie与密钥不入浏览器存储，提交后清空Cookie输入；关闭网页不取消后台扫描
+assets.go[RU6T]: F:将原生界面资源嵌入Go Agent以同源发布 | R:code:client/agent/internal/httpapi/server.go | A:Files | S:不需要Node构建；修改资源后须重新构建Agent
+cards.js[EU6T]: F:共用渲染UP视频投稿卡片、图片、指标与本地关注管理 | R:code:client/frontend/images.js,code:client/frontend/view.mjs | A:renderCards | S:未成功记录的扫描视频链接B站；未知值不补零，远程文字通过textContent渲染
+catalog.css[FU5S]: F:定义三档卡片密度、详情左右布局、版本差异与趋势样式 | R:code:client/frontend/index.html | A:- | S:手机纵向布局，密度改变实际信息层级
+creator-videos.js[AU6T]: F:编排UP详情内关注视频与未关注扫描投稿、分页和显式扫描 | R:code:client/frontend/cards.js | A:initCreatorVideos | S:浏览不启动扫描；另一UP任务不在当前页取消，代际拒绝旧页结果；只处理当前页摘要同步
+detail.js[AU7T]: F:编排详情资料、指标趋势、版本分页及与上一快照内容差异 | R:code:client/frontend/trend.mjs,code:client/frontend/view.mjs | A:initDetail | S:版本请求用独立代际隔离；上一版失败不伪造差异，范围失败保留原成功数据；离线不冒用历史快照
+images.js[EU7T]: F:白名单校验图片URL并按可见区域懒加载和合并元数据请求 | R:code:client/agent/internal/library/images.go | A:safeImageURL,initImages | S:最多4请求且缓存最多500；切服清缓存并拒旧代际，图片直连CDN并no-referrer，失败保留占位
+images.test.mjs[TS5T]: F:验证图片域名、协议、凭据端口边界及头像封面快照字段 | R:code:client/frontend/images.js | A:- | S:-
+index.html[FU6T]: F:定义侧栏工作台、公开库、详情、扫描、设置与认证表单结构 | R:code:client/frontend/app.js | A:- | S:仅展示已实现功能；初始静态内容需模块初始化后交互
+library.js[AU7S]: F:协调总览独立分页、本地与公共库、关注摘要同步和连接目录设置 | R:code:client/frontend/detail.js,code:client/frontend/cards.js | A:initLibrary | S:摘要按当前页集合60秒复用且切服代际隔离；浏览器只保存卡片密度；目录迁移在界面明确确认
+navigation.js[EU6T]: F:驱动白名单片段路由、页面标题、侧栏和移动导航 | R:code:client/frontend/view.mjs | A:initNavigation | S:路由切换不停止后台任务，保留详情来源；非法片段回总览
+trend.mjs[KU7T]: F:将真实UTC日采样去重建模并渲染SVG趋势与指针提示 | R:code:client/frontend/view.mjs | A:trendModel,renderTrend | S:同日取最新，缺失日断线不插值，少于两点无净变化，负增长和有效零保留
+trend.test.mjs[TU5T]: F:验证UTC日采样去重、缺口、负增长及空单点边界 | R:code:client/frontend/trend.mjs | A:- | S:-
+view.mjs[CU7T]: F:提供路由、真实进度、状态时间数值和内容差异展示函数 | R:code:client/frontend/view.test.mjs | A:routeForHash,progress,followState | S:只有明确complete显示100%；兼容秒与毫秒，业务码区分缓存原因，统计变化不列内容修改
+view.test.mjs[TU5T]: F:验证路由、时区、进度、关注确认及缓存业务提示语义 | R:code:client/frontend/view.mjs | A:- | S:-
+
+===/<repository>/docs/===
+PRD.md[SB7L]: F:定义公共历史追踪与本地Agent平台的产品目标、业务规则及分期验收 | R:code:client/README.md,code:docs/client-server-architecture.md | A:- | S:需求不等于已实现；公共数据无个人订阅账号，私人档案与媒体属本地，异常不直接推断删除
+architecture.md[SG8L]: F:维护全仓模块源码测试导航、依赖边界与查询执行链路，并标明详情数据来源调整规划 | R:code:backend/cmd/server/main.go,code:client/agent/cmd/agent/main.go,code:docs/client-detail-data-sources.md | A:- | S:当前能力与后续规划分开；详情来源和回退设计尚未实施；schema4迁移不回填裁剪历史；部分旧示例须结合最新协议理解
+client-catalog.md[SU6S]: F:说明卡片密度、全量排序分页、独立摘要、UP视频区和详情数据口径，并链接后续来源回退设计 | R:code:client/agent/internal/library/catalog.go,code:client/frontend/detail.js,code:docs/client-detail-data-sources.md | A:- | S:近7日统计仅已记录范围；缓存与跟踪确认独立；仅默认30日第一页供离线回退；新来源方案待实施
+client-data-management.md[SD6T]: F:设计私人档案管理、一致性备份恢复及未来自选云盘 | R:code:client/README.md | A:- | S:仍属设计；默认排除凭据媒体，恢复不重放任务，DPAPI文件不能作跨用户凭据包
+client-discovery.md[SI6S]: F:说明Cookie验证、WBI投稿扫描、完整性、会话与系统持久化 | R:code:client/agent/internal/scanner/service.go | A:- | S:扫描模块不建公共跟踪；模拟验收不代表真实账号全量覆盖
+client-launch-media.md[SU6T]: F:说明Agent默认浏览器启动认证与历史快照图片地址加载 | R:code:client/agent/cmd/agent/startup.go,code:client/frontend/images.js | A:- | S:图片直连白名单CDN不代理；文中8182链路为历史口径，当前公共端口以public-api为准
+client-library.md[SB6T]: F:说明已实现本地关注、服务器资料接入、缓存和公共申请协议 | R:code:client/agent/internal/library/service.go | A:- | S:取关只影响本地；已启用目标复用不改调度，完整公网准入仍待实施
+client-server-architecture.md[SG7M]: F:定义服务器公共历史与本地私人关注、发现任务和未来下载的协作 | R:code:docs/public-api.md,code:docs/client-data-management.md | A:- | S:部分实现；服务准入不是个人账户，未来Qt不改变归属，目标标识请求不承诺匿名
+client-ux-feedback.md[SU3T]: F:保留用户对侧栏、公开总览、双库自动关注及设置的原始体验要求 | R:code:docs/client-workspace.md | A:- | S:-
+client-workspace.md[SU6S]: F:记录工作台来源、关注自动核对、目录迁移和模块加载故障证据 | R:code:client/agent/internal/library/pending.go,code:client/frontend/library.js | A:- | S:故障章节保存历史待验收记录，不应把旧text/plain响应当当前代码行为
+dashboard.md[SU6S]: F:定义观察台页面、状态、新鲜度、统计指标和内部交互口径 | R:code:backend/internal/storage/dashboard.go,code:backend/internal/admin/pages.go | A:- | S:last_run不等于成功时间，running仅进程内；首次收录不算内容更新，未知不补零
+database.md[SD8L]: F:定义当前索引、业务快照版本、日指标及调度表模型与事务读写规则 | R:code:backend/internal/storage/repo.go,code:backend/internal/storage/fingerprint.go | A:- | S:内容和统计分开；相邻指纹判变，A到B再A追加新序号；视频只滤顶层合集且旧payload不重写；调度为独立第六表
+performance-analysis-2026-11-18.md[SP6S]: F:分析2026年11月18日UP详情负载与CPU采样的查询热点和重复读取 | R:code:perf-creator-profile.json,code:backend/internal/storage/dashboard.go | A:- | S:CPU归因不能量化连接池排队；证据指向Content复用Catalog及重复读取，不据HTTP宽栈更换协议
+performance-profiling.md[SO6S]: F:提供独立回环pprof配置、负载采样、SSH火焰图和等待内存诊断步骤 | R:code:backend/cmd/server/profiling.go | A:- | S:已结束负载不能补采；CPU热点与阻塞等待分开解释
+public-api.md[SN7S]: F:规定8181公共JSON路由、共享请求限制、有界申请和8182管理迁移 | R:code:backend/internal/publicapi/server.go,code:docs/public-response.md | A:- | S:顶部新协议覆盖旧HTTP映射，业务限流HTTP200仍检查code；现有限流不等于认证或长期预算
+public-response.md[SN8T]: F:规定公共业务HTTP200的ok/code、目标状态、Agent核对与兼容边界 | R:code:backend/internal/publicapi/response.go,code:client/agent/internal/remote/client.go | A:- | S:请求格式和内部故障保留HTTP错误；暂停不恢复，6次失败转人工，缺资料不等于连接失败
+request-stages.md[SN8S]: F:定义跟踪申请各阶段预算、结果未知、批量截止和停机收尾契约 | R:code:backend/internal/tracker/request.go,code:backend/internal/publicapi/targets.go | A:- | S:整次申请无统一事务，部分提交不删除；查询取消但有效资料可独立保存，超时先核对；Agent等待长于服务器收尾
+video-discovery.md[SB7S]: F:定义作者待添加视频融合、分页、选择、批量任务和重试边界 | R:code:backend/internal/discovery/service.go,code:backend/internal/provider/bilibili/list_page.go | A:- | S:仅显式导入写入，默认不选；完整只指本次可发现范围；20分钟内存会话不作永久同步游标
+client-detail-data-sources.md[SU7S]: F:设计Agent平台当前资料、服务器历史跟踪与平台失败回退的职责、查询预算、缓存和按需版本契约 | R:code:PLANs/2026-11-19-client-detail-data-sources.md,code:backend/internal/publicapi/read.go,code:client/agent/internal/library/service.go | A:- | S:尚未实施；正常2次SQL，平台失败回退额外最多1次；即时值不写历史，seq仅绑定服务器资料
+
+===/<repository>/scripts/perf/===
+.gitignore[FV2T]: F:排除性能脚本运行生成的Python字节码目录 | R:- | A:- | S:-
+README.md[SP6S]: F:说明标准库多Agent负载工具、详情混合health场景与申请诊断统计口径 | R:code:client/agent/internal/remote/client.go | A:- | S:默认只读不重试POST；capacity去客户端节流，health差值不等于HTTP成本，退出0不表示业务全成功
