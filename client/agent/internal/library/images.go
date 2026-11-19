@@ -109,7 +109,7 @@ func (s *Service) readImage(ctx context.Context, base, kind, id string, seq int6
 	var data remote.Detail
 	var err error
 	if s.current != nil {
-		data, err = s.client.History(ctx, base, kind, id, 1, seq, "30")
+		data, err = s.client.HistoryPage(ctx, base, kind, id, 1, seq, "30")
 	} else {
 		data, err = s.client.Detail(ctx, base, kind, id, 1, seq)
 	}

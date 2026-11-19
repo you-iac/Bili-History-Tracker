@@ -77,8 +77,8 @@ func (c *Client) Metadata(ctx context.Context, base, kind, id string) (Item, err
 	return data.Item, err
 }
 
-// History 只读取历史，指定seq时校验所选快照，不回退完整详情。
-func (c *Client) History(ctx context.Context, base, kind, id string, page int, seq int64, days string) (Detail, error) {
+// HistoryPage 读取分页历史，指定 seq 时校验所选快照，不回退完整详情。
+func (c *Client) HistoryPage(ctx context.Context, base, kind, id string, page int, seq int64, days string) (Detail, error) {
 	var data Detail
 	if days == "" {
 		days = "30"

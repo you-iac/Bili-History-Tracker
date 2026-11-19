@@ -33,4 +33,6 @@
 
 详情只读取一次目标摘要，复用请求内资料组装应答，同时重新确认任务启停和运行状态；观测字段沿用本次摘要，不跨请求缓存。调用与 SQL 成本见 [详情性能](../../../docs/detail-query-performance.md)，回归见 [detail_query_test.go](detail_query_test.go)。
 
+[detail_sources.go](detail_sources.go) 提供 `/api/detail/{type}/{id}` 基础历史（2次SQL）、`/saved` 保存资料、`/versions` 游标列表和 `/snapshot?seq=...` 指定快照（各1次SQL）。正常路径不读版本payload、不经过Catalog；未记录资料与真实任务状态独立，读取不触发申请或采集。入口及缓存边界见 [详情来源设计](../../../docs/client-detail-data-sources.md)，回归见 [独立读取](detail_sources_test.go) 和 [显式本机容量对照](detail_load_test.go)。
+
 测试入口：[业务组合与整数精度](response_test.go)、[路由隔离与旧 API](routes_test.go)、[限流并发与滚动窗口](limit_test.go)、[截断、应答和副作用](targets_test.go)、[只读协议](read_test.go)。

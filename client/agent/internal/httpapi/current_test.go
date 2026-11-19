@@ -19,7 +19,7 @@ type currentPlatform struct{}
 
 func (currentPlatform) Current(_ context.Context, kind, id string) (bilibili.Metadata, error) {
 	value := int64(100)
-	return bilibili.Metadata{Kind: kind, ID: id, Name: "本地视频", Cover: "https://i0.hdslb.com/current.jpg", Metric: &value, OwnerID: "123", At: time.Now().UnixMilli()}, nil
+	return bilibili.Metadata{Kind: kind, ID: id, Name: "本地视频", Cover: "https://i0.hdslb.com/current.jpg", Metric: &value, OwnerID: "123", ObservedAt: time.Now().UnixMilli()}, nil
 }
 
 func TestCurrentPageHTTPRefreshAndCreatorFollowedVideos(t *testing.T) {

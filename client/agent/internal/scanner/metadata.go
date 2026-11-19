@@ -17,10 +17,10 @@ func (s *Service) Current(ctx context.Context, kind, id string) (bilibili.Metada
 		return bilibili.Metadata{}, errors.New("本地平台服务已关闭。")
 	}
 	provider, ok := api.(interface {
-		Current(context.Context, string, string, string) (bilibili.Metadata, error)
+		CurrentWithCookie(context.Context, string, string, string) (bilibili.Metadata, error)
 	})
 	if !ok {
 		return bilibili.Metadata{}, errors.New("本地平台暂不支持当前资料查询。")
 	}
-	return provider.Current(ctx, cookie, kind, id)
+	return provider.CurrentWithCookie(ctx, cookie, kind, id)
 }

@@ -67,7 +67,7 @@ func TestModuleMIMEOverridesMachineMapping(t *testing.T) {
 	defer mime.AddExtensionType(".mjs", original)
 	_ = mime.AddExtensionType(".mjs", "text/plain")
 	h := setup(t)
-	for _, asset := range []string{"app.js", "navigation.js", "library.js", "view.mjs", "trend.mjs", "cards.js", "detail.js", "creator-videos.js", "images.js"} {
+	for _, asset := range []string{"app.js", "navigation.js", "library.js", "view.mjs", "trend.mjs", "cards.js", "detail.js", "detail-sources.mjs", "creator-videos.js", "images.js"} {
 		for _, method := range []string{"GET", "HEAD"} {
 			r := h.call(method, "/"+asset, "")
 			if r.Code != 200 || !strings.HasPrefix(r.Header().Get("Content-Type"), "text/javascript") || r.Header().Get("X-Content-Type-Options") != "nosniff" {

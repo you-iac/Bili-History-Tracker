@@ -5,6 +5,7 @@
 // 申请阶段预算及有界收尾见 docs/request-stages.md。
 // 详情复用请求内摘要，独立确认任务状态；查询边界见 docs/detail-query-performance.md。
 // 本地优先客户端使用批量采样、历史专用和资料兜底入口，见 docs/local-first-metadata.md。
+// detail_sources.go 的独立历史/资料回退不调用目录聚合，见 docs/client-detail-data-sources.md。
 package publicapi
 
 import (
@@ -43,6 +44,9 @@ type historyReader interface {
 	Versions(context.Context, string, string, string, string, int, int, int) (storage.VersionPage, error)
 	Metrics(context.Context, string, string, string, int, time.Time) (storage.MetricSeries, error)
 	ReadSnapshot(context.Context, string, string, string, int64) (storage.Snapshot, error)
+	ReadDetailTarget(context.Context, string, string, string, time.Time) (storage.DetailRecord, error)
+	ReadSavedContent(context.Context, string, string, string) (storage.SavedContent, error)
+	ReadDetailVersions(context.Context, string, string, string, int64) (storage.DetailVersions, error)
 }
 
 // Server 与后台共享存储和采集实例，只注册明确允许公开的操作。
@@ -94,6 +98,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/metrics/batch", s.batchMetrics)
 	mux.HandleFunc("GET /api/metadata/{type}/{id}", s.metadata)
 	mux.HandleFunc("GET /api/history/{type}/{id}", s.history)
+	mux.HandleFunc("GET /api/detail/{type}/{id}", s.detailHistory)
+	mux.HandleFunc("GET /api/detail/{type}/{id}/{part}", s.detailSources)
 	mux.HandleFunc("POST /targets", s.requestTarget)
 	mux.HandleFunc("/api/v1/", s.legacyJSON)
 	return newGate(s.config.RequestsPerSecond).wrap(mux)

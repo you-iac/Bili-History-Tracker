@@ -13,6 +13,7 @@ import (
 )
 
 func (s *Server) libraryRoutes() {
+	s.detailSourceRoutes()
 	s.mux.HandleFunc("POST /api/follows/refresh", func(w http.ResponseWriter, r *http.Request) {
 		count, err := s.library.SyncSummaries(r.Context(), r.URL.Query().Get("kind"), r.URL.Query()["id"]...)
 		if err != nil {

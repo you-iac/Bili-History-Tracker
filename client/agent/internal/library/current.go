@@ -66,7 +66,7 @@ func (s *Service) readCurrent(ctx context.Context, kind, id string) (remote.Item
 		if data.Kind != kind || data.ID != id || data.Name == "" || data.Metric != nil && *data.Metric < 0 {
 			err = errors.New("本地平台资料身份或数量无效。")
 		} else {
-			item = remote.Item{Kind: kind, ID: id, Name: data.Name, Cover: remote.NormalizeImageURL(data.Cover), OwnerID: data.OwnerID, OwnerName: data.OwnerName, Metric: data.Metric, PublishedAt: data.PublishedAt, MetadataSource: "bilibili", MetadataAt: data.At}
+			item = remote.Item{Kind: kind, ID: id, Name: data.Name, Cover: remote.NormalizeImageURL(data.Cover), OwnerID: data.OwnerID, OwnerName: data.OwnerName, Metric: data.Metric, PublishedAt: data.PublishedAt, MetadataSource: "bilibili", MetadataAt: data.ObservedAt}
 		}
 	}
 	s.mu.Lock()
@@ -343,7 +343,7 @@ func (s *Service) syncLocalSummaries(ctx context.Context, kind string, ids []str
 
 func (s *Service) localDetail(ctx context.Context, base, kind, id string, page int, seq int64, days string) (remote.Detail, error) {
 	if seq > 0 {
-		return s.client.History(ctx, base, kind, id, page, seq, days)
+		return s.client.HistoryPage(ctx, base, kind, id, page, seq, days)
 	}
 	if days != "" && days != "7" && days != "30" && days != "90" && days != "all" || page < 1 || page > 100000 {
 		return remote.Detail{}, &Error{Message: "历史查询范围或页码无效。", Status: 400}
@@ -358,7 +358,7 @@ func (s *Service) localDetail(ctx context.Context, base, kind, id string, page i
 	}
 	s.mu.Unlock()
 	current, currentErr := s.currentOrFallback(ctx, base, kind, id)
-	data, readErr := s.client.History(ctx, base, kind, id, page, 0, days)
+	data, readErr := s.client.HistoryPage(ctx, base, kind, id, page, 0, days)
 	if readErr != nil {
 		data.Item = seed
 	}

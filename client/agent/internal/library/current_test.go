@@ -39,7 +39,7 @@ func (s *currentStore) SaveLibrary(v any) error {
 
 func currentData(kind, id string) bilibili.Metadata {
 	metric := int64(123)
-	return bilibili.Metadata{Kind: kind, ID: id, Name: "本地 " + id, Cover: "https://i0.hdslb.com/local.jpg", Metric: &metric, OwnerID: "123", PublishedAt: time.Now().UTC().Truncate(24 * time.Hour).UnixMilli(), At: time.Now().UnixMilli()}
+	return bilibili.Metadata{Kind: kind, ID: id, Name: "本地 " + id, Cover: "https://i0.hdslb.com/local.jpg", Metric: &metric, OwnerID: "123", PublishedAt: time.Now().UTC().Truncate(24 * time.Hour).UnixMilli(), ObservedAt: time.Now().UnixMilli()}
 }
 
 func TestLocalPageUsesOneHistoryBatchAndPersistsMetadata(t *testing.T) {

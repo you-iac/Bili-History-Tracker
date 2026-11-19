@@ -65,7 +65,7 @@ export function initLibrary({api,notify,onScan,navigate}) {
     if(publicMode&&state.sort==='added')state.sort='published';
     if(publicMode&&creator&&['views','published'].includes(state.sort))state.sort='popular';
     $('library-title').textContent=publicMode?(creator?'服务器公开 UP 库':'服务器公开视频库'):(creator?'我的 UP 主库':'我的视频库');
-    $('library-description').textContent=publicMode?'搜索服务器已记录的目标，当前资料优先在本地查询 B站。':'个人关注保存在本机，当前资料优先查询 B站，历史变化由服务器提供。';
+    $('library-description').textContent=publicMode?'搜索服务器已记录的目标；公开记录只展示服务器已有数据，关注后自动申请持续跟踪。':'个人关注保存在本机，先展示缓存，打开详情或刷新后从 B站和服务器更新资料。';
     $('scope-local').setAttribute('aria-pressed',String(!publicMode));$('scope-public').setAttribute('aria-pressed',String(publicMode));
     $('library-query').placeholder=creator?'搜索名称、UID 或 B站空间链接':'搜索标题、BV 号或 B站视频链接';
     $('library-sort').value=state.sort;

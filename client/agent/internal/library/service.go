@@ -1,15 +1,17 @@
-// Package library 管理本地私人 UP/视频关注、服务器地址与最近读取的公共资料。
+// Package library 管理私人关注、平台当前资料、服务器历史与各自来源隔离的缓存。
 // 写入成功才更新内存；网络操作在锁外执行，取消关注不会请求服务器停采。见 docs/client-library.md。
 // 摘要同步独立于关注提交，范围匹配的详情才可作为离线缓存。
 // 浏览/后台核对、JSON业务失败和有界重试见 docs/public-response.md。
 // 自动关注、公开查询和退避队列见 docs/client-workspace.md；独立详情与匹配缓存见 docs/client-catalog.md；图片地址缓存见 docs/client-launch-media.md。
 // 正常Agent注入CurrentSource，当前资料本地查询、历史批读与UP本地汇总见 docs/local-first-metadata.md。
+// 平台优先、服务器资料回退和并发约定见 detail_sources.go 与 docs/client-detail-data-sources.md。
 package library
 
 import (
 	"context"
 	"crypto/rand"
 	"errors"
+	"maps"
 	"net/url"
 	"regexp"
 	"strings"
@@ -47,6 +49,7 @@ type Follow struct {
 	NeedsAttention   bool            `json:"needs_attention,omitempty"`
 	Summary          *remote.Item    `json:"summary,omitempty"`
 	SummaryAt        *time.Time      `json:"summary_at,omitempty"`
+	Current          *CurrentView    `json:"current,omitempty"`
 	DiscoveryOwnerID string          `json:"discovery_creator_id,omitempty"`
 	Discovery        *bilibili.Video `json:"discovery,omitempty"`
 	Kind             string          `json:"kind"`
@@ -62,6 +65,8 @@ type Follow struct {
 	NextAttempt      *time.Time      `json:"next_attempt_at,omitempty"`
 }
 type state struct {
+	Current   map[string]CurrentView `json:"current_profiles,omitempty"`
+	History   map[string]HistoryView `json:"detail_history,omitempty"`
 	Images    map[string]ImageRecord `json:"images,omitempty"`
 	Version   int                    `json:"version"`
 	ServerURL string                 `json:"server_url"`
@@ -81,6 +86,9 @@ type Service struct {
 	currentCache    map[string]currentRecord
 	currentCalls    map[string]*currentCall
 	currentCooldown time.Time
+	detailCurrentCalls    map[string]*detailCurrentCall
+	detailHistoryCalls    map[string]*detailHistoryCall
+	detailCurrentFailures map[string]detailCurrentFailure
 	summaryCalls    map[string]*summaryCall
 	serverEpoch     uint64
 	imageCalls      map[string]*imageCall
@@ -102,6 +110,9 @@ func New(store Storage, client *remote.Client, sources ...CurrentSource) (*Servi
 	if len(sources) > 0 {
 		s.current = sources[0]
 	}
+	s.detailCurrentCalls = map[string]*detailCurrentCall{}
+	s.detailHistoryCalls = map[string]*detailHistoryCall{}
+	s.detailCurrentFailures = map[string]detailCurrentFailure{}
 	if err := store.LoadLibrary(&s.state); err != nil {
 		return nil, errors.New("关注库无法读取，请先备份 library.json 后检查文件")
 	}
@@ -187,6 +198,13 @@ func (s *Service) Configure(input string) error {
 	next.ServerURL = base
 	next.Overview = nil
 	next.Images = nil
+	next.History = nil
+	next.Current = maps.Clone(s.state.Current)
+	for key, value := range next.Current {
+		if value.Source == "server" {
+			delete(next.Current, key)
+		}
+	}
 	for i := range next.Follows {
 		var localCurrent *remote.Item
 		if s.current != nil && next.Follows[i].Summary != nil && next.Follows[i].Summary.MetadataSource == "bilibili" {
@@ -220,6 +238,7 @@ func (s *Service) Configure(input string) error {
 	err = s.save(next)
 	if err == nil {
 		s.serverEpoch++
+		clear(s.detailCurrentFailures)
 		clear(s.imageErrors)
 		select {
 		case s.wake <- struct{}{}:

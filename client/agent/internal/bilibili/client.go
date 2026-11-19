@@ -1,7 +1,7 @@
 // Package bilibili 提供本地 Cookie 登录验证、UP 主投稿分页与当前视频/作者资料查询。
 // Cookie 显式传入，不读取环境变量、不回退公开合集发现、不返回原始响应。
 // 固定 HTTPS 地址且禁止重定向；设计与接口来源见 docs/client-discovery.md。
-// 当前资料的本地优先与服务器兜底职责见 docs/local-first-metadata.md。
+// 当前资料的本地优先、详情来源与服务器兜底职责见 docs/local-first-metadata.md 和 docs/client-detail-data-sources.md。
 package bilibili
 
 import (
@@ -187,6 +187,10 @@ func (c *Client) Videos(ctx context.Context, cookie, uid string, page int, keys 
 }
 
 func (c *Client) get(ctx context.Context, route string, query url.Values, cookie, uid string, target any) error {
+	return c.getWith(ctx, c.http, route, query, cookie, uid, target)
+}
+
+func (c *Client) getWith(ctx context.Context, client *http.Client, route string, query url.Values, cookie, uid string, target any) error {
 	endpoint := "https://api.bilibili.com" + route
 	if len(query) > 0 {
 		endpoint += "?" + query.Encode()
@@ -195,11 +199,13 @@ func (c *Client) get(ctx context.Context, route string, query url.Values, cookie
 	if err != nil {
 		return &Error{Code: "network", Message: "无法创建平台请求。"}
 	}
-	req.Header.Set("Cookie", cookie)
+	if cookie != "" {
+		req.Header.Set("Cookie", cookie)
+	}
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
 	req.Header.Set("Referer", "https://space.bilibili.com/"+uid)
-	resp, err := c.http.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		if ctx.Err() != nil {
 			return ctx.Err()
