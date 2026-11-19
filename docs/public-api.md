@@ -43,6 +43,10 @@
 | `GET /` | 公共统计及近期内容，不包含管理日志、凭据或私人数据 |
 | `GET /creators`、`GET /videos` | 数据库目录；保留 `q/id/owner/sort/page` 参数及 `items/page/limit/total` 响应 |
 | `GET /detail/{type}/{id}` | 数据库详情、`days=7/30/90/all` 指标、版本分页及可选 `seq` 快照 |
+| `GET /api/detail/{type}/{id}?days=7或30或90或all` | 轻量服务器 `record/target/metrics`；不返回当前快照、版本列表或总数，2次SQL |
+| `GET /api/detail/{type}/{id}/saved` | 最后保存的归一化 `item/description/snapshot_at`，seq与资料同次关联，1次SQL；供平台读取失败后回退 |
+| `GET /api/detail/{type}/{id}/versions?before=正序号` | 递减seq的十条游标页；`items/has_more/next_before`，无总数，1次SQL |
+| `GET /api/detail/{type}/{id}/snapshot?seq=正序号` | 只读指定版本 `kind/id/seq/at/snapshot`，1次SQL |
 | `GET /api/targets/status?kind=...&id=...` | 精确返回 `kind/id/recorded/tracking/status`；未知目标不等于下架 |
 | `GET /api/metrics/{type}/{id}?days=...` | 已有成功资料的目标指标历史；作者占位行返回 `DETAIL_NOT_RECORDED` 与真实任务状态，完整资料无样本时成功返回空数组；沿用真实 UTC 日采样口径 |
 | `POST /targets` | 单目标或有上限的批量申请，只接受 JSON，不接受后台表单或采集间隔 |

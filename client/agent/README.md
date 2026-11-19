@@ -23,7 +23,7 @@ Agent 是运行在本机的 Go 程序：提供网页、本地 UP/视频关注库
 | 模块 | 职责 |
 |---|---|
 | [main](cmd/agent/main.go) | 组装回环服务并自动打开已认证网页，默认8183 |
-| [httpapi](internal/httpapi/server.go)、[关注接口](internal/httpapi/library.go) | 网页与27个API，会话、来源、CSRF保护 |
+| [httpapi](internal/httpapi/server.go)、[关注接口](internal/httpapi/library.go)、[独立资料接口](internal/httpapi/detail_sources.go) | 网页与32个API，会话、来源、CSRF保护 |
 | [library](internal/library/service.go) | 本地关注/公开搜索、总览缓存、浏览与后台核对、缺失补申请和有界退避，见 [reconciliation.go](internal/library/reconciliation.go)、[pending.go](internal/library/pending.go) 和 [JSON协议](../../docs/public-response.md) |
 | [remote](internal/remote/client.go) | 按8181公共协议的固定路径查询/提交，不转发平台 Cookie或本地会话 |
 | [scanner](internal/scanner/service.go)、[bilibili](internal/bilibili/client.go) | Cookie验证、投稿分页、取消与检查点恢复 |
@@ -74,5 +74,10 @@ Agent 是运行在本机的 Go 程序：提供网页、本地 UP/视频关注库
 | `POST /api/follows/{kind}/{id}/refresh` | 核对公共状态，读取并保存最近资料/版本/指标 |
 | `POST /api/follows/{kind}/{id}/submit` | 核对并按需提交已保存目标到8181，返回确认或阶段失败 |
 | `GET /api/library/{kind}/{id}?days=30&page=1&seq=1` | 读取公开详情、7/30/90/all趋势、版本页与快照；附带个人关注/来源和匹配的30日离线缓存状态，已本地关注时按既有规则核对并按需补申请 |
+| `GET /api/current/{kind}/{id}?refresh=1` | 平台当前资料；失败后才读服务器保存资料，仍失败保留缓存，不申请任务；refresh不绕过失败退避 |
+| `GET /api/current/{kind}/{id}/cache` | 零网络读当前资料缓存及本地关注；可先于其他分支展示 |
+| `GET /api/history/{kind}/{id}?days=30` | 服务器记录、真实跟踪与7/30/90/all曲线；失败仅回退匹配来源/范围缓存 |
+| `GET /api/history/{kind}/{id}/versions?before=序号` | 按需十条版本续页，无总数 |
+| `GET /api/history/{kind}/{id}/snapshot?seq=序号` | 按需指定版本，不夹带完整详情 |
 
 扫描后台执行，网页关闭不取消；关注刷新/提交的本地等待绑定请求，但服务器已接收的有效资料可继续独立有界保存，超时后先核对状态。关注库保留 `last_stage/last_outcome`，核对65秒、刷新90秒，本地 HTTP 写入95秒、网页相关等待100秒；待提交申请由后台退避处理。完整行为见 [分阶段申请设计](../../docs/request-stages.md)、[本地关注实现](../../docs/client-library.md)，原扫描协议见 [发现说明](../../docs/client-discovery.md#本地-api-与会话)。

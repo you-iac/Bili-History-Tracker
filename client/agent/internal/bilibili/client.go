@@ -1,6 +1,7 @@
-// Package bilibili 提供本地 Cookie 登录验证与 UP 主投稿分页。
-// Cookie 显式传入，不读取环境变量、不回退公开合集发现、不返回原始响应。
+// Package bilibili 提供公开当前资料、Cookie 登录验证与 UP 主投稿分页。
+// 当前资料不带 Cookie；扫描 Cookie 显式传入，不回退公开合集发现、不返回原始响应。
 // 固定 HTTPS 地址且禁止重定向；设计与接口来源见 docs/client-discovery.md。
+// 当前资料字段与回退边界见 docs/client-detail-data-sources.md。
 package bilibili
 
 import (
@@ -188,7 +189,9 @@ func (c *Client) get(ctx context.Context, route string, query url.Values, cookie
 	if err != nil {
 		return &Error{Code: "network", Message: "无法创建平台请求。"}
 	}
-	req.Header.Set("Cookie", cookie)
+	if cookie != "" {
+		req.Header.Set("Cookie", cookie)
+	}
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
 	req.Header.Set("Referer", "https://space.bilibili.com/"+uid)

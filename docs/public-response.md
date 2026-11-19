@@ -28,6 +28,9 @@
 - POST /targets：提交后确认任务为 `active` 才返回成功。单目标成功返回平铺状态和 `result`，失败返回 `ok:false/code/error`，能够确认时附 `target`。最终状态为 `paused` 或 `absent` 时，分别返回 `TARGET_PAUSED` 或 `TARGET_SUBMISSION_FAILED`，附读到的状态。批量保留前 N 项和原序号，每项按同一规则生成 `ok/code`，旧 `http_status` 保留作诊断。应答描述本次确认时观察到的状态，后续管理操作仍可改变任务状态。
 - GET /detail/{type}/{id}：成功保留item/metrics/versions并附target；无资料200+DETAIL_NOT_RECORDED及target；快照缺失200+SNAPSHOT_NOT_FOUND。任务读取失败不伪造absent。
 - GET /api/metrics/{type}/{id}?days=7/30/90/all：目标无成功资料（包括作者占位行）时返回200、`ok:false/code:DETAIL_NOT_RECORDED` 及真实 `target`，不改变跟踪状态、不触发采集。已有完整资料但缺少粉丝指标或窗口内没有采样时，返回 `ok:true/code:OK/points:[]`；真实零值保留为值为0的采样点，不用零补齐缺失。数据库读取故障仍返回500。实时查询的上游失败映射为公共JSON业务结果。
+- 独立 `GET /api/detail/{type}/{id}` 以两次SQL返回 `record/target/metrics`，无记录时仍成功表达 `recorded=false` 和真实任务状态，不调用旧详情探测，也不申请任务。`/saved` 无资料使用 `DETAIL_NOT_RECORDED`，`/snapshot?seq=...` 无该版使用 `SNAPSHOT_NOT_FOUND`；两者失败不再额外读取target，内部读取错误仍500。`/versions` 用递减seq续页，无版本时成功返回空列表。详见 [来源与回退契约](client-detail-data-sources.md)。
+
+Agent作者详情的当前资料分支、服务器历史分支分别处理失败。平台当前资料不带服务器seq；平台失败才读取 `/saved`，再失败保留同来源缓存，无缓存显示不可获取。此只读路径不进入浏览核对/补申请；独立后台关注核对仍保留。其他旧详情和目录调用继续遵守原规则。
 
 跟踪申请新增 `stage=check/query/persist/target/confirm` 与 `outcome=not_applied/unknown/confirmed`。查询、保存、建任务及确认各自计时；有效资料进入保存后不因请求取消而丢弃。无最终状态时省略兼容 `tracking` 字段，不能把未知结果当作任务不存在；`confirmed` 只表示最终状态已读取，仍以 `ok` 和实际任务状态判断成功。完整预算、HTTP与业务码、部分提交和客户端等待链见 [分阶段申请设计](request-stages.md)。
 

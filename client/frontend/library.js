@@ -64,7 +64,7 @@ export function initLibrary({api,notify,onScan,navigate}) {
     const state=views[kind],publicMode=state.scope==='public',creator=kind==='creator';
     if(publicMode&&state.sort==='added')state.sort='published';
     $('library-title').textContent=publicMode?(creator?'服务器公开 UP 库':'服务器公开视频库'):(creator?'我的 UP 主库':'我的视频库');
-    $('library-description').textContent=publicMode?'仅搜索服务器已经收录的公开记录，关注后自动申请持续跟踪。':'个人关注保存在本机，资料来自服务器最近一次观测。';
+    $('library-description').textContent=publicMode?'仅搜索服务器已经收录的公开记录，关注后自动申请持续跟踪。':'个人关注保存在本机，先展示缓存，打开详情或刷新后更新资料。';
     $('scope-local').setAttribute('aria-pressed',String(!publicMode));$('scope-public').setAttribute('aria-pressed',String(publicMode));
     $('library-query').placeholder=creator?'搜索名称、UID 或 B站空间链接':'搜索标题、BV 号或 B站视频链接';
     $('library-sort').value=state.sort;

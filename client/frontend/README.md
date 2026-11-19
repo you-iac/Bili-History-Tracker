@@ -10,7 +10,7 @@
 - [library.js](library.js)：总览、公开库搜索、自动关注、设置与分页总览；详情使用独立路由；文本使用 `textContent`，所有远程请求经 Agent。
 - [cards.js](cards.js)、[catalog.css](catalog.css)：响应式卡片与三档内容密度。
 - [creator-videos.js](creator-videos.js)：详情内已关注/未关注投稿，搜索、排序、扫描与关注操作。
-- [detail.js](detail.js)、[trend.mjs](trend.mjs)：详情路由、UTC真实日采样与版本对比，见 [库与详情](../../docs/client-catalog.md) 及 [趋势测试](trend.test.mjs)。
+- [detail.js](detail.js)、[detail-sources.mjs](detail-sources.mjs)、[trend.mjs](trend.mjs)：作者平台资料与服务器历史独立展示、缓存先展示、UTC采样、版本/比较按需；独立视频详情保留兼容路径，见 [来源设计](../../docs/client-detail-data-sources.md)、[读取测试](detail-sources.test.mjs) 及 [趋势测试](trend.test.mjs)。
 - [images.js](images.js)：可见图片懒加载、白名单URL及失败占位，见 [启动与图片](../../docs/client-launch-media.md) 与 [地址测试](images.test.mjs)。
 - [view.mjs](view.mjs)：状态、进度与北京时间显示，未知总量不伪造完成；[view.test.mjs](view.test.mjs) 覆盖关键边界。
 - 通过同源本地 HTTP API 向 [Agent](../agent/README.md) 提交配置和任务操作，读取校验结果与持久化状态；远端业务数据和平台查询由 Agent 执行，图片由浏览器加载。

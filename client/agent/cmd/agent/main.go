@@ -50,7 +50,7 @@ func run(ctx context.Context, address, directory string, automatic bool, launch 
 		return err
 	}
 	defer service.Close()
-	collection, err := library.New(store, remote.New(nil))
+	collection, err := library.New(store, remote.New(nil), bilibili.New(nil))
 	if err != nil {
 		return err
 	}

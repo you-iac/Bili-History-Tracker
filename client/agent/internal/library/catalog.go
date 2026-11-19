@@ -33,6 +33,9 @@ func SearchQuery(kind, q string) (string, error) {
 }
 
 func followItem(f Follow) remote.Item {
+	if f.Current != nil && f.Current.Available {
+		return f.Current.Item
+	}
 	if f.Summary != nil {
 		return *f.Summary
 	}
@@ -118,6 +121,10 @@ func (s *Service) ListCatalog(kind, q string, page int, pendingOnly bool, order,
 		}
 	}
 	for _, f := range s.state.Follows {
+		if current, ok := s.state.Current[targetKey(f.Kind, f.ID)]; ok && current.Item.ObservedAt >= followItem(f).ObservedAt && (current.Source == "platform" || current.ServerURL == s.state.ServerURL) {
+			current.LocalFollow = nil
+			f.Current = &current
+		}
 		if f.Kind == "creator" {
 			result.Creators++
 		} else {
@@ -125,7 +132,7 @@ func (s *Service) ListCatalog(kind, q string, page int, pendingOnly bool, order,
 		}
 		i := followItem(f)
 		if v, ok := known[f.ID]; ok && f.Kind == "video" {
-			if f.Data == nil {
+			if f.Data == nil && f.Current == nil {
 				i = remote.Item{Kind: "video", ID: f.ID, Name: v.Title, PublishedAt: v.PublishedAt, Metric: v.Views, Cover: v.Cover}
 			}
 			i.OwnerID = owner

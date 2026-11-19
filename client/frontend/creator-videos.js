@@ -43,9 +43,9 @@ export function initCreatorVideos({api,notify,onAdd,onChanged,onSyncSummaries,im
     const nextStamp=JSON.stringify([scope,result.items]);
     if(force||stamp!==nextStamp){
       stamp=nextStamp;
-      renderCards({container:$('creator-videos-rows'),data:result,kind:'video',publicMode:scope==='discovered',button,images,
+      renderCards({container:$('creator-videos-rows'),data:result,kind:'video',publicMode:scope==='discovered',button,images,resolveImages:false,
         onAdd:(kind,id)=>onAdd(kind,id),
-        onRefresh:f=>api(`/api/library/video/${f.id}?days=30&page=1`),
+        onRefresh:f=>api(`/api/current/video/${f.id}?refresh=1`),
         onRetry:f=>api(`/api/follows/video/${f.id}/submit`,{method:'POST',body:'{}'}),
         onRemove:f=>api(`/api/follows/video/${f.id}`,{method:'DELETE',body:'{}'})});
     }
@@ -58,7 +58,6 @@ export function initCreatorVideos({api,notify,onAdd,onChanged,onSyncSummaries,im
       const data=await api(`/api/creator-videos/${owner}?`+new URLSearchParams({scope,sort,q,page:String(page)}));
       if(token!==sequence||owner!==uid)return;
       render(data,force);$('creator-videos-error').hidden=true;lastRead=Date.now();
-      if(force&&scope==='followed')void onSyncSummaries?.('video',result.items.map(item=>item.id)).then(()=>{if(uid===owner&&token===sequence)load();}).catch(()=>{});
     }catch(error){if(token===sequence){$('creator-videos-error').textContent=error.message+' 已保留上次读取的结果。';$('creator-videos-error').hidden=false;}}
     finally{if(token===sequence){loading=false;$('creator-videos-loading').hidden=true;controls();}}
   }

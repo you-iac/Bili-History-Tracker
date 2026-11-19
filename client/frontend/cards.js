@@ -3,16 +3,16 @@ import {compactNumber,signedNumber,detailHref,publishedAt} from './view.mjs';
 
 const statusNames={ok:'观测正常',running:'正在采集',pending:'等待采集',recovered:'已恢复',stale:'数据较旧',paused:'已暂停',unavailable:'暂不可用',not_recorded:'尚未记录'};
 export function cardStatus(item) {return item?statusNames[item.status]||(item.tracking?'服务器跟踪中':'未在公共跟踪'):'待获取资料';}
-export function renderCards({container,data,kind,publicMode,button,images,onAdd,onRefresh,onRetry,onRemove,onScan}) {
+export function renderCards({container,data,kind,publicMode,button,images,onAdd,onRefresh,onRetry,onRemove,onScan,resolveImages=true}) {
   const node=(tag,text,className)=>{const el=document.createElement(tag);if(text!=null)el.textContent=text;if(className)el.className=className;return el;};
   const fragment=document.createDocumentFragment();
   for(const follow of data.items) {
-    const item=publicMode?follow:(follow.summary||follow.data?.item),followed=publicMode?follow.followed:true,creator=kind==='creator';
+    const item=publicMode?follow:(follow.current?.item||follow.summary||follow.data?.item),followed=publicMode?follow.followed:true,creator=kind==='creator';
     const external=kind==='video'&&item?.recorded===false;
     const href=external?'https://www.bilibili.com/video/'+follow.id:detailHref(kind,follow.id,publicMode?'public':'');
     const card=node('article',null,'entity-card '+kind+'-card'),top=node('div',null,'entity-top'+(creator?'':' video-top'));
     const avatar=node('span',creator?(item?.name||follow.id).slice(0,1):'▷','entity-avatar'+(creator?'':' video-placeholder'));
-    images.show(avatar,{kind,id:follow.id,seq:item?.seq||0,url:item?.cover||''});top.append(avatar);
+    images.show(avatar,{kind,id:follow.id,seq:item?.seq||0,url:item?.cover||'',resolve:resolveImages});top.append(avatar);
     const title=node('a',item?.name||follow.id,'entity-title');title.href=href;
     if(external){title.target='_blank';title.rel='noopener noreferrer';}
     const identity=node('p',(creator?'UID ':'')+follow.id+(item?.owner_name?' · '+item.owner_name:''),'entity-id');
@@ -38,6 +38,7 @@ export function renderCards({container,data,kind,publicMode,button,images,onAdd,
       more.append(menu);actions.append(more);
     }
     card.append(top,title,identity,basic,stats,extra);
+    if(!publicMode&&follow.current?.available){const current=follow.current;card.append(node('small',`${current.source==='platform'?'平台资料':'服务器最后记录'} · ${current.item.observed_at?new Date(current.item.observed_at).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'}):'观测时间未知'}`,'muted'));}
     if(!publicMode&&follow.last_error)card.append(node('p',follow.last_error,'follow-error'));
     card.append(actions);
     card.addEventListener('click',event=>{if(!event.target.closest('a,button,summary,details,input,select')&&!getSelection()?.toString())title.click();});

@@ -1,7 +1,7 @@
 # 作者详情的数据来源与服务器回退设计
 
 - 创建时间：2026-11-19 11:19（Asia/Shanghai）。
-- 状态：方案已确认，待实施；本分支从 `548f18555585b0e0e73a1fa36f2e26ce8c1cb9a5` 建立，只交付设计与任务文档，不包含 T2 接口实现。
+- 状态：UP 主详情核心功能、本机回归、两个公开目标的无 Cookie 读取和 VM 32 并发接口对照已完成。其余 VM 验收及旧调用方迁移见 [实施任务](../PLANs/2026-11-19-client-detail-data-sources.md)。
 - 实施任务：[详情数据来源与按需历史](../PLANs/2026-11-19-client-detail-data-sources.md)。
 
 ## 目标与范围
@@ -107,7 +107,7 @@ flowchart TD
 
 ## 接口与兼容边界
 
-接口按职责拆分，实施时在现有路由风格下确定最终路径并同步 [公共协议](public-api.md)、[业务应答](public-response.md) 和 Agent 接口说明。下列是必须实现的契约职责，不是已经存在的新路由：
+接口已按下列职责拆分，具体路由见文末“已实施接口”；[公共协议](public-api.md)、[业务应答](public-response.md) 和 Agent 接口说明同步维护。旧完整详情接口保留兼容，独立视频详情尚沿用旧链路。
 
 | 读取职责 | 输入 | 输出与约束 |
 |---|---|---|
@@ -125,7 +125,7 @@ flowchart TD
 
 - 平台当前资料与服务器历史缓存独立保存。平台缓存按平台、类型、ID 及实际读取上下文隔离；使用登录态可见性时纳入身份代际，不混用不同账号结果。首期公开元数据默认不附 Cookie，登录态扫描继续使用原流程。
 - 服务器缓存按服务器地址/代际、目标及数据范围隔离；切服丢弃旧服务器缓存，不必丢弃身份匹配的平台公开资料缓存。服务器回退内容不能写入平台成功缓存并改变来源。
-- 同目标平台查询与服务器回退分别合并在途请求；建议首期当前资料有效期 5 分钟、失败退避 1 分钟、平台读取预算 8 秒、回退预算 5 秒，实施阶段通过平台桩与取消测试校准。以上为设计初值，不是现有代码常量或性能承诺。
+- 同目标当前资料请求合并在途执行；当前采用平台成功缓存5分钟、服务器回退缓存及失败退避1分钟、平台读取预算8秒、回退预算5秒，已通过平台桩及取消测试。参数仍可依据真实部署调整，不作为性能承诺。
 - 有效缓存直接展示；过期缓存先展示，再后台刷新。显式刷新可绕过成功缓存有效期，但保留在途合并与失败退避，不因页面切换无限重试；平台与回退请求均支持取消，旧路由、旧服务器和取关重关注的迟到响应按身份/代际拒绝写回。
 - 私人关注的新增、取消、提交退避、暂停不恢复等约束保持；浏览视频列表不自动逐项同步服务器摘要或申请跟踪。已有后台关注核对继续独立运行，不能把它的 SQL 宣称为详情预算中的零成本。
 - 视频区默认只读本地关注和缓存。需要当前标题/播放量时采用显式刷新或有界后台更新；不能打开一个作者就请求其所有视频。已有历史增长缓存可标时间展示，缺失时显示未知，不通过打开页面逐条补曲线。
@@ -142,12 +142,37 @@ flowchart TD
 
 ## 模块导航与实施约束
 
-| 职责 | 现有实现与待调整点 | 相关验证入口 |
+| 职责 | 实现与边界 | 相关验证入口 |
 |---|---|---|
-| 平台当前资料 | [Agent 平台适配器](../client/agent/internal/bilibili/client.go) 目前承担登录与扫描，需增加有边界的元数据能力；字段校验参考 [服务器作者适配器](../backend/internal/provider/bilibili/creator.go) 和 [视频适配器](../backend/internal/provider/bilibili/bilibili.go) | [平台测试](../client/agent/internal/bilibili/client_test.go)，实施补当前资料桩测试 |
-| 本地编排与缓存 | [service.go](../client/agent/internal/library/service.go)、[localstate/store.go](../client/agent/internal/localstate/store.go)、[images.go](../client/agent/internal/library/images.go) | [library 测试](../client/agent/internal/library/service_test.go)、[图片测试](../client/agent/internal/library/images_test.go) |
-| 历史和回退读取 | [publicapi/read.go](../backend/internal/publicapi/read.go)、[response.go](../backend/internal/publicapi/response.go)、[storage/dashboard.go](../backend/internal/storage/dashboard.go) | [公共读取测试](../backend/internal/publicapi/read_test.go)、[存储测试](../backend/internal/storage/dashboard_test.go) |
-| Agent 协议 | [remote/client.go](../client/agent/internal/remote/client.go)、[httpapi/library.go](../client/agent/internal/httpapi/library.go) | [远程协议测试](../client/agent/internal/remote/client_test.go)、[详情 HTTP 测试](../client/agent/internal/httpapi/details_test.go) |
-| 页面与本地视频 | [detail.js](../client/frontend/detail.js)、[creator-videos.js](../client/frontend/creator-videos.js)、[library/catalog.go](../client/agent/internal/library/catalog.go)、[summaries.go](../client/agent/internal/library/summaries.go) | [视图测试](../client/frontend/view.test.mjs)、[趋势测试](../client/frontend/trend.test.mjs)、[本地目录测试](../client/agent/internal/library/catalog_test.go) |
+| 平台当前资料 | [metadata.go](../client/agent/internal/bilibili/metadata.go) 的 `Client.Current`，固定公开端点、无Cookie、严格身份和未知计数 | [平台资料测试](../client/agent/internal/bilibili/metadata_test.go) |
+| 本地编排与缓存 | [detail_sources.go](../client/agent/internal/library/detail_sources.go) 的 `Current/CurrentCache/History`；[service.go](../client/agent/internal/library/service.go) 加载和切服隔离，复用 [localstate](../client/agent/internal/localstate/store.go) 保存 | [缓存、回退与升级测试](../client/agent/internal/library/detail_sources_test.go) |
+| 历史和回退读取 | [公共处理器](../backend/internal/publicapi/detail_sources.go)、[精确存储](../backend/internal/storage/detail_sources.go)；复用已有 `Metrics`，不调用旧 `Content/Catalog` | [公共测试](../backend/internal/publicapi/detail_sources_test.go)、[SQL预算与索引](../backend/internal/storage/detail_sources_test.go) |
+| Agent 协议 | [remote/detail_sources.go](../client/agent/internal/remote/detail_sources.go)、[httpapi/detail_sources.go](../client/agent/internal/httpapi/detail_sources.go) | [响应校验](../client/agent/internal/remote/detail_sources_test.go)、[本地HTTP测试](../client/agent/internal/httpapi/detail_sources_test.go) |
+| 页面与本地视频 | [detail.js](../client/frontend/detail.js)、[独立读取](../client/frontend/detail-sources.mjs)、[creator-videos.js](../client/frontend/creator-videos.js)、[library/catalog.go](../client/agent/internal/library/catalog.go) | [前端读取测试](../client/frontend/detail-sources.test.mjs)、[真实Agent浏览器桩联调](../client/agent/internal/httpapi/detail_browser_test.go)、[目录测试](../client/agent/internal/library/catalog_test.go) |
 
-新增或调整 Go 职责时更新包/文件头注释与 [架构导航](architecture.md)，实现约束留在代码附近。本文中的接口、预算和行为均需经任务验收后才能改记为已实现。
+新增或调整 Go 职责时更新包/文件头注释与 [架构导航](architecture.md)，实现约束留在代码附近。本文中的接口和本机验证结果以以下实施记录为准；真实平台与 VM 验收仍须完成后才能关闭实施计划。
+
+## 已实施接口与本机验证（2026-11-19）
+
+公共服务器新增以下只读入口，仍共用原有入口限流和业务 JSON 信封：
+
+| 路由 | 响应 | SQL 次数 |
+|---|---|---:|
+| `GET /api/detail/{type}/{id}?days=7或30或90或all` | `record`（kind/id/recorded/seq/observed_at）、真实 `target` 状态、`metrics.points/truncated` | 2 |
+| `GET /api/detail/{type}/{id}/saved` | 归一化 `item`、`description`、`snapshot_at`；item.seq 与资料同次读取 | 1 |
+| `GET /api/detail/{type}/{id}/versions?before=序号` | 最多10个 `items`（seq/at）、`has_more/next_before`，首次省略 before | 1 |
+| `GET /api/detail/{type}/{id}/snapshot?seq=正整数` | kind/id/seq/at/snapshot，只读明确版本 | 1 |
+
+基础历史对未记录目标仍成功返回 `recorded=false`、真实任务状态和已有采样（通常为空），不额外探测目录。保存资料不存在返回 `DETAIL_NOT_RECORDED`，快照不存在返回 `SNAPSHOT_NOT_FOUND`；内部失败保持 HTTP 500，输入错误 HTTP 400。正常历史不返回完整资料、投稿汇总、版本列表或总数。
+
+Agent 新增五个会话保护入口：`GET /api/current/{kind}/{id}`（可带 `refresh=1`）、`GET /api/current/{kind}/{id}/cache`（零网络）、`GET /api/history/{kind}/{id}?days=...`、`GET /api/history/{kind}/{id}/versions?before=...`、`GET /api/history/{kind}/{id}/snapshot?seq=...`。浏览器作者详情并发读取当前资料与服务器历史，缓存先展示；时间范围切换只读历史。展开历史才取列表，选择版本只取该版，点击“与上一版本比较”才取上一版并复用已选快照。当前资料失败不妨碍曲线显示，历史失败时服务器 seq 显示未知，不能冒充未记录。
+
+当前资料响应为 `available/item/description/source/checked_at/cached`，可附 `server_url/snapshot_at/fallback_reason/read_error/cache_error/local_follow`。有资料时 `source` 为 platform 或 server，缓存由 cached 表达；无资料时 available=false且source可为空。当前适配器固定为bilibili，缓存平台命名空间隐含于此能力，未来扩展平台需一并扩展缓存键。平台资料 item.seq=0 且不声称服务器已记录；服务器资料的 seq、观测时间及快照创建时间分别保留。历史响应为 `record/target/metrics/server_url/checked_at/cached`，错误与缓存提示单独附加。
+
+`library.json` 增加独立的 `current_profiles`（最多2000目标）和 `detail_history`（最多200个目标/范围组合），保留原版本1及已有字段兼容。平台成功缓存有效5分钟，服务器回退缓存和失败退避1分钟；平台读取预算8秒、服务器回退5秒。在途请求合并，网络在锁外，迟到结果在回写前检查服务器代际和关注身份；取关不会被读取重新创建。旧版同服务器摘要可作为 server 来源资料缓存，旧默认详情仅回退30日历史，不能用于其他时间范围。切服保留平台公开缓存并清除服务器来源缓存。
+
+UP 视频区继续使用本地完整集合筛选排序分页，打开页面不逐项同步摘要、不申请任务、不发远端图片解析；单条“刷新资料”调用 Agent 当前资料入口。缺少图片地址保留占位。已有独立后台关注核对仍运行，费用不计入详情的2/3次 SQL预算。独立视频详情、总览、公开库及其他旧接口继续保留原流程，不声称它们都已优化。
+
+实现入口为 [storage/detail_sources.go](../backend/internal/storage/detail_sources.go)、[publicapi/detail_sources.go](../backend/internal/publicapi/detail_sources.go)、[remote/detail_sources.go](../client/agent/internal/remote/detail_sources.go)、[library/detail_sources.go](../client/agent/internal/library/detail_sources.go)、[平台 metadata.go](../client/agent/internal/bilibili/metadata.go)、[本地 HTTP](../client/agent/internal/httpapi/detail_sources.go) 与 [前端独立读取](../client/frontend/detail-sources.mjs)。
+
+本机已通过真实 SQLite 驱动计数/执行计划测试、两模块完整 Go test/vet/build、20项前端测试及语法检查、1440和390像素 Chrome 回归，以及真实Agent会话/HTTP/缓存/远程客户端的浏览器桩联调。查询次数为基础2、回退额外1，精确查询使用已有索引，无数据库迁移。覆盖范围切换、版本按需/游标、显式比较、回退、双端失败、迟到响应和图片预算。隔离测试Agent对UID `122541` 和BV `BV17x411w7KC` 的无Cookie公开读取也成功，平台来源且seq=0，不代表长期可用性。完整条件与数据见 [本地对照记录](performance-detail-optimization-2026-11-19.md)。实际Agent与VM组合的长时性能、CPU/磁盘采样和用户部署尚未验收，不能把本机短窗口结果套用到旧VM的626～771毫秒基线。

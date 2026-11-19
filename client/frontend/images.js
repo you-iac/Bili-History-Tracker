@@ -35,11 +35,11 @@ export function initImages({api}) {
   function prune(){cleanupScheduled=false;for(const element of watching)if(!element.isConnected){observer?.unobserve(element);watching.delete(element);}}
   return {
     setSource(value){if(source===value)return;source=value;generation++;cache.clear();failures.clear();broken.clear();queue=[];for(const element of watching)observer?.unobserve(element);watching.clear();},
-    show(element,{kind,id,seq=0,url=''}){
+    show(element,{kind,id,seq=0,url='',resolve=true}){
       observer?.unobserve(element);watching.delete(element);element.querySelector('img')?.remove();element.dataset.mediaState='pending';element.classList.add('remote-image');
       const record={element,kind,id,seq:Number.isSafeInteger(seq)&&seq>=0?seq:0,generation,queued:false};records.set(element,record);
       const known=safeImageURL(url);
-      if(known){queueMicrotask(()=>assign(record,known));}else if(observer){watching.add(element);observer.observe(element);}else{queueMicrotask(()=>enqueue(record));}
+      if(known){queueMicrotask(()=>assign(record,known));}else if(!resolve){element.dataset.mediaState='unavailable';}else if(observer){watching.add(element);observer.observe(element);}else{queueMicrotask(()=>enqueue(record));}
       if(!cleanupScheduled){cleanupScheduled=true;queueMicrotask(prune);}
     }
   };

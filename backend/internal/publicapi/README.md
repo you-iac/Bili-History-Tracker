@@ -29,4 +29,6 @@
 
 业务协议见 [JSON应答](../../../docs/public-response.md)；[response.go](response.go) 提供目标/资料独立状态，[legacy.go](legacy.go) 只适配实时上游业务结果，数据库内部故障保留500。
 
+[detail_sources.go](detail_sources.go) 提供 `/api/detail/{type}/{id}` 基础历史（2次SQL）、`/saved` 保存资料、`/versions` 游标列表和 `/snapshot?seq=...` 指定快照（各1次SQL）。正常路径不读版本payload、不经过Catalog；未记录资料与真实任务状态独立，读取不触发申请或采集。入口及缓存边界见 [详情来源设计](../../../docs/client-detail-data-sources.md)，回归见 [独立读取](detail_sources_test.go) 和 [显式本机容量对照](detail_load_test.go)。
+
 测试入口：[业务组合与整数精度](response_test.go)、[路由隔离与旧 API](routes_test.go)、[限流并发与滚动窗口](limit_test.go)、[截断、应答和副作用](targets_test.go)、[只读协议](read_test.go)。

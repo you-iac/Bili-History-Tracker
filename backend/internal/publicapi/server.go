@@ -3,6 +3,7 @@
 // 不导入 admin，不暴露管理表单、日志或批量导入，不接收本地 Cookie。
 // 正常业务HTTP200并检查JSON结果；入口限制不等于长期预算或认证。见 docs/public-response.md、docs/architecture.md。
 // 申请阶段预算及有界收尾见 docs/request-stages.md。
+// detail_sources.go 的独立历史/资料回退不调用目录聚合，见 docs/client-detail-data-sources.md。
 package publicapi
 
 import (
@@ -75,6 +76,8 @@ func (s *Server) Handler() http.Handler {
 	})
 	mux.HandleFunc("GET /api/targets/status", s.clientTargetStatus)
 	mux.HandleFunc("GET /api/metrics/{type}/{id}", s.metrics)
+	mux.HandleFunc("GET /api/detail/{type}/{id}", s.detailHistory)
+	mux.HandleFunc("GET /api/detail/{type}/{id}/{part}", s.detailSources)
 	mux.HandleFunc("POST /targets", s.requestTarget)
 	mux.HandleFunc("/api/v1/", s.legacyJSON)
 	return newGate(s.config.RequestsPerSecond).wrap(mux)
