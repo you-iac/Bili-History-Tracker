@@ -1,5 +1,7 @@
 # 客户端卡片库、UP 视频与详情
 
+后续调整见 [作者详情的数据来源与服务器回退设计](client-detail-data-sources.md) 与 [实施任务](../PLANs/2026-11-19-client-detail-data-sources.md)：Agent 优先获取当前资料，服务器提供历史与跟踪，平台失败再读服务器最后保存资料，版本按需加载。本分支仅交付设计文档，服务器接口、Agent 与页面改造均待实施；下文仍描述现有行为。
+
 本轮实现见 [UI 优化计划](../PLANs/2026-11-16-client-ui-content.md)。原计划已单独提交，本版收录 UI 与摘要缓存修复；[跟踪状态对账](../PLANs/archive/2026-11-16-agent-follow-reconciliation.md) 已由 [公共JSON计划](../PLANs/archive/2026-11-17-public-json-response.md) 扩展实施，详见 [协议](public-response.md)。浏览器资源内嵌在 Agent，修改后需要重新构建并启动 Agent；公开库的新增排序和 UP 投稿统计需要同步更新 backend，然后刷新资料。旧资料缺少字段时显示未知。
 
 ## 页面与卡片密度

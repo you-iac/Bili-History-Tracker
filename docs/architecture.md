@@ -1,5 +1,7 @@
 # 服务端查询模块
 
+作者详情后续职责划分见 [数据来源与服务器回退设计](client-detail-data-sources.md) 和 [实施任务](../PLANs/2026-11-19-client-detail-data-sources.md)：Agent 读取平台当前资料，服务器提供历史与跟踪；平台失败时精确读取服务器最后保存资料。此设计待实施，不代表下述现有链路已调整。
+
 公共JSON业务应答和Agent核对见 [协议](public-response.md) 与 [实施计划](../PLANs/archive/2026-11-17-public-json-response.md)。实现位于现有publicapi、remote、library和详情模块，不变更数据库结构。
 
 跟踪申请的阶段预算、错误原因、部分提交及 Agent 等待链见 [分阶段申请设计](request-stages.md)；实现入口为 [RequestTarget](../backend/internal/tracker/request.go)、[阶段策略](../backend/internal/tracker/request_policy.go) 和 [公共申请应答](../backend/internal/publicapi/targets.go)，回归见 [tracker 阶段测试](../backend/internal/tracker/request_stages_test.go) 与 [publicapi 阶段测试](../backend/internal/publicapi/request_stages_test.go)。
@@ -16,6 +18,7 @@
 
 | 模块或独立职责 | 功能与边界 | 实现入口与关键符号 | 相关测试 |
 |---|---|---|---|
+| 详情数据来源与回退（规划） | Agent 当前资料与服务器历史分开；平台失败回退服务器记录，基础 2 次 SQL、回退额外最多 1 次，历史按需 | [设计与模块导航](client-detail-data-sources.md)；现有 [detail.js](../client/frontend/detail.js)、[library/service.go](../client/agent/internal/library/service.go)、[publicapi/read.go](../backend/internal/publicapi/read.go)、[storage/dashboard.go](../backend/internal/storage/dashboard.go) 待调整 | [任务与验收](../PLANs/2026-11-19-client-detail-data-sources.md)，本分支尚无新实现验证结果 |
 | 性能诊断 | 默认关闭的独立回环 pprof 入口，按需 CPU/内存/阻塞/锁/trace 采样，不挂载到业务端口 | [profiling.go](../backend/cmd/server/profiling.go) 的 `profilingOptions/newProfilingServer`；使用与火焰图见 [性能诊断](performance-profiling.md) | [配置、采样数据与路由隔离](../backend/cmd/server/profiling_test.go) |
 | Agent 视角吞吐压测 | 默认按 ID 读取详情，支持类型筛选和固定目标；保留混合读取、独立 HTTP 基线与申请诊断，区分业务成功、限流和收尾 | [load_test.py](../scripts/perf/load_test.py) 的 `run_load/run_operation`，见 [测量口径与用法](../scripts/perf/README.md) | [协议、统计、详情目标隔离与 HTTP 连接复用回归](../scripts/perf/test_load_test.py) |
 | 服务启动 | 组装数据源和查询服务、读取配置、管理 HTTP 服务生命周期；公共入口默认监听所有 IPv4 网卡，管理入口默认本机 | [main.go](../backend/cmd/server/main.go) 的 `main/listenAddresses` | [main_test.go](../backend/cmd/server/main_test.go)（监听配置与限额）、[shutdown_linux_test.go](../backend/cmd/server/shutdown_linux_test.go)（Linux 空闲服务信号入口）；启动与查询见本文命令 |
