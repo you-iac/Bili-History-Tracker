@@ -49,6 +49,16 @@
 - 纯人工提交不强制署名；不要给未参与的提交补署名。
 - 署名只描述协作来源，不替代代码评审、测试和计划归档。
 
+## Code Review Rules
+
+### 语言
+
+- 所有代码审查评论、PR 描述与回复一律使用简体中文。
+- 代码标识符、文件路径、命令、原始错误信息和日志保持原文，不翻译。
+- 严重级别标签（P0 / P1）保留，说明文字用中文。
+- Always write code review comments and PR descriptions in Simplified Chinese; keep
+  code identifiers, file paths, commands and raw error text unchanged.
+
 <!-- aoci:begin -->
 ## AOCI 仓库认知
 
