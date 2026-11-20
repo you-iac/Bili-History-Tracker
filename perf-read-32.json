@@ -1,0 +1,3795 @@
+{
+  "measurement_s": 60.0,
+  "actual_s": 60.417291300000215,
+  "drain_s": 0.4172913000002154,
+  "measurement_started_at": "2026-11-18T08:01:05.959503+00:00",
+  "started_operations": 2083,
+  "incomplete_operations": 3,
+  "unconsumed_targets": null,
+  "finite_workload": false,
+  "worker_errors": [],
+  "requests": {
+    "GET /api/targets/status": {
+      "completed": 411,
+      "successful": 411,
+      "window_completed": 410,
+      "window_successful": 410,
+      "rps": 6.833333333333333,
+      "goodput": 6.833333333333333,
+      "drained_rps": 6.802688289337436,
+      "drained_goodput": 6.802688289337436,
+      "tail_completed": 1,
+      "ok_rate": 1.0,
+      "window_ok_rate": 1.0,
+      "latency_ms": {
+        "p50": 406.07,
+        "p95": 907.7,
+        "p99": 1170.83,
+        "max": 1280.74
+      },
+      "success_latency_ms": {
+        "p50": 406.07,
+        "p95": 907.7,
+        "p99": 1170.83,
+        "max": 1280.74
+      },
+      "client_wait_s": 0.00021130000095581636,
+      "response_mb_s": 0.0008997,
+      "submitted_targets": 0,
+      "confirmed_targets": 0,
+      "confirmed_targets_s": 0.0,
+      "codes": {
+        "OK": 411
+      },
+      "http": {
+        "200": 411
+      },
+      "stages": {},
+      "outcomes": {},
+      "submission_results": {},
+      "target_codes": {},
+      "failure_examples": [],
+      "per_second": [
+        {
+          "second": 0,
+          "completed": 4,
+          "successful": 4
+        },
+        {
+          "second": 1,
+          "completed": 5,
+          "successful": 5
+        },
+        {
+          "second": 2,
+          "completed": 6,
+          "successful": 6
+        },
+        {
+          "second": 3,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 4,
+          "completed": 4,
+          "successful": 4
+        },
+        {
+          "second": 5,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 6,
+          "completed": 6,
+          "successful": 6
+        },
+        {
+          "second": 7,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 8,
+          "completed": 4,
+          "successful": 4
+        },
+        {
+          "second": 9,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 10,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 11,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 12,
+          "completed": 4,
+          "successful": 4
+        },
+        {
+          "second": 13,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 14,
+          "completed": 3,
+          "successful": 3
+        },
+        {
+          "second": 15,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 16,
+          "completed": 5,
+          "successful": 5
+        },
+        {
+          "second": 17,
+          "completed": 6,
+          "successful": 6
+        },
+        {
+          "second": 18,
+          "completed": 4,
+          "successful": 4
+        },
+        {
+          "second": 19,
+          "completed": 12,
+          "successful": 12
+        },
+        {
+          "second": 20,
+          "completed": 11,
+          "successful": 11
+        },
+        {
+          "second": 21,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 22,
+          "completed": 6,
+          "successful": 6
+        },
+        {
+          "second": 23,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 24,
+          "completed": 4,
+          "successful": 4
+        },
+        {
+          "second": 25,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 26,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 27,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 28,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 29,
+          "completed": 6,
+          "successful": 6
+        },
+        {
+          "second": 30,
+          "completed": 10,
+          "successful": 10
+        },
+        {
+          "second": 31,
+          "completed": 5,
+          "successful": 5
+        },
+        {
+          "second": 32,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 33,
+          "completed": 6,
+          "successful": 6
+        },
+        {
+          "second": 34,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 35,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 36,
+          "completed": 5,
+          "successful": 5
+        },
+        {
+          "second": 37,
+          "completed": 12,
+          "successful": 12
+        },
+        {
+          "second": 38,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 39,
+          "completed": 3,
+          "successful": 3
+        },
+        {
+          "second": 40,
+          "completed": 10,
+          "successful": 10
+        },
+        {
+          "second": 41,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 42,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 43,
+          "completed": 2,
+          "successful": 2
+        },
+        {
+          "second": 44,
+          "completed": 6,
+          "successful": 6
+        },
+        {
+          "second": 45,
+          "completed": 10,
+          "successful": 10
+        },
+        {
+          "second": 46,
+          "completed": 6,
+          "successful": 6
+        },
+        {
+          "second": 47,
+          "completed": 6,
+          "successful": 6
+        },
+        {
+          "second": 48,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 49,
+          "completed": 5,
+          "successful": 5
+        },
+        {
+          "second": 50,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 51,
+          "completed": 4,
+          "successful": 4
+        },
+        {
+          "second": 52,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 53,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 54,
+          "completed": 4,
+          "successful": 4
+        },
+        {
+          "second": 55,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 56,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 57,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 58,
+          "completed": 11,
+          "successful": 11
+        },
+        {
+          "second": 59,
+          "completed": 6,
+          "successful": 6
+        }
+      ]
+    },
+    "GET /detail/video": {
+      "completed": 594,
+      "successful": 594,
+      "window_completed": 579,
+      "window_successful": 579,
+      "rps": 9.65,
+      "goodput": 9.65,
+      "drained_rps": 9.831622491159214,
+      "drained_goodput": 9.831622491159214,
+      "tail_completed": 15,
+      "ok_rate": 1.0,
+      "window_ok_rate": 1.0,
+      "latency_ms": {
+        "p50": 1084.94,
+        "p95": 1830.0,
+        "p99": 2179.76,
+        "max": 2797.66
+      },
+      "success_latency_ms": {
+        "p50": 1084.94,
+        "p95": 1830.0,
+        "p99": 2179.76,
+        "max": 2797.66
+      },
+      "client_wait_s": 0.0003142000059597194,
+      "response_mb_s": 0.0111279,
+      "submitted_targets": 0,
+      "confirmed_targets": 0,
+      "confirmed_targets_s": 0.0,
+      "codes": {
+        "OK": 594
+      },
+      "http": {
+        "200": 594
+      },
+      "stages": {},
+      "outcomes": {},
+      "submission_results": {},
+      "target_codes": {},
+      "failure_examples": [],
+      "per_second": [
+        {
+          "second": 0,
+          "completed": 0,
+          "successful": 0
+        },
+        {
+          "second": 1,
+          "completed": 6,
+          "successful": 6
+        },
+        {
+          "second": 2,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 3,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 4,
+          "completed": 12,
+          "successful": 12
+        },
+        {
+          "second": 5,
+          "completed": 11,
+          "successful": 11
+        },
+        {
+          "second": 6,
+          "completed": 13,
+          "successful": 13
+        },
+        {
+          "second": 7,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 8,
+          "completed": 4,
+          "successful": 4
+        },
+        {
+          "second": 9,
+          "completed": 11,
+          "successful": 11
+        },
+        {
+          "second": 10,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 11,
+          "completed": 6,
+          "successful": 6
+        },
+        {
+          "second": 12,
+          "completed": 14,
+          "successful": 14
+        },
+        {
+          "second": 13,
+          "completed": 12,
+          "successful": 12
+        },
+        {
+          "second": 14,
+          "completed": 11,
+          "successful": 11
+        },
+        {
+          "second": 15,
+          "completed": 6,
+          "successful": 6
+        },
+        {
+          "second": 16,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 17,
+          "completed": 6,
+          "successful": 6
+        },
+        {
+          "second": 18,
+          "completed": 6,
+          "successful": 6
+        },
+        {
+          "second": 19,
+          "completed": 12,
+          "successful": 12
+        },
+        {
+          "second": 20,
+          "completed": 17,
+          "successful": 17
+        },
+        {
+          "second": 21,
+          "completed": 14,
+          "successful": 14
+        },
+        {
+          "second": 22,
+          "completed": 11,
+          "successful": 11
+        },
+        {
+          "second": 23,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 24,
+          "completed": 11,
+          "successful": 11
+        },
+        {
+          "second": 25,
+          "completed": 10,
+          "successful": 10
+        },
+        {
+          "second": 26,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 27,
+          "completed": 13,
+          "successful": 13
+        },
+        {
+          "second": 28,
+          "completed": 14,
+          "successful": 14
+        },
+        {
+          "second": 29,
+          "completed": 10,
+          "successful": 10
+        },
+        {
+          "second": 30,
+          "completed": 11,
+          "successful": 11
+        },
+        {
+          "second": 31,
+          "completed": 10,
+          "successful": 10
+        },
+        {
+          "second": 32,
+          "completed": 5,
+          "successful": 5
+        },
+        {
+          "second": 33,
+          "completed": 16,
+          "successful": 16
+        },
+        {
+          "second": 34,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 35,
+          "completed": 10,
+          "successful": 10
+        },
+        {
+          "second": 36,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 37,
+          "completed": 14,
+          "successful": 14
+        },
+        {
+          "second": 38,
+          "completed": 14,
+          "successful": 14
+        },
+        {
+          "second": 39,
+          "completed": 12,
+          "successful": 12
+        },
+        {
+          "second": 40,
+          "completed": 6,
+          "successful": 6
+        },
+        {
+          "second": 41,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 42,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 43,
+          "completed": 10,
+          "successful": 10
+        },
+        {
+          "second": 44,
+          "completed": 13,
+          "successful": 13
+        },
+        {
+          "second": 45,
+          "completed": 10,
+          "successful": 10
+        },
+        {
+          "second": 46,
+          "completed": 14,
+          "successful": 14
+        },
+        {
+          "second": 47,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 48,
+          "completed": 10,
+          "successful": 10
+        },
+        {
+          "second": 49,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 50,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 51,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 52,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 53,
+          "completed": 5,
+          "successful": 5
+        },
+        {
+          "second": 54,
+          "completed": 10,
+          "successful": 10
+        },
+        {
+          "second": 55,
+          "completed": 10,
+          "successful": 10
+        },
+        {
+          "second": 56,
+          "completed": 10,
+          "successful": 10
+        },
+        {
+          "second": 57,
+          "completed": 10,
+          "successful": 10
+        },
+        {
+          "second": 58,
+          "completed": 11,
+          "successful": 11
+        },
+        {
+          "second": 59,
+          "completed": 11,
+          "successful": 11
+        }
+      ]
+    },
+    "GET /videos": {
+      "completed": 742,
+      "successful": 742,
+      "window_completed": 738,
+      "window_successful": 738,
+      "rps": 12.3,
+      "goodput": 12.3,
+      "drained_rps": 12.281252337441307,
+      "drained_goodput": 12.281252337441307,
+      "tail_completed": 4,
+      "ok_rate": 1.0,
+      "window_ok_rate": 1.0,
+      "latency_ms": {
+        "p50": 362.51,
+        "p95": 734.17,
+        "p99": 947.33,
+        "max": 1248.63
+      },
+      "success_latency_ms": {
+        "p50": 362.51,
+        "p95": 734.17,
+        "p99": 947.33,
+        "max": 1248.63
+      },
+      "client_wait_s": 0.0004022999564767815,
+      "response_mb_s": 0.09646016666666667,
+      "submitted_targets": 0,
+      "confirmed_targets": 0,
+      "confirmed_targets_s": 0.0,
+      "codes": {
+        "OK": 742
+      },
+      "http": {
+        "200": 742
+      },
+      "stages": {},
+      "outcomes": {},
+      "submission_results": {},
+      "target_codes": {},
+      "failure_examples": [],
+      "per_second": [
+        {
+          "second": 0,
+          "completed": 14,
+          "successful": 14
+        },
+        {
+          "second": 1,
+          "completed": 15,
+          "successful": 15
+        },
+        {
+          "second": 2,
+          "completed": 17,
+          "successful": 17
+        },
+        {
+          "second": 3,
+          "completed": 13,
+          "successful": 13
+        },
+        {
+          "second": 4,
+          "completed": 13,
+          "successful": 13
+        },
+        {
+          "second": 5,
+          "completed": 13,
+          "successful": 13
+        },
+        {
+          "second": 6,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 7,
+          "completed": 12,
+          "successful": 12
+        },
+        {
+          "second": 8,
+          "completed": 11,
+          "successful": 11
+        },
+        {
+          "second": 9,
+          "completed": 13,
+          "successful": 13
+        },
+        {
+          "second": 10,
+          "completed": 12,
+          "successful": 12
+        },
+        {
+          "second": 11,
+          "completed": 12,
+          "successful": 12
+        },
+        {
+          "second": 12,
+          "completed": 11,
+          "successful": 11
+        },
+        {
+          "second": 13,
+          "completed": 10,
+          "successful": 10
+        },
+        {
+          "second": 14,
+          "completed": 11,
+          "successful": 11
+        },
+        {
+          "second": 15,
+          "completed": 16,
+          "successful": 16
+        },
+        {
+          "second": 16,
+          "completed": 14,
+          "successful": 14
+        },
+        {
+          "second": 17,
+          "completed": 15,
+          "successful": 15
+        },
+        {
+          "second": 18,
+          "completed": 14,
+          "successful": 14
+        },
+        {
+          "second": 19,
+          "completed": 13,
+          "successful": 13
+        },
+        {
+          "second": 20,
+          "completed": 6,
+          "successful": 6
+        },
+        {
+          "second": 21,
+          "completed": 10,
+          "successful": 10
+        },
+        {
+          "second": 22,
+          "completed": 10,
+          "successful": 10
+        },
+        {
+          "second": 23,
+          "completed": 15,
+          "successful": 15
+        },
+        {
+          "second": 24,
+          "completed": 11,
+          "successful": 11
+        },
+        {
+          "second": 25,
+          "completed": 15,
+          "successful": 15
+        },
+        {
+          "second": 26,
+          "completed": 11,
+          "successful": 11
+        },
+        {
+          "second": 27,
+          "completed": 14,
+          "successful": 14
+        },
+        {
+          "second": 28,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 29,
+          "completed": 10,
+          "successful": 10
+        },
+        {
+          "second": 30,
+          "completed": 14,
+          "successful": 14
+        },
+        {
+          "second": 31,
+          "completed": 11,
+          "successful": 11
+        },
+        {
+          "second": 32,
+          "completed": 12,
+          "successful": 12
+        },
+        {
+          "second": 33,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 34,
+          "completed": 12,
+          "successful": 12
+        },
+        {
+          "second": 35,
+          "completed": 11,
+          "successful": 11
+        },
+        {
+          "second": 36,
+          "completed": 11,
+          "successful": 11
+        },
+        {
+          "second": 37,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 38,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 39,
+          "completed": 14,
+          "successful": 14
+        },
+        {
+          "second": 40,
+          "completed": 15,
+          "successful": 15
+        },
+        {
+          "second": 41,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 42,
+          "completed": 14,
+          "successful": 14
+        },
+        {
+          "second": 43,
+          "completed": 16,
+          "successful": 16
+        },
+        {
+          "second": 44,
+          "completed": 13,
+          "successful": 13
+        },
+        {
+          "second": 45,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 46,
+          "completed": 11,
+          "successful": 11
+        },
+        {
+          "second": 47,
+          "completed": 14,
+          "successful": 14
+        },
+        {
+          "second": 48,
+          "completed": 13,
+          "successful": 13
+        },
+        {
+          "second": 49,
+          "completed": 17,
+          "successful": 17
+        },
+        {
+          "second": 50,
+          "completed": 14,
+          "successful": 14
+        },
+        {
+          "second": 51,
+          "completed": 13,
+          "successful": 13
+        },
+        {
+          "second": 52,
+          "completed": 13,
+          "successful": 13
+        },
+        {
+          "second": 53,
+          "completed": 17,
+          "successful": 17
+        },
+        {
+          "second": 54,
+          "completed": 12,
+          "successful": 12
+        },
+        {
+          "second": 55,
+          "completed": 15,
+          "successful": 15
+        },
+        {
+          "second": 56,
+          "completed": 10,
+          "successful": 10
+        },
+        {
+          "second": 57,
+          "completed": 14,
+          "successful": 14
+        },
+        {
+          "second": 58,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 59,
+          "completed": 11,
+          "successful": 11
+        }
+      ]
+    },
+    "GET /detail/creator": {
+      "completed": 455,
+      "successful": 455,
+      "window_completed": 445,
+      "window_successful": 445,
+      "rps": 7.416666666666667,
+      "goodput": 7.416666666666667,
+      "drained_rps": 7.530956622015896,
+      "drained_goodput": 7.530956622015896,
+      "tail_completed": 10,
+      "ok_rate": 1.0,
+      "window_ok_rate": 1.0,
+      "latency_ms": {
+        "p50": 1086.44,
+        "p95": 1825.3,
+        "p99": 2157.02,
+        "max": 2505.96
+      },
+      "success_latency_ms": {
+        "p50": 1086.44,
+        "p95": 1825.3,
+        "p99": 2157.02,
+        "max": 2505.96
+      },
+      "client_wait_s": 0.00024339999436051585,
+      "response_mb_s": 0.006421233333333333,
+      "submitted_targets": 0,
+      "confirmed_targets": 0,
+      "confirmed_targets_s": 0.0,
+      "codes": {
+        "OK": 455
+      },
+      "http": {
+        "200": 455
+      },
+      "stages": {},
+      "outcomes": {},
+      "submission_results": {},
+      "target_codes": {},
+      "failure_examples": [],
+      "per_second": [
+        {
+          "second": 0,
+          "completed": 0,
+          "successful": 0
+        },
+        {
+          "second": 1,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 2,
+          "completed": 5,
+          "successful": 5
+        },
+        {
+          "second": 3,
+          "completed": 4,
+          "successful": 4
+        },
+        {
+          "second": 4,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 5,
+          "completed": 4,
+          "successful": 4
+        },
+        {
+          "second": 6,
+          "completed": 6,
+          "successful": 6
+        },
+        {
+          "second": 7,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 8,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 9,
+          "completed": 4,
+          "successful": 4
+        },
+        {
+          "second": 10,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 11,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 12,
+          "completed": 11,
+          "successful": 11
+        },
+        {
+          "second": 13,
+          "completed": 5,
+          "successful": 5
+        },
+        {
+          "second": 14,
+          "completed": 10,
+          "successful": 10
+        },
+        {
+          "second": 15,
+          "completed": 4,
+          "successful": 4
+        },
+        {
+          "second": 16,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 17,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 18,
+          "completed": 6,
+          "successful": 6
+        },
+        {
+          "second": 19,
+          "completed": 11,
+          "successful": 11
+        },
+        {
+          "second": 20,
+          "completed": 14,
+          "successful": 14
+        },
+        {
+          "second": 21,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 22,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 23,
+          "completed": 4,
+          "successful": 4
+        },
+        {
+          "second": 24,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 25,
+          "completed": 5,
+          "successful": 5
+        },
+        {
+          "second": 26,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 27,
+          "completed": 10,
+          "successful": 10
+        },
+        {
+          "second": 28,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 29,
+          "completed": 12,
+          "successful": 12
+        },
+        {
+          "second": 30,
+          "completed": 10,
+          "successful": 10
+        },
+        {
+          "second": 31,
+          "completed": 15,
+          "successful": 15
+        },
+        {
+          "second": 32,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 33,
+          "completed": 12,
+          "successful": 12
+        },
+        {
+          "second": 34,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 35,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 36,
+          "completed": 5,
+          "successful": 5
+        },
+        {
+          "second": 37,
+          "completed": 6,
+          "successful": 6
+        },
+        {
+          "second": 38,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 39,
+          "completed": 3,
+          "successful": 3
+        },
+        {
+          "second": 40,
+          "completed": 10,
+          "successful": 10
+        },
+        {
+          "second": 41,
+          "completed": 6,
+          "successful": 6
+        },
+        {
+          "second": 42,
+          "completed": 12,
+          "successful": 12
+        },
+        {
+          "second": 43,
+          "completed": 2,
+          "successful": 2
+        },
+        {
+          "second": 44,
+          "completed": 3,
+          "successful": 3
+        },
+        {
+          "second": 45,
+          "completed": 10,
+          "successful": 10
+        },
+        {
+          "second": 46,
+          "completed": 6,
+          "successful": 6
+        },
+        {
+          "second": 47,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 48,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 49,
+          "completed": 3,
+          "successful": 3
+        },
+        {
+          "second": 50,
+          "completed": 4,
+          "successful": 4
+        },
+        {
+          "second": 51,
+          "completed": 12,
+          "successful": 12
+        },
+        {
+          "second": 52,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 53,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 54,
+          "completed": 4,
+          "successful": 4
+        },
+        {
+          "second": 55,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 56,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 57,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 58,
+          "completed": 13,
+          "successful": 13
+        },
+        {
+          "second": 59,
+          "completed": 6,
+          "successful": 6
+        }
+      ]
+    },
+    "GET /creators": {
+      "completed": 724,
+      "successful": 724,
+      "window_completed": 722,
+      "window_successful": 722,
+      "rps": 12.033333333333333,
+      "goodput": 12.033333333333333,
+      "drained_rps": 11.983324383163755,
+      "drained_goodput": 11.983324383163755,
+      "tail_completed": 2,
+      "ok_rate": 1.0,
+      "window_ok_rate": 1.0,
+      "latency_ms": {
+        "p50": 311.55,
+        "p95": 753.12,
+        "p99": 978.84,
+        "max": 1196.11
+      },
+      "success_latency_ms": {
+        "p50": 311.55,
+        "p95": 753.12,
+        "p99": 978.84,
+        "max": 1196.11
+      },
+      "client_wait_s": 0.00035150000621797517,
+      "response_mb_s": 0.07463358333333332,
+      "submitted_targets": 0,
+      "confirmed_targets": 0,
+      "confirmed_targets_s": 0.0,
+      "codes": {
+        "OK": 724
+      },
+      "http": {
+        "200": 724
+      },
+      "stages": {},
+      "outcomes": {},
+      "submission_results": {},
+      "target_codes": {},
+      "failure_examples": [],
+      "per_second": [
+        {
+          "second": 0,
+          "completed": 16,
+          "successful": 16
+        },
+        {
+          "second": 1,
+          "completed": 10,
+          "successful": 10
+        },
+        {
+          "second": 2,
+          "completed": 14,
+          "successful": 14
+        },
+        {
+          "second": 3,
+          "completed": 15,
+          "successful": 15
+        },
+        {
+          "second": 4,
+          "completed": 10,
+          "successful": 10
+        },
+        {
+          "second": 5,
+          "completed": 6,
+          "successful": 6
+        },
+        {
+          "second": 6,
+          "completed": 15,
+          "successful": 15
+        },
+        {
+          "second": 7,
+          "completed": 10,
+          "successful": 10
+        },
+        {
+          "second": 8,
+          "completed": 12,
+          "successful": 12
+        },
+        {
+          "second": 9,
+          "completed": 12,
+          "successful": 12
+        },
+        {
+          "second": 10,
+          "completed": 14,
+          "successful": 14
+        },
+        {
+          "second": 11,
+          "completed": 5,
+          "successful": 5
+        },
+        {
+          "second": 12,
+          "completed": 14,
+          "successful": 14
+        },
+        {
+          "second": 13,
+          "completed": 10,
+          "successful": 10
+        },
+        {
+          "second": 14,
+          "completed": 16,
+          "successful": 16
+        },
+        {
+          "second": 15,
+          "completed": 17,
+          "successful": 17
+        },
+        {
+          "second": 16,
+          "completed": 10,
+          "successful": 10
+        },
+        {
+          "second": 17,
+          "completed": 16,
+          "successful": 16
+        },
+        {
+          "second": 18,
+          "completed": 12,
+          "successful": 12
+        },
+        {
+          "second": 19,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 20,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 21,
+          "completed": 11,
+          "successful": 11
+        },
+        {
+          "second": 22,
+          "completed": 13,
+          "successful": 13
+        },
+        {
+          "second": 23,
+          "completed": 14,
+          "successful": 14
+        },
+        {
+          "second": 24,
+          "completed": 19,
+          "successful": 19
+        },
+        {
+          "second": 25,
+          "completed": 10,
+          "successful": 10
+        },
+        {
+          "second": 26,
+          "completed": 15,
+          "successful": 15
+        },
+        {
+          "second": 27,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 28,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 29,
+          "completed": 12,
+          "successful": 12
+        },
+        {
+          "second": 30,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 31,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 32,
+          "completed": 13,
+          "successful": 13
+        },
+        {
+          "second": 33,
+          "completed": 12,
+          "successful": 12
+        },
+        {
+          "second": 34,
+          "completed": 14,
+          "successful": 14
+        },
+        {
+          "second": 35,
+          "completed": 12,
+          "successful": 12
+        },
+        {
+          "second": 36,
+          "completed": 14,
+          "successful": 14
+        },
+        {
+          "second": 37,
+          "completed": 11,
+          "successful": 11
+        },
+        {
+          "second": 38,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 39,
+          "completed": 11,
+          "successful": 11
+        },
+        {
+          "second": 40,
+          "completed": 11,
+          "successful": 11
+        },
+        {
+          "second": 41,
+          "completed": 17,
+          "successful": 17
+        },
+        {
+          "second": 42,
+          "completed": 12,
+          "successful": 12
+        },
+        {
+          "second": 43,
+          "completed": 14,
+          "successful": 14
+        },
+        {
+          "second": 44,
+          "completed": 12,
+          "successful": 12
+        },
+        {
+          "second": 45,
+          "completed": 14,
+          "successful": 14
+        },
+        {
+          "second": 46,
+          "completed": 10,
+          "successful": 10
+        },
+        {
+          "second": 47,
+          "completed": 13,
+          "successful": 13
+        },
+        {
+          "second": 48,
+          "completed": 11,
+          "successful": 11
+        },
+        {
+          "second": 49,
+          "completed": 16,
+          "successful": 16
+        },
+        {
+          "second": 50,
+          "completed": 11,
+          "successful": 11
+        },
+        {
+          "second": 51,
+          "completed": 12,
+          "successful": 12
+        },
+        {
+          "second": 52,
+          "completed": 15,
+          "successful": 15
+        },
+        {
+          "second": 53,
+          "completed": 11,
+          "successful": 11
+        },
+        {
+          "second": 54,
+          "completed": 14,
+          "successful": 14
+        },
+        {
+          "second": 55,
+          "completed": 11,
+          "successful": 11
+        },
+        {
+          "second": 56,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 57,
+          "completed": 16,
+          "successful": 16
+        },
+        {
+          "second": 58,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 59,
+          "completed": 15,
+          "successful": 15
+        }
+      ]
+    }
+  },
+  "requests_total": {
+    "completed": 2926,
+    "successful": 2926,
+    "window_completed": 2894,
+    "window_successful": 2894,
+    "rps": 48.233333333333334,
+    "goodput": 48.233333333333334,
+    "drained_rps": 48.429844123117604,
+    "drained_goodput": 48.429844123117604,
+    "tail_completed": 32,
+    "ok_rate": 1.0,
+    "window_ok_rate": 1.0,
+    "latency_ms": {
+      "p50": 513.8,
+      "p95": 1561.76,
+      "p99": 1960.25,
+      "max": 2797.66
+    },
+    "success_latency_ms": {
+      "p50": 513.8,
+      "p95": 1561.76,
+      "p99": 1960.25,
+      "max": 2797.66
+    },
+    "client_wait_s": 0.0015226999639708083,
+    "response_mb_s": 0.18954258333333335,
+    "submitted_targets": 0,
+    "confirmed_targets": 0,
+    "confirmed_targets_s": 0.0,
+    "codes": {
+      "OK": 2926
+    },
+    "http": {
+      "200": 2926
+    },
+    "stages": {},
+    "outcomes": {},
+    "submission_results": {},
+    "target_codes": {},
+    "failure_examples": [],
+    "per_second": [
+      {
+        "second": 0,
+        "completed": 34,
+        "successful": 34
+      },
+      {
+        "second": 1,
+        "completed": 43,
+        "successful": 43
+      },
+      {
+        "second": 2,
+        "completed": 50,
+        "successful": 50
+      },
+      {
+        "second": 3,
+        "completed": 48,
+        "successful": 48
+      },
+      {
+        "second": 4,
+        "completed": 48,
+        "successful": 48
+      },
+      {
+        "second": 5,
+        "completed": 43,
+        "successful": 43
+      },
+      {
+        "second": 6,
+        "completed": 49,
+        "successful": 49
+      },
+      {
+        "second": 7,
+        "completed": 45,
+        "successful": 45
+      },
+      {
+        "second": 8,
+        "completed": 40,
+        "successful": 40
+      },
+      {
+        "second": 9,
+        "completed": 48,
+        "successful": 48
+      },
+      {
+        "second": 10,
+        "completed": 49,
+        "successful": 49
+      },
+      {
+        "second": 11,
+        "completed": 39,
+        "successful": 39
+      },
+      {
+        "second": 12,
+        "completed": 54,
+        "successful": 54
+      },
+      {
+        "second": 13,
+        "completed": 44,
+        "successful": 44
+      },
+      {
+        "second": 14,
+        "completed": 51,
+        "successful": 51
+      },
+      {
+        "second": 15,
+        "completed": 51,
+        "successful": 51
+      },
+      {
+        "second": 16,
+        "completed": 46,
+        "successful": 46
+      },
+      {
+        "second": 17,
+        "completed": 50,
+        "successful": 50
+      },
+      {
+        "second": 18,
+        "completed": 42,
+        "successful": 42
+      },
+      {
+        "second": 19,
+        "completed": 55,
+        "successful": 55
+      },
+      {
+        "second": 20,
+        "completed": 56,
+        "successful": 56
+      },
+      {
+        "second": 21,
+        "completed": 53,
+        "successful": 53
+      },
+      {
+        "second": 22,
+        "completed": 47,
+        "successful": 47
+      },
+      {
+        "second": 23,
+        "completed": 49,
+        "successful": 49
+      },
+      {
+        "second": 24,
+        "completed": 53,
+        "successful": 53
+      },
+      {
+        "second": 25,
+        "completed": 47,
+        "successful": 47
+      },
+      {
+        "second": 26,
+        "completed": 47,
+        "successful": 47
+      },
+      {
+        "second": 27,
+        "completed": 53,
+        "successful": 53
+      },
+      {
+        "second": 28,
+        "completed": 46,
+        "successful": 46
+      },
+      {
+        "second": 29,
+        "completed": 50,
+        "successful": 50
+      },
+      {
+        "second": 30,
+        "completed": 52,
+        "successful": 52
+      },
+      {
+        "second": 31,
+        "completed": 48,
+        "successful": 48
+      },
+      {
+        "second": 32,
+        "completed": 45,
+        "successful": 45
+      },
+      {
+        "second": 33,
+        "completed": 55,
+        "successful": 55
+      },
+      {
+        "second": 34,
+        "completed": 48,
+        "successful": 48
+      },
+      {
+        "second": 35,
+        "completed": 48,
+        "successful": 48
+      },
+      {
+        "second": 36,
+        "completed": 44,
+        "successful": 44
+      },
+      {
+        "second": 37,
+        "completed": 52,
+        "successful": 52
+      },
+      {
+        "second": 38,
+        "completed": 47,
+        "successful": 47
+      },
+      {
+        "second": 39,
+        "completed": 43,
+        "successful": 43
+      },
+      {
+        "second": 40,
+        "completed": 52,
+        "successful": 52
+      },
+      {
+        "second": 41,
+        "completed": 48,
+        "successful": 48
+      },
+      {
+        "second": 42,
+        "completed": 52,
+        "successful": 52
+      },
+      {
+        "second": 43,
+        "completed": 44,
+        "successful": 44
+      },
+      {
+        "second": 44,
+        "completed": 47,
+        "successful": 47
+      },
+      {
+        "second": 45,
+        "completed": 53,
+        "successful": 53
+      },
+      {
+        "second": 46,
+        "completed": 47,
+        "successful": 47
+      },
+      {
+        "second": 47,
+        "completed": 47,
+        "successful": 47
+      },
+      {
+        "second": 48,
+        "completed": 50,
+        "successful": 50
+      },
+      {
+        "second": 49,
+        "completed": 49,
+        "successful": 49
+      },
+      {
+        "second": 50,
+        "completed": 45,
+        "successful": 45
+      },
+      {
+        "second": 51,
+        "completed": 49,
+        "successful": 49
+      },
+      {
+        "second": 52,
+        "completed": 51,
+        "successful": 51
+      },
+      {
+        "second": 53,
+        "completed": 50,
+        "successful": 50
+      },
+      {
+        "second": 54,
+        "completed": 44,
+        "successful": 44
+      },
+      {
+        "second": 55,
+        "completed": 52,
+        "successful": 52
+      },
+      {
+        "second": 56,
+        "completed": 45,
+        "successful": 45
+      },
+      {
+        "second": 57,
+        "completed": 55,
+        "successful": 55
+      },
+      {
+        "second": 58,
+        "completed": 53,
+        "successful": 53
+      },
+      {
+        "second": 59,
+        "completed": 49,
+        "successful": 49
+      }
+    ]
+  },
+  "operations": {
+    "refresh": {
+      "completed": 410,
+      "successful": 410,
+      "window_completed": 404,
+      "window_successful": 404,
+      "rps": 6.733333333333333,
+      "goodput": 6.733333333333333,
+      "drained_rps": 6.786136736322016,
+      "drained_goodput": 6.786136736322016,
+      "tail_completed": 6,
+      "ok_rate": 1.0,
+      "window_ok_rate": 1.0,
+      "latency_ms": {
+        "p50": 1587.92,
+        "p95": 2485.82,
+        "p99": 2937.45,
+        "max": 3604.03
+      },
+      "success_latency_ms": {
+        "p50": 1587.92,
+        "p95": 2485.82,
+        "p99": 2937.45,
+        "max": 3604.03
+      },
+      "client_wait_s": 0.0,
+      "response_mb_s": 0.0,
+      "submitted_targets": 0,
+      "confirmed_targets": 0,
+      "confirmed_targets_s": 0.0,
+      "codes": {
+        "OK": 410
+      },
+      "http": {},
+      "stages": {},
+      "outcomes": {},
+      "submission_results": {},
+      "target_codes": {},
+      "failure_examples": [],
+      "per_second": [
+        {
+          "second": 0,
+          "completed": 0,
+          "successful": 0
+        },
+        {
+          "second": 1,
+          "completed": 3,
+          "successful": 3
+        },
+        {
+          "second": 2,
+          "completed": 5,
+          "successful": 5
+        },
+        {
+          "second": 3,
+          "completed": 3,
+          "successful": 3
+        },
+        {
+          "second": 4,
+          "completed": 11,
+          "successful": 11
+        },
+        {
+          "second": 5,
+          "completed": 6,
+          "successful": 6
+        },
+        {
+          "second": 6,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 7,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 8,
+          "completed": 2,
+          "successful": 2
+        },
+        {
+          "second": 9,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 10,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 11,
+          "completed": 4,
+          "successful": 4
+        },
+        {
+          "second": 12,
+          "completed": 12,
+          "successful": 12
+        },
+        {
+          "second": 13,
+          "completed": 4,
+          "successful": 4
+        },
+        {
+          "second": 14,
+          "completed": 6,
+          "successful": 6
+        },
+        {
+          "second": 15,
+          "completed": 2,
+          "successful": 2
+        },
+        {
+          "second": 16,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 17,
+          "completed": 4,
+          "successful": 4
+        },
+        {
+          "second": 18,
+          "completed": 5,
+          "successful": 5
+        },
+        {
+          "second": 19,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 20,
+          "completed": 15,
+          "successful": 15
+        },
+        {
+          "second": 21,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 22,
+          "completed": 6,
+          "successful": 6
+        },
+        {
+          "second": 23,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 24,
+          "completed": 5,
+          "successful": 5
+        },
+        {
+          "second": 25,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 26,
+          "completed": 3,
+          "successful": 3
+        },
+        {
+          "second": 27,
+          "completed": 11,
+          "successful": 11
+        },
+        {
+          "second": 28,
+          "completed": 6,
+          "successful": 6
+        },
+        {
+          "second": 29,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 30,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 31,
+          "completed": 10,
+          "successful": 10
+        },
+        {
+          "second": 32,
+          "completed": 4,
+          "successful": 4
+        },
+        {
+          "second": 33,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 34,
+          "completed": 5,
+          "successful": 5
+        },
+        {
+          "second": 35,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 36,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 37,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 38,
+          "completed": 11,
+          "successful": 11
+        },
+        {
+          "second": 39,
+          "completed": 6,
+          "successful": 6
+        },
+        {
+          "second": 40,
+          "completed": 5,
+          "successful": 5
+        },
+        {
+          "second": 41,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 42,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 43,
+          "completed": 6,
+          "successful": 6
+        },
+        {
+          "second": 44,
+          "completed": 5,
+          "successful": 5
+        },
+        {
+          "second": 45,
+          "completed": 6,
+          "successful": 6
+        },
+        {
+          "second": 46,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 47,
+          "completed": 5,
+          "successful": 5
+        },
+        {
+          "second": 48,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 49,
+          "completed": 2,
+          "successful": 2
+        },
+        {
+          "second": 50,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 51,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 52,
+          "completed": 4,
+          "successful": 4
+        },
+        {
+          "second": 53,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 54,
+          "completed": 5,
+          "successful": 5
+        },
+        {
+          "second": 55,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 56,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 57,
+          "completed": 6,
+          "successful": 6
+        },
+        {
+          "second": 58,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 59,
+          "completed": 10,
+          "successful": 10
+        }
+      ]
+    },
+    "catalog": {
+      "completed": 598,
+      "successful": 598,
+      "window_completed": 597,
+      "window_successful": 597,
+      "rps": 9.95,
+      "goodput": 9.95,
+      "drained_rps": 9.897828703220892,
+      "drained_goodput": 9.897828703220892,
+      "tail_completed": 1,
+      "ok_rate": 1.0,
+      "window_ok_rate": 1.0,
+      "latency_ms": {
+        "p50": 337.9,
+        "p95": 723.95,
+        "p99": 883.39,
+        "max": 1139.47
+      },
+      "success_latency_ms": {
+        "p50": 337.9,
+        "p95": 723.95,
+        "p99": 883.39,
+        "max": 1139.47
+      },
+      "client_wait_s": 0.0,
+      "response_mb_s": 0.0,
+      "submitted_targets": 0,
+      "confirmed_targets": 0,
+      "confirmed_targets_s": 0.0,
+      "codes": {
+        "OK": 598
+      },
+      "http": {},
+      "stages": {},
+      "outcomes": {},
+      "submission_results": {},
+      "target_codes": {},
+      "failure_examples": [],
+      "per_second": [
+        {
+          "second": 0,
+          "completed": 13,
+          "successful": 13
+        },
+        {
+          "second": 1,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 2,
+          "completed": 16,
+          "successful": 16
+        },
+        {
+          "second": 3,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 4,
+          "completed": 14,
+          "successful": 14
+        },
+        {
+          "second": 5,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 6,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 7,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 8,
+          "completed": 6,
+          "successful": 6
+        },
+        {
+          "second": 9,
+          "completed": 12,
+          "successful": 12
+        },
+        {
+          "second": 10,
+          "completed": 5,
+          "successful": 5
+        },
+        {
+          "second": 11,
+          "completed": 6,
+          "successful": 6
+        },
+        {
+          "second": 12,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 13,
+          "completed": 10,
+          "successful": 10
+        },
+        {
+          "second": 14,
+          "completed": 15,
+          "successful": 15
+        },
+        {
+          "second": 15,
+          "completed": 13,
+          "successful": 13
+        },
+        {
+          "second": 16,
+          "completed": 13,
+          "successful": 13
+        },
+        {
+          "second": 17,
+          "completed": 19,
+          "successful": 19
+        },
+        {
+          "second": 18,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 19,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 20,
+          "completed": 2,
+          "successful": 2
+        },
+        {
+          "second": 21,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 22,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 23,
+          "completed": 11,
+          "successful": 11
+        },
+        {
+          "second": 24,
+          "completed": 14,
+          "successful": 14
+        },
+        {
+          "second": 25,
+          "completed": 10,
+          "successful": 10
+        },
+        {
+          "second": 26,
+          "completed": 11,
+          "successful": 11
+        },
+        {
+          "second": 27,
+          "completed": 13,
+          "successful": 13
+        },
+        {
+          "second": 28,
+          "completed": 5,
+          "successful": 5
+        },
+        {
+          "second": 29,
+          "completed": 13,
+          "successful": 13
+        },
+        {
+          "second": 30,
+          "completed": 12,
+          "successful": 12
+        },
+        {
+          "second": 31,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 32,
+          "completed": 12,
+          "successful": 12
+        },
+        {
+          "second": 33,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 34,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 35,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 36,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 37,
+          "completed": 12,
+          "successful": 12
+        },
+        {
+          "second": 38,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 39,
+          "completed": 11,
+          "successful": 11
+        },
+        {
+          "second": 40,
+          "completed": 14,
+          "successful": 14
+        },
+        {
+          "second": 41,
+          "completed": 12,
+          "successful": 12
+        },
+        {
+          "second": 42,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 43,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 44,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 45,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 46,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 47,
+          "completed": 10,
+          "successful": 10
+        },
+        {
+          "second": 48,
+          "completed": 6,
+          "successful": 6
+        },
+        {
+          "second": 49,
+          "completed": 11,
+          "successful": 11
+        },
+        {
+          "second": 50,
+          "completed": 10,
+          "successful": 10
+        },
+        {
+          "second": 51,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 52,
+          "completed": 11,
+          "successful": 11
+        },
+        {
+          "second": 53,
+          "completed": 12,
+          "successful": 12
+        },
+        {
+          "second": 54,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 55,
+          "completed": 12,
+          "successful": 12
+        },
+        {
+          "second": 56,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 57,
+          "completed": 22,
+          "successful": 22
+        },
+        {
+          "second": 58,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 59,
+          "completed": 8,
+          "successful": 8
+        }
+      ]
+    },
+    "detail": {
+      "completed": 639,
+      "successful": 639,
+      "window_completed": 620,
+      "window_successful": 620,
+      "rps": 10.333333333333334,
+      "goodput": 10.333333333333334,
+      "drained_rps": 10.576442376853093,
+      "drained_goodput": 10.576442376853093,
+      "tail_completed": 19,
+      "ok_rate": 1.0,
+      "window_ok_rate": 1.0,
+      "latency_ms": {
+        "p50": 1060.5,
+        "p95": 1791.32,
+        "p99": 2157.05,
+        "max": 2505.99
+      },
+      "success_latency_ms": {
+        "p50": 1060.5,
+        "p95": 1791.32,
+        "p99": 2157.05,
+        "max": 2505.99
+      },
+      "client_wait_s": 0.0,
+      "response_mb_s": 0.0,
+      "submitted_targets": 0,
+      "confirmed_targets": 0,
+      "confirmed_targets_s": 0.0,
+      "codes": {
+        "OK": 639
+      },
+      "http": {},
+      "stages": {},
+      "outcomes": {},
+      "submission_results": {},
+      "target_codes": {},
+      "failure_examples": [],
+      "per_second": [
+        {
+          "second": 0,
+          "completed": 0,
+          "successful": 0
+        },
+        {
+          "second": 1,
+          "completed": 10,
+          "successful": 10
+        },
+        {
+          "second": 2,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 3,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 4,
+          "completed": 10,
+          "successful": 10
+        },
+        {
+          "second": 5,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 6,
+          "completed": 11,
+          "successful": 11
+        },
+        {
+          "second": 7,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 8,
+          "completed": 11,
+          "successful": 11
+        },
+        {
+          "second": 9,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 10,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 11,
+          "completed": 10,
+          "successful": 10
+        },
+        {
+          "second": 12,
+          "completed": 13,
+          "successful": 13
+        },
+        {
+          "second": 13,
+          "completed": 13,
+          "successful": 13
+        },
+        {
+          "second": 14,
+          "completed": 15,
+          "successful": 15
+        },
+        {
+          "second": 15,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 16,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 17,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 18,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 19,
+          "completed": 15,
+          "successful": 15
+        },
+        {
+          "second": 20,
+          "completed": 16,
+          "successful": 16
+        },
+        {
+          "second": 21,
+          "completed": 14,
+          "successful": 14
+        },
+        {
+          "second": 22,
+          "completed": 12,
+          "successful": 12
+        },
+        {
+          "second": 23,
+          "completed": 6,
+          "successful": 6
+        },
+        {
+          "second": 24,
+          "completed": 14,
+          "successful": 14
+        },
+        {
+          "second": 25,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 26,
+          "completed": 11,
+          "successful": 11
+        },
+        {
+          "second": 27,
+          "completed": 12,
+          "successful": 12
+        },
+        {
+          "second": 28,
+          "completed": 15,
+          "successful": 15
+        },
+        {
+          "second": 29,
+          "completed": 14,
+          "successful": 14
+        },
+        {
+          "second": 30,
+          "completed": 13,
+          "successful": 13
+        },
+        {
+          "second": 31,
+          "completed": 15,
+          "successful": 15
+        },
+        {
+          "second": 32,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 33,
+          "completed": 21,
+          "successful": 21
+        },
+        {
+          "second": 34,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 35,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 36,
+          "completed": 6,
+          "successful": 6
+        },
+        {
+          "second": 37,
+          "completed": 12,
+          "successful": 12
+        },
+        {
+          "second": 38,
+          "completed": 10,
+          "successful": 10
+        },
+        {
+          "second": 39,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 40,
+          "completed": 11,
+          "successful": 11
+        },
+        {
+          "second": 41,
+          "completed": 6,
+          "successful": 6
+        },
+        {
+          "second": 42,
+          "completed": 12,
+          "successful": 12
+        },
+        {
+          "second": 43,
+          "completed": 6,
+          "successful": 6
+        },
+        {
+          "second": 44,
+          "completed": 11,
+          "successful": 11
+        },
+        {
+          "second": 45,
+          "completed": 14,
+          "successful": 14
+        },
+        {
+          "second": 46,
+          "completed": 11,
+          "successful": 11
+        },
+        {
+          "second": 47,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 48,
+          "completed": 11,
+          "successful": 11
+        },
+        {
+          "second": 49,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 50,
+          "completed": 6,
+          "successful": 6
+        },
+        {
+          "second": 51,
+          "completed": 11,
+          "successful": 11
+        },
+        {
+          "second": 52,
+          "completed": 11,
+          "successful": 11
+        },
+        {
+          "second": 53,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 54,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 55,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 56,
+          "completed": 10,
+          "successful": 10
+        },
+        {
+          "second": 57,
+          "completed": 12,
+          "successful": 12
+        },
+        {
+          "second": 58,
+          "completed": 15,
+          "successful": 15
+        },
+        {
+          "second": 59,
+          "completed": 7,
+          "successful": 7
+        }
+      ]
+    },
+    "overview": {
+      "completed": 433,
+      "successful": 433,
+      "window_completed": 430,
+      "window_successful": 430,
+      "rps": 7.166666666666667,
+      "goodput": 7.166666666666667,
+      "drained_rps": 7.166822455676666,
+      "drained_goodput": 7.166822455676666,
+      "tail_completed": 3,
+      "ok_rate": 1.0,
+      "window_ok_rate": 1.0,
+      "latency_ms": {
+        "p50": 707.59,
+        "p95": 1295.01,
+        "p99": 1620.03,
+        "max": 1968.81
+      },
+      "success_latency_ms": {
+        "p50": 707.59,
+        "p95": 1295.01,
+        "p99": 1620.03,
+        "max": 1968.81
+      },
+      "client_wait_s": 0.0,
+      "response_mb_s": 0.0,
+      "submitted_targets": 0,
+      "confirmed_targets": 0,
+      "confirmed_targets_s": 0.0,
+      "codes": {
+        "OK": 433
+      },
+      "http": {},
+      "stages": {},
+      "outcomes": {},
+      "submission_results": {},
+      "target_codes": {},
+      "failure_examples": [],
+      "per_second": [
+        {
+          "second": 0,
+          "completed": 6,
+          "successful": 6
+        },
+        {
+          "second": 1,
+          "completed": 10,
+          "successful": 10
+        },
+        {
+          "second": 2,
+          "completed": 6,
+          "successful": 6
+        },
+        {
+          "second": 3,
+          "completed": 11,
+          "successful": 11
+        },
+        {
+          "second": 4,
+          "completed": 6,
+          "successful": 6
+        },
+        {
+          "second": 5,
+          "completed": 5,
+          "successful": 5
+        },
+        {
+          "second": 6,
+          "completed": 5,
+          "successful": 5
+        },
+        {
+          "second": 7,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 8,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 9,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 10,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 11,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 12,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 13,
+          "completed": 6,
+          "successful": 6
+        },
+        {
+          "second": 14,
+          "completed": 5,
+          "successful": 5
+        },
+        {
+          "second": 15,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 16,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 17,
+          "completed": 5,
+          "successful": 5
+        },
+        {
+          "second": 18,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 19,
+          "completed": 6,
+          "successful": 6
+        },
+        {
+          "second": 20,
+          "completed": 6,
+          "successful": 6
+        },
+        {
+          "second": 21,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 22,
+          "completed": 5,
+          "successful": 5
+        },
+        {
+          "second": 23,
+          "completed": 11,
+          "successful": 11
+        },
+        {
+          "second": 24,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 25,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 26,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 27,
+          "completed": 5,
+          "successful": 5
+        },
+        {
+          "second": 28,
+          "completed": 5,
+          "successful": 5
+        },
+        {
+          "second": 29,
+          "completed": 5,
+          "successful": 5
+        },
+        {
+          "second": 30,
+          "completed": 5,
+          "successful": 5
+        },
+        {
+          "second": 31,
+          "completed": 5,
+          "successful": 5
+        },
+        {
+          "second": 32,
+          "completed": 6,
+          "successful": 6
+        },
+        {
+          "second": 33,
+          "completed": 5,
+          "successful": 5
+        },
+        {
+          "second": 34,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 35,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 36,
+          "completed": 10,
+          "successful": 10
+        },
+        {
+          "second": 37,
+          "completed": 3,
+          "successful": 3
+        },
+        {
+          "second": 38,
+          "completed": 5,
+          "successful": 5
+        },
+        {
+          "second": 39,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 40,
+          "completed": 6,
+          "successful": 6
+        },
+        {
+          "second": 41,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 42,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 43,
+          "completed": 11,
+          "successful": 11
+        },
+        {
+          "second": 44,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 45,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 46,
+          "completed": 7,
+          "successful": 7
+        },
+        {
+          "second": 47,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 48,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 49,
+          "completed": 11,
+          "successful": 11
+        },
+        {
+          "second": 50,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 51,
+          "completed": 10,
+          "successful": 10
+        },
+        {
+          "second": 52,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 53,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 54,
+          "completed": 9,
+          "successful": 9
+        },
+        {
+          "second": 55,
+          "completed": 8,
+          "successful": 8
+        },
+        {
+          "second": 56,
+          "completed": 6,
+          "successful": 6
+        },
+        {
+          "second": 57,
+          "completed": 4,
+          "successful": 4
+        },
+        {
+          "second": 58,
+          "completed": 4,
+          "successful": 4
+        },
+        {
+          "second": 59,
+          "completed": 8,
+          "successful": 8
+        }
+      ]
+    }
+  },
+  "operations_total": {
+    "completed": 2080,
+    "successful": 2080,
+    "window_completed": 2051,
+    "window_successful": 2051,
+    "rps": 34.18333333333333,
+    "goodput": 34.18333333333333,
+    "drained_rps": 34.42723027207267,
+    "drained_goodput": 34.42723027207267,
+    "tail_completed": 29,
+    "ok_rate": 1.0,
+    "window_ok_rate": 1.0,
+    "latency_ms": {
+      "p50": 829.6,
+      "p95": 1971.98,
+      "p99": 2498.1,
+      "max": 3604.03
+    },
+    "success_latency_ms": {
+      "p50": 829.6,
+      "p95": 1971.98,
+      "p99": 2498.1,
+      "max": 3604.03
+    },
+    "client_wait_s": 0.0,
+    "response_mb_s": 0.0,
+    "submitted_targets": 0,
+    "confirmed_targets": 0,
+    "confirmed_targets_s": 0.0,
+    "codes": {
+      "OK": 2080
+    },
+    "http": {},
+    "stages": {},
+    "outcomes": {},
+    "submission_results": {},
+    "target_codes": {},
+    "failure_examples": [],
+    "per_second": [
+      {
+        "second": 0,
+        "completed": 19,
+        "successful": 19
+      },
+      {
+        "second": 1,
+        "completed": 32,
+        "successful": 32
+      },
+      {
+        "second": 2,
+        "completed": 35,
+        "successful": 35
+      },
+      {
+        "second": 3,
+        "completed": 29,
+        "successful": 29
+      },
+      {
+        "second": 4,
+        "completed": 41,
+        "successful": 41
+      },
+      {
+        "second": 5,
+        "completed": 29,
+        "successful": 29
+      },
+      {
+        "second": 6,
+        "completed": 32,
+        "successful": 32
+      },
+      {
+        "second": 7,
+        "completed": 33,
+        "successful": 33
+      },
+      {
+        "second": 8,
+        "completed": 27,
+        "successful": 27
+      },
+      {
+        "second": 9,
+        "completed": 34,
+        "successful": 34
+      },
+      {
+        "second": 10,
+        "completed": 30,
+        "successful": 30
+      },
+      {
+        "second": 11,
+        "completed": 28,
+        "successful": 28
+      },
+      {
+        "second": 12,
+        "completed": 41,
+        "successful": 41
+      },
+      {
+        "second": 13,
+        "completed": 33,
+        "successful": 33
+      },
+      {
+        "second": 14,
+        "completed": 41,
+        "successful": 41
+      },
+      {
+        "second": 15,
+        "completed": 30,
+        "successful": 30
+      },
+      {
+        "second": 16,
+        "completed": 39,
+        "successful": 39
+      },
+      {
+        "second": 17,
+        "completed": 37,
+        "successful": 37
+      },
+      {
+        "second": 18,
+        "completed": 29,
+        "successful": 29
+      },
+      {
+        "second": 19,
+        "completed": 38,
+        "successful": 38
+      },
+      {
+        "second": 20,
+        "completed": 39,
+        "successful": 39
+      },
+      {
+        "second": 21,
+        "completed": 38,
+        "successful": 38
+      },
+      {
+        "second": 22,
+        "completed": 31,
+        "successful": 31
+      },
+      {
+        "second": 23,
+        "completed": 35,
+        "successful": 35
+      },
+      {
+        "second": 24,
+        "completed": 40,
+        "successful": 40
+      },
+      {
+        "second": 25,
+        "completed": 34,
+        "successful": 34
+      },
+      {
+        "second": 26,
+        "completed": 32,
+        "successful": 32
+      },
+      {
+        "second": 27,
+        "completed": 41,
+        "successful": 41
+      },
+      {
+        "second": 28,
+        "completed": 31,
+        "successful": 31
+      },
+      {
+        "second": 29,
+        "completed": 40,
+        "successful": 40
+      },
+      {
+        "second": 30,
+        "completed": 38,
+        "successful": 38
+      },
+      {
+        "second": 31,
+        "completed": 38,
+        "successful": 38
+      },
+      {
+        "second": 32,
+        "completed": 31,
+        "successful": 31
+      },
+      {
+        "second": 33,
+        "completed": 42,
+        "successful": 42
+      },
+      {
+        "second": 34,
+        "completed": 32,
+        "successful": 32
+      },
+      {
+        "second": 35,
+        "completed": 31,
+        "successful": 31
+      },
+      {
+        "second": 36,
+        "completed": 32,
+        "successful": 32
+      },
+      {
+        "second": 37,
+        "completed": 35,
+        "successful": 35
+      },
+      {
+        "second": 38,
+        "completed": 34,
+        "successful": 34
+      },
+      {
+        "second": 39,
+        "completed": 33,
+        "successful": 33
+      },
+      {
+        "second": 40,
+        "completed": 36,
+        "successful": 36
+      },
+      {
+        "second": 41,
+        "completed": 34,
+        "successful": 34
+      },
+      {
+        "second": 42,
+        "completed": 36,
+        "successful": 36
+      },
+      {
+        "second": 43,
+        "completed": 30,
+        "successful": 30
+      },
+      {
+        "second": 44,
+        "completed": 31,
+        "successful": 31
+      },
+      {
+        "second": 45,
+        "completed": 36,
+        "successful": 36
+      },
+      {
+        "second": 46,
+        "completed": 34,
+        "successful": 34
+      },
+      {
+        "second": 47,
+        "completed": 33,
+        "successful": 33
+      },
+      {
+        "second": 48,
+        "completed": 33,
+        "successful": 33
+      },
+      {
+        "second": 49,
+        "completed": 33,
+        "successful": 33
+      },
+      {
+        "second": 50,
+        "completed": 31,
+        "successful": 31
+      },
+      {
+        "second": 51,
+        "completed": 37,
+        "successful": 37
+      },
+      {
+        "second": 52,
+        "completed": 34,
+        "successful": 34
+      },
+      {
+        "second": 53,
+        "completed": 34,
+        "successful": 34
+      },
+      {
+        "second": 54,
+        "completed": 31,
+        "successful": 31
+      },
+      {
+        "second": 55,
+        "completed": 37,
+        "successful": 37
+      },
+      {
+        "second": 56,
+        "completed": 33,
+        "successful": 33
+      },
+      {
+        "second": 57,
+        "completed": 44,
+        "successful": 44
+      },
+      {
+        "second": 58,
+        "completed": 37,
+        "successful": 37
+      },
+      {
+        "second": 59,
+        "completed": 33,
+        "successful": 33
+      }
+    ]
+  },
+  "schema_version": 2,
+  "config": {
+    "base_url": "http://192.168.61.128:8181",
+    "mode": "read",
+    "scenario": "mixed",
+    "pacing": "capacity",
+    "duration": 60.0,
+    "concurrency": 32,
+    "timeout": null,
+    "max_ids": 100,
+    "targets_file": null,
+    "batch_size": 10,
+    "seed": 1,
+    "json_out": "perf-read-32.json"
+  },
+  "target_pool": 191,
+  "finished_at": "2026-11-18T08:02:06.386227+00:00"
+}

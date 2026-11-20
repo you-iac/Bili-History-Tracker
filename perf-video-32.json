@@ -1,0 +1,1421 @@
+{
+  "measurement_s": 60.0,
+  "actual_s": 60.39631510000254,
+  "drain_s": 0.3963151000025391,
+  "measurement_started_at": "2026-11-18T08:36:54.227685+00:00",
+  "started_operations": 2933,
+  "incomplete_operations": 0,
+  "unconsumed_targets": null,
+  "finite_workload": false,
+  "worker_errors": [],
+  "requests": {
+    "GET /detail/video": {
+      "completed": 2933,
+      "successful": 2933,
+      "window_completed": 2901,
+      "window_successful": 2901,
+      "rps": 48.35,
+      "goodput": 48.35,
+      "drained_rps": 48.56256536749999,
+      "drained_goodput": 48.56256536749999,
+      "tail_completed": 32,
+      "ok_rate": 1.0,
+      "window_ok_rate": 1.0,
+      "latency_ms": {
+        "p50": 635.57,
+        "p95": 1028.7,
+        "p99": 1199.78,
+        "max": 1481.57
+      },
+      "success_latency_ms": {
+        "p50": 635.57,
+        "p95": 1028.7,
+        "p99": 1199.78,
+        "max": 1481.57
+      },
+      "client_wait_s": 0.001546200095617678,
+      "response_mb_s": 0.05149128333333333,
+      "response_bytes": 3123200,
+      "window_response_bytes": 3089477,
+      "mean_response_bytes": 1064.8482782134333,
+      "submitted_targets": 0,
+      "confirmed_targets": 0,
+      "confirmed_targets_s": 0.0,
+      "codes": {
+        "OK": 2933
+      },
+      "http": {
+        "200": 2933
+      },
+      "stages": {},
+      "outcomes": {},
+      "submission_results": {},
+      "target_codes": {},
+      "failure_examples": [],
+      "per_second": [
+        {
+          "second": 0,
+          "completed": 33,
+          "successful": 33
+        },
+        {
+          "second": 1,
+          "completed": 46,
+          "successful": 46
+        },
+        {
+          "second": 2,
+          "completed": 45,
+          "successful": 45
+        },
+        {
+          "second": 3,
+          "completed": 51,
+          "successful": 51
+        },
+        {
+          "second": 4,
+          "completed": 46,
+          "successful": 46
+        },
+        {
+          "second": 5,
+          "completed": 53,
+          "successful": 53
+        },
+        {
+          "second": 6,
+          "completed": 50,
+          "successful": 50
+        },
+        {
+          "second": 7,
+          "completed": 50,
+          "successful": 50
+        },
+        {
+          "second": 8,
+          "completed": 51,
+          "successful": 51
+        },
+        {
+          "second": 9,
+          "completed": 50,
+          "successful": 50
+        },
+        {
+          "second": 10,
+          "completed": 48,
+          "successful": 48
+        },
+        {
+          "second": 11,
+          "completed": 53,
+          "successful": 53
+        },
+        {
+          "second": 12,
+          "completed": 52,
+          "successful": 52
+        },
+        {
+          "second": 13,
+          "completed": 50,
+          "successful": 50
+        },
+        {
+          "second": 14,
+          "completed": 50,
+          "successful": 50
+        },
+        {
+          "second": 15,
+          "completed": 49,
+          "successful": 49
+        },
+        {
+          "second": 16,
+          "completed": 51,
+          "successful": 51
+        },
+        {
+          "second": 17,
+          "completed": 47,
+          "successful": 47
+        },
+        {
+          "second": 18,
+          "completed": 44,
+          "successful": 44
+        },
+        {
+          "second": 19,
+          "completed": 44,
+          "successful": 44
+        },
+        {
+          "second": 20,
+          "completed": 47,
+          "successful": 47
+        },
+        {
+          "second": 21,
+          "completed": 48,
+          "successful": 48
+        },
+        {
+          "second": 22,
+          "completed": 54,
+          "successful": 54
+        },
+        {
+          "second": 23,
+          "completed": 47,
+          "successful": 47
+        },
+        {
+          "second": 24,
+          "completed": 50,
+          "successful": 50
+        },
+        {
+          "second": 25,
+          "completed": 52,
+          "successful": 52
+        },
+        {
+          "second": 26,
+          "completed": 48,
+          "successful": 48
+        },
+        {
+          "second": 27,
+          "completed": 49,
+          "successful": 49
+        },
+        {
+          "second": 28,
+          "completed": 51,
+          "successful": 51
+        },
+        {
+          "second": 29,
+          "completed": 53,
+          "successful": 53
+        },
+        {
+          "second": 30,
+          "completed": 48,
+          "successful": 48
+        },
+        {
+          "second": 31,
+          "completed": 49,
+          "successful": 49
+        },
+        {
+          "second": 32,
+          "completed": 51,
+          "successful": 51
+        },
+        {
+          "second": 33,
+          "completed": 51,
+          "successful": 51
+        },
+        {
+          "second": 34,
+          "completed": 45,
+          "successful": 45
+        },
+        {
+          "second": 35,
+          "completed": 52,
+          "successful": 52
+        },
+        {
+          "second": 36,
+          "completed": 51,
+          "successful": 51
+        },
+        {
+          "second": 37,
+          "completed": 50,
+          "successful": 50
+        },
+        {
+          "second": 38,
+          "completed": 47,
+          "successful": 47
+        },
+        {
+          "second": 39,
+          "completed": 50,
+          "successful": 50
+        },
+        {
+          "second": 40,
+          "completed": 49,
+          "successful": 49
+        },
+        {
+          "second": 41,
+          "completed": 50,
+          "successful": 50
+        },
+        {
+          "second": 42,
+          "completed": 55,
+          "successful": 55
+        },
+        {
+          "second": 43,
+          "completed": 51,
+          "successful": 51
+        },
+        {
+          "second": 44,
+          "completed": 51,
+          "successful": 51
+        },
+        {
+          "second": 45,
+          "completed": 50,
+          "successful": 50
+        },
+        {
+          "second": 46,
+          "completed": 51,
+          "successful": 51
+        },
+        {
+          "second": 47,
+          "completed": 52,
+          "successful": 52
+        },
+        {
+          "second": 48,
+          "completed": 43,
+          "successful": 43
+        },
+        {
+          "second": 49,
+          "completed": 47,
+          "successful": 47
+        },
+        {
+          "second": 50,
+          "completed": 39,
+          "successful": 39
+        },
+        {
+          "second": 51,
+          "completed": 43,
+          "successful": 43
+        },
+        {
+          "second": 52,
+          "completed": 45,
+          "successful": 45
+        },
+        {
+          "second": 53,
+          "completed": 46,
+          "successful": 46
+        },
+        {
+          "second": 54,
+          "completed": 41,
+          "successful": 41
+        },
+        {
+          "second": 55,
+          "completed": 48,
+          "successful": 48
+        },
+        {
+          "second": 56,
+          "completed": 42,
+          "successful": 42
+        },
+        {
+          "second": 57,
+          "completed": 46,
+          "successful": 46
+        },
+        {
+          "second": 58,
+          "completed": 47,
+          "successful": 47
+        },
+        {
+          "second": 59,
+          "completed": 49,
+          "successful": 49
+        }
+      ]
+    }
+  },
+  "requests_total": {
+    "completed": 2933,
+    "successful": 2933,
+    "window_completed": 2901,
+    "window_successful": 2901,
+    "rps": 48.35,
+    "goodput": 48.35,
+    "drained_rps": 48.56256536749999,
+    "drained_goodput": 48.56256536749999,
+    "tail_completed": 32,
+    "ok_rate": 1.0,
+    "window_ok_rate": 1.0,
+    "latency_ms": {
+      "p50": 635.57,
+      "p95": 1028.7,
+      "p99": 1199.78,
+      "max": 1481.57
+    },
+    "success_latency_ms": {
+      "p50": 635.57,
+      "p95": 1028.7,
+      "p99": 1199.78,
+      "max": 1481.57
+    },
+    "client_wait_s": 0.001546200095617678,
+    "response_mb_s": 0.05149128333333333,
+    "response_bytes": 3123200,
+    "window_response_bytes": 3089477,
+    "mean_response_bytes": 1064.8482782134333,
+    "submitted_targets": 0,
+    "confirmed_targets": 0,
+    "confirmed_targets_s": 0.0,
+    "codes": {
+      "OK": 2933
+    },
+    "http": {
+      "200": 2933
+    },
+    "stages": {},
+    "outcomes": {},
+    "submission_results": {},
+    "target_codes": {},
+    "failure_examples": [],
+    "per_second": [
+      {
+        "second": 0,
+        "completed": 33,
+        "successful": 33
+      },
+      {
+        "second": 1,
+        "completed": 46,
+        "successful": 46
+      },
+      {
+        "second": 2,
+        "completed": 45,
+        "successful": 45
+      },
+      {
+        "second": 3,
+        "completed": 51,
+        "successful": 51
+      },
+      {
+        "second": 4,
+        "completed": 46,
+        "successful": 46
+      },
+      {
+        "second": 5,
+        "completed": 53,
+        "successful": 53
+      },
+      {
+        "second": 6,
+        "completed": 50,
+        "successful": 50
+      },
+      {
+        "second": 7,
+        "completed": 50,
+        "successful": 50
+      },
+      {
+        "second": 8,
+        "completed": 51,
+        "successful": 51
+      },
+      {
+        "second": 9,
+        "completed": 50,
+        "successful": 50
+      },
+      {
+        "second": 10,
+        "completed": 48,
+        "successful": 48
+      },
+      {
+        "second": 11,
+        "completed": 53,
+        "successful": 53
+      },
+      {
+        "second": 12,
+        "completed": 52,
+        "successful": 52
+      },
+      {
+        "second": 13,
+        "completed": 50,
+        "successful": 50
+      },
+      {
+        "second": 14,
+        "completed": 50,
+        "successful": 50
+      },
+      {
+        "second": 15,
+        "completed": 49,
+        "successful": 49
+      },
+      {
+        "second": 16,
+        "completed": 51,
+        "successful": 51
+      },
+      {
+        "second": 17,
+        "completed": 47,
+        "successful": 47
+      },
+      {
+        "second": 18,
+        "completed": 44,
+        "successful": 44
+      },
+      {
+        "second": 19,
+        "completed": 44,
+        "successful": 44
+      },
+      {
+        "second": 20,
+        "completed": 47,
+        "successful": 47
+      },
+      {
+        "second": 21,
+        "completed": 48,
+        "successful": 48
+      },
+      {
+        "second": 22,
+        "completed": 54,
+        "successful": 54
+      },
+      {
+        "second": 23,
+        "completed": 47,
+        "successful": 47
+      },
+      {
+        "second": 24,
+        "completed": 50,
+        "successful": 50
+      },
+      {
+        "second": 25,
+        "completed": 52,
+        "successful": 52
+      },
+      {
+        "second": 26,
+        "completed": 48,
+        "successful": 48
+      },
+      {
+        "second": 27,
+        "completed": 49,
+        "successful": 49
+      },
+      {
+        "second": 28,
+        "completed": 51,
+        "successful": 51
+      },
+      {
+        "second": 29,
+        "completed": 53,
+        "successful": 53
+      },
+      {
+        "second": 30,
+        "completed": 48,
+        "successful": 48
+      },
+      {
+        "second": 31,
+        "completed": 49,
+        "successful": 49
+      },
+      {
+        "second": 32,
+        "completed": 51,
+        "successful": 51
+      },
+      {
+        "second": 33,
+        "completed": 51,
+        "successful": 51
+      },
+      {
+        "second": 34,
+        "completed": 45,
+        "successful": 45
+      },
+      {
+        "second": 35,
+        "completed": 52,
+        "successful": 52
+      },
+      {
+        "second": 36,
+        "completed": 51,
+        "successful": 51
+      },
+      {
+        "second": 37,
+        "completed": 50,
+        "successful": 50
+      },
+      {
+        "second": 38,
+        "completed": 47,
+        "successful": 47
+      },
+      {
+        "second": 39,
+        "completed": 50,
+        "successful": 50
+      },
+      {
+        "second": 40,
+        "completed": 49,
+        "successful": 49
+      },
+      {
+        "second": 41,
+        "completed": 50,
+        "successful": 50
+      },
+      {
+        "second": 42,
+        "completed": 55,
+        "successful": 55
+      },
+      {
+        "second": 43,
+        "completed": 51,
+        "successful": 51
+      },
+      {
+        "second": 44,
+        "completed": 51,
+        "successful": 51
+      },
+      {
+        "second": 45,
+        "completed": 50,
+        "successful": 50
+      },
+      {
+        "second": 46,
+        "completed": 51,
+        "successful": 51
+      },
+      {
+        "second": 47,
+        "completed": 52,
+        "successful": 52
+      },
+      {
+        "second": 48,
+        "completed": 43,
+        "successful": 43
+      },
+      {
+        "second": 49,
+        "completed": 47,
+        "successful": 47
+      },
+      {
+        "second": 50,
+        "completed": 39,
+        "successful": 39
+      },
+      {
+        "second": 51,
+        "completed": 43,
+        "successful": 43
+      },
+      {
+        "second": 52,
+        "completed": 45,
+        "successful": 45
+      },
+      {
+        "second": 53,
+        "completed": 46,
+        "successful": 46
+      },
+      {
+        "second": 54,
+        "completed": 41,
+        "successful": 41
+      },
+      {
+        "second": 55,
+        "completed": 48,
+        "successful": 48
+      },
+      {
+        "second": 56,
+        "completed": 42,
+        "successful": 42
+      },
+      {
+        "second": 57,
+        "completed": 46,
+        "successful": 46
+      },
+      {
+        "second": 58,
+        "completed": 47,
+        "successful": 47
+      },
+      {
+        "second": 59,
+        "completed": 49,
+        "successful": 49
+      }
+    ]
+  },
+  "operations": {
+    "detail/video": {
+      "completed": 2933,
+      "successful": 2933,
+      "window_completed": 2901,
+      "window_successful": 2901,
+      "rps": 48.35,
+      "goodput": 48.35,
+      "drained_rps": 48.56256536749999,
+      "drained_goodput": 48.56256536749999,
+      "tail_completed": 32,
+      "ok_rate": 1.0,
+      "window_ok_rate": 1.0,
+      "latency_ms": {
+        "p50": 635.61,
+        "p95": 1028.73,
+        "p99": 1199.82,
+        "max": 1481.61
+      },
+      "success_latency_ms": {
+        "p50": 635.61,
+        "p95": 1028.73,
+        "p99": 1199.82,
+        "max": 1481.61
+      },
+      "client_wait_s": 0.0,
+      "response_mb_s": 0.0,
+      "response_bytes": 0,
+      "window_response_bytes": 0,
+      "mean_response_bytes": 0.0,
+      "submitted_targets": 0,
+      "confirmed_targets": 0,
+      "confirmed_targets_s": 0.0,
+      "codes": {
+        "OK": 2933
+      },
+      "http": {},
+      "stages": {},
+      "outcomes": {},
+      "submission_results": {},
+      "target_codes": {},
+      "failure_examples": [],
+      "per_second": [
+        {
+          "second": 0,
+          "completed": 33,
+          "successful": 33
+        },
+        {
+          "second": 1,
+          "completed": 46,
+          "successful": 46
+        },
+        {
+          "second": 2,
+          "completed": 45,
+          "successful": 45
+        },
+        {
+          "second": 3,
+          "completed": 51,
+          "successful": 51
+        },
+        {
+          "second": 4,
+          "completed": 46,
+          "successful": 46
+        },
+        {
+          "second": 5,
+          "completed": 53,
+          "successful": 53
+        },
+        {
+          "second": 6,
+          "completed": 50,
+          "successful": 50
+        },
+        {
+          "second": 7,
+          "completed": 50,
+          "successful": 50
+        },
+        {
+          "second": 8,
+          "completed": 51,
+          "successful": 51
+        },
+        {
+          "second": 9,
+          "completed": 50,
+          "successful": 50
+        },
+        {
+          "second": 10,
+          "completed": 48,
+          "successful": 48
+        },
+        {
+          "second": 11,
+          "completed": 53,
+          "successful": 53
+        },
+        {
+          "second": 12,
+          "completed": 52,
+          "successful": 52
+        },
+        {
+          "second": 13,
+          "completed": 50,
+          "successful": 50
+        },
+        {
+          "second": 14,
+          "completed": 50,
+          "successful": 50
+        },
+        {
+          "second": 15,
+          "completed": 49,
+          "successful": 49
+        },
+        {
+          "second": 16,
+          "completed": 51,
+          "successful": 51
+        },
+        {
+          "second": 17,
+          "completed": 47,
+          "successful": 47
+        },
+        {
+          "second": 18,
+          "completed": 44,
+          "successful": 44
+        },
+        {
+          "second": 19,
+          "completed": 44,
+          "successful": 44
+        },
+        {
+          "second": 20,
+          "completed": 47,
+          "successful": 47
+        },
+        {
+          "second": 21,
+          "completed": 48,
+          "successful": 48
+        },
+        {
+          "second": 22,
+          "completed": 54,
+          "successful": 54
+        },
+        {
+          "second": 23,
+          "completed": 47,
+          "successful": 47
+        },
+        {
+          "second": 24,
+          "completed": 50,
+          "successful": 50
+        },
+        {
+          "second": 25,
+          "completed": 52,
+          "successful": 52
+        },
+        {
+          "second": 26,
+          "completed": 48,
+          "successful": 48
+        },
+        {
+          "second": 27,
+          "completed": 49,
+          "successful": 49
+        },
+        {
+          "second": 28,
+          "completed": 51,
+          "successful": 51
+        },
+        {
+          "second": 29,
+          "completed": 53,
+          "successful": 53
+        },
+        {
+          "second": 30,
+          "completed": 48,
+          "successful": 48
+        },
+        {
+          "second": 31,
+          "completed": 49,
+          "successful": 49
+        },
+        {
+          "second": 32,
+          "completed": 51,
+          "successful": 51
+        },
+        {
+          "second": 33,
+          "completed": 51,
+          "successful": 51
+        },
+        {
+          "second": 34,
+          "completed": 45,
+          "successful": 45
+        },
+        {
+          "second": 35,
+          "completed": 52,
+          "successful": 52
+        },
+        {
+          "second": 36,
+          "completed": 51,
+          "successful": 51
+        },
+        {
+          "second": 37,
+          "completed": 50,
+          "successful": 50
+        },
+        {
+          "second": 38,
+          "completed": 47,
+          "successful": 47
+        },
+        {
+          "second": 39,
+          "completed": 50,
+          "successful": 50
+        },
+        {
+          "second": 40,
+          "completed": 49,
+          "successful": 49
+        },
+        {
+          "second": 41,
+          "completed": 50,
+          "successful": 50
+        },
+        {
+          "second": 42,
+          "completed": 55,
+          "successful": 55
+        },
+        {
+          "second": 43,
+          "completed": 51,
+          "successful": 51
+        },
+        {
+          "second": 44,
+          "completed": 51,
+          "successful": 51
+        },
+        {
+          "second": 45,
+          "completed": 50,
+          "successful": 50
+        },
+        {
+          "second": 46,
+          "completed": 51,
+          "successful": 51
+        },
+        {
+          "second": 47,
+          "completed": 52,
+          "successful": 52
+        },
+        {
+          "second": 48,
+          "completed": 43,
+          "successful": 43
+        },
+        {
+          "second": 49,
+          "completed": 47,
+          "successful": 47
+        },
+        {
+          "second": 50,
+          "completed": 39,
+          "successful": 39
+        },
+        {
+          "second": 51,
+          "completed": 43,
+          "successful": 43
+        },
+        {
+          "second": 52,
+          "completed": 45,
+          "successful": 45
+        },
+        {
+          "second": 53,
+          "completed": 46,
+          "successful": 46
+        },
+        {
+          "second": 54,
+          "completed": 41,
+          "successful": 41
+        },
+        {
+          "second": 55,
+          "completed": 48,
+          "successful": 48
+        },
+        {
+          "second": 56,
+          "completed": 42,
+          "successful": 42
+        },
+        {
+          "second": 57,
+          "completed": 46,
+          "successful": 46
+        },
+        {
+          "second": 58,
+          "completed": 47,
+          "successful": 47
+        },
+        {
+          "second": 59,
+          "completed": 49,
+          "successful": 49
+        }
+      ]
+    }
+  },
+  "operations_total": {
+    "completed": 2933,
+    "successful": 2933,
+    "window_completed": 2901,
+    "window_successful": 2901,
+    "rps": 48.35,
+    "goodput": 48.35,
+    "drained_rps": 48.56256536749999,
+    "drained_goodput": 48.56256536749999,
+    "tail_completed": 32,
+    "ok_rate": 1.0,
+    "window_ok_rate": 1.0,
+    "latency_ms": {
+      "p50": 635.61,
+      "p95": 1028.73,
+      "p99": 1199.82,
+      "max": 1481.61
+    },
+    "success_latency_ms": {
+      "p50": 635.61,
+      "p95": 1028.73,
+      "p99": 1199.82,
+      "max": 1481.61
+    },
+    "client_wait_s": 0.0,
+    "response_mb_s": 0.0,
+    "response_bytes": 0,
+    "window_response_bytes": 0,
+    "mean_response_bytes": 0.0,
+    "submitted_targets": 0,
+    "confirmed_targets": 0,
+    "confirmed_targets_s": 0.0,
+    "codes": {
+      "OK": 2933
+    },
+    "http": {},
+    "stages": {},
+    "outcomes": {},
+    "submission_results": {},
+    "target_codes": {},
+    "failure_examples": [],
+    "per_second": [
+      {
+        "second": 0,
+        "completed": 33,
+        "successful": 33
+      },
+      {
+        "second": 1,
+        "completed": 46,
+        "successful": 46
+      },
+      {
+        "second": 2,
+        "completed": 45,
+        "successful": 45
+      },
+      {
+        "second": 3,
+        "completed": 51,
+        "successful": 51
+      },
+      {
+        "second": 4,
+        "completed": 46,
+        "successful": 46
+      },
+      {
+        "second": 5,
+        "completed": 53,
+        "successful": 53
+      },
+      {
+        "second": 6,
+        "completed": 50,
+        "successful": 50
+      },
+      {
+        "second": 7,
+        "completed": 50,
+        "successful": 50
+      },
+      {
+        "second": 8,
+        "completed": 51,
+        "successful": 51
+      },
+      {
+        "second": 9,
+        "completed": 50,
+        "successful": 50
+      },
+      {
+        "second": 10,
+        "completed": 48,
+        "successful": 48
+      },
+      {
+        "second": 11,
+        "completed": 53,
+        "successful": 53
+      },
+      {
+        "second": 12,
+        "completed": 52,
+        "successful": 52
+      },
+      {
+        "second": 13,
+        "completed": 50,
+        "successful": 50
+      },
+      {
+        "second": 14,
+        "completed": 50,
+        "successful": 50
+      },
+      {
+        "second": 15,
+        "completed": 49,
+        "successful": 49
+      },
+      {
+        "second": 16,
+        "completed": 51,
+        "successful": 51
+      },
+      {
+        "second": 17,
+        "completed": 47,
+        "successful": 47
+      },
+      {
+        "second": 18,
+        "completed": 44,
+        "successful": 44
+      },
+      {
+        "second": 19,
+        "completed": 44,
+        "successful": 44
+      },
+      {
+        "second": 20,
+        "completed": 47,
+        "successful": 47
+      },
+      {
+        "second": 21,
+        "completed": 48,
+        "successful": 48
+      },
+      {
+        "second": 22,
+        "completed": 54,
+        "successful": 54
+      },
+      {
+        "second": 23,
+        "completed": 47,
+        "successful": 47
+      },
+      {
+        "second": 24,
+        "completed": 50,
+        "successful": 50
+      },
+      {
+        "second": 25,
+        "completed": 52,
+        "successful": 52
+      },
+      {
+        "second": 26,
+        "completed": 48,
+        "successful": 48
+      },
+      {
+        "second": 27,
+        "completed": 49,
+        "successful": 49
+      },
+      {
+        "second": 28,
+        "completed": 51,
+        "successful": 51
+      },
+      {
+        "second": 29,
+        "completed": 53,
+        "successful": 53
+      },
+      {
+        "second": 30,
+        "completed": 48,
+        "successful": 48
+      },
+      {
+        "second": 31,
+        "completed": 49,
+        "successful": 49
+      },
+      {
+        "second": 32,
+        "completed": 51,
+        "successful": 51
+      },
+      {
+        "second": 33,
+        "completed": 51,
+        "successful": 51
+      },
+      {
+        "second": 34,
+        "completed": 45,
+        "successful": 45
+      },
+      {
+        "second": 35,
+        "completed": 52,
+        "successful": 52
+      },
+      {
+        "second": 36,
+        "completed": 51,
+        "successful": 51
+      },
+      {
+        "second": 37,
+        "completed": 50,
+        "successful": 50
+      },
+      {
+        "second": 38,
+        "completed": 47,
+        "successful": 47
+      },
+      {
+        "second": 39,
+        "completed": 50,
+        "successful": 50
+      },
+      {
+        "second": 40,
+        "completed": 49,
+        "successful": 49
+      },
+      {
+        "second": 41,
+        "completed": 50,
+        "successful": 50
+      },
+      {
+        "second": 42,
+        "completed": 55,
+        "successful": 55
+      },
+      {
+        "second": 43,
+        "completed": 51,
+        "successful": 51
+      },
+      {
+        "second": 44,
+        "completed": 51,
+        "successful": 51
+      },
+      {
+        "second": 45,
+        "completed": 50,
+        "successful": 50
+      },
+      {
+        "second": 46,
+        "completed": 51,
+        "successful": 51
+      },
+      {
+        "second": 47,
+        "completed": 52,
+        "successful": 52
+      },
+      {
+        "second": 48,
+        "completed": 43,
+        "successful": 43
+      },
+      {
+        "second": 49,
+        "completed": 47,
+        "successful": 47
+      },
+      {
+        "second": 50,
+        "completed": 39,
+        "successful": 39
+      },
+      {
+        "second": 51,
+        "completed": 43,
+        "successful": 43
+      },
+      {
+        "second": 52,
+        "completed": 45,
+        "successful": 45
+      },
+      {
+        "second": 53,
+        "completed": 46,
+        "successful": 46
+      },
+      {
+        "second": 54,
+        "completed": 41,
+        "successful": 41
+      },
+      {
+        "second": 55,
+        "completed": 48,
+        "successful": 48
+      },
+      {
+        "second": 56,
+        "completed": 42,
+        "successful": 42
+      },
+      {
+        "second": 57,
+        "completed": 46,
+        "successful": 46
+      },
+      {
+        "second": 58,
+        "completed": 47,
+        "successful": 47
+      },
+      {
+        "second": 59,
+        "completed": 49,
+        "successful": 49
+      }
+    ]
+  },
+  "schema_version": 2,
+  "config": {
+    "base_url": "http://192.168.61.128:8181",
+    "mode": "read",
+    "scenario": "detail",
+    "kind": "video",
+    "pacing": "capacity",
+    "duration": 60.0,
+    "concurrency": 32,
+    "timeout": null,
+    "max_ids": 100,
+    "targets_file": null,
+    "id": null,
+    "batch_size": 10,
+    "seed": 1,
+    "json_out": "perf-video-32.json"
+  },
+  "target_pool": 100,
+  "target_kinds": {
+    "video": 100
+  },
+  "transport": {
+    "protocol": "HTTP/1.1",
+    "connection_reuse": true
+  },
+  "finished_at": "2026-11-18T08:37:54.628769+00:00"
+}
