@@ -58,11 +58,11 @@ func TestCreatorVideoHTTPWorkflow(t *testing.T) {
 		handler.ServeHTTP(w, r)
 		return w
 	}
-	w := get("/api/creators/1/videos?scope=recorded")
+	w := get("/manage/creators/1/videos?scope=recorded")
 	if w.Code != 200 || q.calls.Load() != 0 {
 		t.Fatalf("recorded view queried upstream: %d", w.Code)
 	}
-	w = get("/api/creators/1/videos?scope=available&limit=1")
+	w = get("/manage/creators/1/videos?scope=available&limit=1")
 	var page discovery.Page
 	if err := json.Unmarshal(w.Body.Bytes(), &page); err != nil || w.Code != 200 || page.Session == "" {
 		t.Fatalf("first page: %d %s %v", w.Code, w.Body, err)
@@ -71,7 +71,7 @@ func TestCreatorVideoHTTPWorkflow(t *testing.T) {
 		t.Fatalf("browsing persisted content: %v %v", counts, err)
 	}
 	body := fmt.Sprintf(`{"platform":"bilibili","creator_id":"1","all":true,"session":%q}`, page.Session)
-	post := httptest.NewRequest("POST", "/api/ingest/videos", strings.NewReader(body))
+	post := httptest.NewRequest("POST", "/manage/ingest/videos", strings.NewReader(body))
 	post.Header.Set("Content-Type", "application/json")
 	w = httptest.NewRecorder()
 	handler.ServeHTTP(w, post)
@@ -81,7 +81,7 @@ func TestCreatorVideoHTTPWorkflow(t *testing.T) {
 	}
 	deadline := time.Now().Add(3 * time.Second)
 	for time.Now().Before(deadline) {
-		w = get("/api/ingest/jobs/" + job.ID)
+		w = get("/manage/ingest/jobs/" + job.ID)
 		if err := json.Unmarshal(w.Body.Bytes(), &job); err != nil {
 			t.Fatal(err)
 		}
@@ -93,16 +93,16 @@ func TestCreatorVideoHTTPWorkflow(t *testing.T) {
 	if job.State != "complete" || job.Added != 2 {
 		t.Fatalf("task: %+v", job)
 	}
-	w = get("/api/creators/1/videos?scope=recorded")
+	w = get("/manage/creators/1/videos?scope=recorded")
 	if err := json.Unmarshal(w.Body.Bytes(), &page); err != nil || len(page.Items) != 2 || !page.Items[0].Subscribed {
 		t.Fatalf("recorded history: %s %v", w.Body, err)
 	}
-	for _, path := range []string{"/api/creators/1/videos?scope=no", "/api/creators/1/videos?scope=available&limit=0", "/api/creators/1/videos?platform=unknown"} {
+	for _, path := range []string{"/manage/creators/1/videos?scope=no", "/manage/creators/1/videos?scope=available&limit=0", "/manage/creators/1/videos?platform=unknown"} {
 		if w = get(path); w.Code != 400 {
 			t.Fatalf("invalid input accepted: %s %d", path, w.Code)
 		}
 	}
-	post = httptest.NewRequest("POST", "/api/ingest/videos", strings.NewReader(body))
+	post = httptest.NewRequest("POST", "/manage/ingest/videos", strings.NewReader(body))
 	post.Header.Set("Content-Type", "application/json")
 	post.Header.Set("Origin", "https://another.example")
 	w = httptest.NewRecorder()

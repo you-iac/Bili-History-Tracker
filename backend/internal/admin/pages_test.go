@@ -113,7 +113,7 @@ func TestDashboardPagesAndAPI(t *testing.T) {
 			}
 		})
 	}
-	for _, route := range []string{"/api/metrics/video/BV17x411w7KC?days=7", "/api/metrics/creator/12345?days=all"} {
+	for _, route := range []string{"/manage/metrics/video/BV17x411w7KC?days=7", "/manage/metrics/creator/12345?days=all"} {
 		rec := httptest.NewRecorder()
 		server.Handler().ServeHTTP(rec, httptest.NewRequest("GET", route, nil))
 		var series storage.MetricSeries
@@ -124,7 +124,7 @@ func TestDashboardPagesAndAPI(t *testing.T) {
 			t.Fatal("counter decrease was discarded")
 		}
 	}
-	for route, status := range map[string]int{"/does-not-exist": 404, "/detail/wrong/12345": 404, "/detail/video/BV17x411w7KC?seq=999": 400, "/api/metrics/video/BV17x411w7KC?days=invalid": 400} {
+	for route, status := range map[string]int{"/does-not-exist": 404, "/detail/wrong/12345": 404, "/detail/video/BV17x411w7KC?seq=999": 400, "/manage/metrics/video/BV17x411w7KC?days=invalid": 400} {
 		rec := httptest.NewRecorder()
 		server.Handler().ServeHTTP(rec, httptest.NewRequest("GET", route, nil))
 		if rec.Code != status {

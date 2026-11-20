@@ -13,9 +13,11 @@ import (
 )
 
 // ContentItem 是页面读取模型；Metric/Growth 为 nil 表示未知或样本不足。
+// VideoViews 汇总已记录投稿播放量，RecentVideos 统计近7个 UTC 日已记录投稿；均不是全站完整数据。
 type ContentItem struct {
 	Kind, ID, Name, Cover, OwnerID, OwnerName             string
 	Metric, Growth                                        *int64
+	VideoViews, RecentVideos                              *int64
 	Seq, VideoCount, FirstSeenAt, ObservedAt, PublishedAt int64
 	Recorded, Following                                   bool
 	IntervalSeconds, NextRunAt, LastRunAt, LastSuccessAt  int64
@@ -77,21 +79,29 @@ WHERE platform = :platform AND target_type = :kind AND target_id = :id`,
 const catalogCTE = `WITH items AS (
 SELECT 'video' kind, v.video_id id, v.title name, v.creator_id owner_id, c.name owner_name,
 v.view_count metric, v.current_seq seq, 0 video_count, v.first_seen_at first_seen,
-v.last_observed_at observed, COALESCE(v.published_at,0) published, 1 recorded
+v.last_observed_at observed, COALESCE(v.published_at,0) published, 1 recorded,
+v.view_count video_views, NULL recent_videos
 FROM videos v JOIN creators c ON c.platform=v.platform AND c.creator_id=v.creator_id WHERE v.platform=:platform
 UNION ALL
 SELECT 'creator', c.creator_id, c.name, '', '', c.follower_count, COALESCE(c.current_profile_seq,0),
 (SELECT COUNT(*) FROM videos v WHERE v.platform=c.platform AND v.creator_id=c.creator_id),
-c.first_seen_at, COALESCE(c.last_profile_observed_at,0), 0, 1 FROM creators c WHERE c.platform=:platform
+c.first_seen_at, COALESCE(c.last_profile_observed_at,0),
+COALESCE((SELECT MAX(v.published_at) FROM videos v WHERE v.platform=c.platform AND v.creator_id=c.creator_id),0), 1,
+(SELECT SUM(v.view_count) FROM videos v WHERE v.platform=c.platform AND v.creator_id=c.creator_id),
+(SELECT COUNT(*) FROM videos v WHERE v.platform=c.platform AND v.creator_id=c.creator_id AND v.published_at>=:since AND v.published_at<=:now)
+FROM creators c WHERE c.platform=:platform
 UNION ALL
-SELECT t.target_type,t.target_id,t.target_id,'','',NULL,0,0,t.created_at,0,0,0 FROM tracking_targets t
+SELECT t.target_type,t.target_id,t.target_id,'','',NULL,0,0,t.created_at,0,0,0,NULL,NULL FROM tracking_targets t
 WHERE t.platform=:platform AND NOT EXISTS (SELECT 1 FROM videos v WHERE t.target_type='video' AND v.platform=t.platform AND v.video_id=t.target_id)
 AND NOT EXISTS (SELECT 1 FROM creators c WHERE t.target_type='creator' AND c.platform=t.platform AND c.creator_id=t.target_id)
 ), windows AS (
 SELECT subject_type,subject_id,metric,MIN(sampled_at) first_at,MAX(sampled_at) last_at,COUNT(*) samples
 FROM metric_samples WHERE platform=:platform AND sampled_at>=:since AND sampled_at<=:now AND metric IN ('view','follower')
 GROUP BY subject_type,subject_id,metric
-), enriched AS (
+) ` + contentEnrichmentCTE
+
+// contentEnrichmentCTE 共享目录与单目标的字段口径；调用方决定 items 和 windows 的范围。
+const contentEnrichmentCTE = `, enriched AS (
 SELECT i.*,COALESCE(t.enabled,0) following,COALESCE(t.interval_seconds,0) interval_seconds,
 COALESCE(t.next_run_at,0) next_run,COALESCE(t.last_run_at,0) last_run,COALESCE(t.last_result,'') last_result,
 COALESCE(t.last_success_at,NULLIF(i.observed,0),0) last_success,COALESCE(t.failure_count,0) failures,
@@ -188,7 +198,7 @@ func (s *Store) Catalog(ctx context.Context, platform string, f CatalogFilter, n
 	}
 	f.Page = min(f.Page, max(1, (page.Total+f.Limit-1)/f.Limit))
 	page.Page = f.Page
-	sorts := map[string]string{"popular": "metric DESC NULLS LAST", "growth": "growth DESC NULLS LAST", "title": "name COLLATE NOCASE", "published": "published DESC", "discovered": "first_seen DESC"}
+	sorts := map[string]string{"popular": "metric DESC NULLS LAST", "views": "video_views DESC NULLS LAST", "growth": "growth DESC NULLS LAST", "hot": "growth DESC NULLS LAST", "title": "name COLLATE NOCASE", "published": "published DESC", "discovered": "first_seen DESC"}
 	order := sorts[f.Sort]
 	if order == "" {
 		order = "observed DESC"
@@ -213,44 +223,46 @@ LEFT JOIN creator_versions c ON p.kind='creator' AND c.platform=:platform AND c.
 	return page, rows.Err()
 }
 
-func scanContent(rows *sql.Rows, now time.Time) (ContentItem, error) {
+func scanContent(rows interface{ Scan(...any) error }, now time.Time) (ContentItem, error) {
 	var i ContentItem
-	var metric, growth sql.NullInt64
+	var metric, growth, videoViews, recentVideos sql.NullInt64
 	err := rows.Scan(&i.Kind, &i.ID, &i.Name, &i.OwnerID, &i.OwnerName, &metric, &i.Seq, &i.VideoCount, &i.FirstSeenAt, &i.ObservedAt, &i.PublishedAt, &i.Recorded,
-		&i.Following, &i.IntervalSeconds, &i.NextRunAt, &i.LastRunAt, &i.LastResult, &i.LastSuccessAt, &i.Failures, &i.LastFailureAt, &i.FailureReason, &i.RecoveredAt, &growth, &i.GrowthFrom, &i.GrowthTo, &i.Cover)
+		&videoViews, &recentVideos, &i.Following, &i.IntervalSeconds, &i.NextRunAt, &i.LastRunAt, &i.LastResult, &i.LastSuccessAt, &i.Failures, &i.LastFailureAt, &i.FailureReason, &i.RecoveredAt, &growth, &i.GrowthFrom, &i.GrowthTo, &i.Cover)
+	if videoViews.Valid {
+		i.VideoViews = &videoViews.Int64
+	}
+	if recentVideos.Valid {
+		i.RecentVideos = &recentVideos.Int64
+	}
 	if metric.Valid {
 		i.Metric = &metric.Int64
 	}
 	if growth.Valid {
 		i.Growth = &growth.Int64
 	}
-	i.Status = "ok"
-	if !i.Following {
-		i.Status = "unfollowed"
-	} else if i.LastResult != "" && i.LastResult != "ok" {
-		i.Status = "error"
-	} else if i.LastSuccessAt == 0 {
-		i.Status = "pending"
-	} else if now.UnixMilli()-i.LastSuccessAt > (max(i.IntervalSeconds*2, 1800)+1800)*1000 {
-		i.Status = "stale"
-	} else if i.RecoveredAt > 0 {
-		i.Status = "recovered"
-	}
-	if i.Kind == "creator" && i.Seq == 0 && i.Status == "unfollowed" {
-		i.Status = "profile_pending"
-	}
+	i.Status = i.ObservationStatus(now)
 	return i, err
 }
 
-func (s *Store) Content(ctx context.Context, platform, kind, id string, now time.Time) (ContentItem, error) {
-	p, err := s.Catalog(ctx, platform, CatalogFilter{Kind: kind, ID: id, Limit: 1}, now)
-	if err != nil {
-		return ContentItem{}, err
+// ObservationStatus 按当前摘要中的任务与观测字段推导状态，不查询数据库。
+// 复用摘要组装实时任务状态时，调用方须先更新 Following 和 IntervalSeconds。
+func (i ContentItem) ObservationStatus(now time.Time) string {
+	status := "ok"
+	if !i.Following {
+		status = "unfollowed"
+	} else if i.LastResult != "" && i.LastResult != "ok" {
+		status = "error"
+	} else if i.LastSuccessAt == 0 {
+		status = "pending"
+	} else if now.UnixMilli()-i.LastSuccessAt > (max(i.IntervalSeconds*2, 1800)+1800)*1000 {
+		status = "stale"
+	} else if i.RecoveredAt > 0 {
+		status = "recovered"
 	}
-	if len(p.Items) == 0 {
-		return ContentItem{}, sql.ErrNoRows
+	if i.Kind == "creator" && i.Seq == 0 && status == "unfollowed" {
+		status = "profile_pending"
 	}
-	return p.Items[0], nil
+	return status
 }
 
 func (s *Store) Summary(ctx context.Context, platform string, now time.Time) (DashboardSummary, error) {

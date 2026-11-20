@@ -23,43 +23,53 @@ type Querier interface {
 	GetCreator(ctx context.Context, platform, id string) (source.CreatorProfile, error)
 }
 
-// Tracker 串行执行查询并落库。同一目标不会并发执行。
+// Tracker 对同一目标互斥执行；调度器串行，显式申请可有限并发。
+// Stop/Wait 管理在途工作；已接收有效资料的申请使用独立预算保存，见 docs/request-stages.md。
 type Tracker struct {
 	store    *storage.Store
+	requests requestStore
+	budgets  RequestBudgets
 	queries  Querier
 	log      *Log
 	platform string
 	mu       sync.Mutex
 	running  map[string]bool
+	stopping bool
+	workers  sync.WaitGroup
+	workCtx  context.Context
+	stopWork context.CancelFunc
 }
 
 // New 创建 tracker。platform 是写入数据库的平台名。
 func New(store *storage.Store, queries Querier, log *Log, platform string) *Tracker {
+	workCtx, stopWork := context.WithCancel(context.Background())
 	return &Tracker{
 		store:    store,
+		requests: store,
+		budgets:  DefaultRequestBudgets(),
 		queries:  queries,
 		log:      log,
 		platform: platform,
 		running:  make(map[string]bool),
+		workCtx:  workCtx,
+		stopWork: stopWork,
 	}
 }
 
 // RunTarget 执行一次目标查询；同一目标正在执行时直接跳过。
 func (t *Tracker) RunTarget(ctx context.Context, target storage.Target) {
-	key := target.TargetType + ":" + target.TargetID
-	t.mu.Lock()
-	if t.running[key] {
-		t.mu.Unlock()
+	if t.beginTarget(target.TargetType, target.TargetID, false) != nil {
 		return
 	}
-	t.running[key] = true
-	t.mu.Unlock()
-	defer func() {
-		t.mu.Lock()
-		delete(t.running, key)
-		t.mu.Unlock()
-	}()
+	defer t.endTarget(target.TargetType, target.TargetID)
+	ctx, cancel := context.WithCancel(ctx)
+	stop := context.AfterFunc(t.workCtx, cancel)
+	defer stop()
+	defer cancel()
+	t.runTarget(ctx, target)
+}
 
+func (t *Tracker) runTarget(ctx context.Context, target storage.Target) {
 	switch target.TargetType {
 	case "creator":
 		t.runCreator(ctx, target)
@@ -70,16 +80,58 @@ func (t *Tracker) RunTarget(ctx context.Context, target storage.Target) {
 
 // RunNow 在后台异步执行一次目标查询，并把下次运行时间推后。
 func (t *Tracker) RunNow(target storage.Target) {
+	// 启动 goroutine 前登记，Stop/Wait 不会漏过尚未获得运行机会的任务。
+	if t.beginTarget(target.TargetType, target.TargetID, false) != nil {
+		return
+	}
 	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer t.endTarget(target.TargetType, target.TargetID)
+		ctx, cancel := context.WithTimeout(t.workCtx, 2*time.Minute)
 		defer cancel()
-		t.RunTarget(ctx, target)
+		t.runTarget(ctx, target)
 		interval := time.Duration(target.IntervalSeconds) * time.Second
 		if interval <= 0 {
 			interval = DefaultInterval
 		}
 		_ = t.store.MarkTargetRun(ctx, target, time.Now(), time.Now().Add(interval))
 	}()
+}
+
+// Stop 停止接纳新的 tracker 工作并取消查询；已进入独立保存阶段的显式申请继续有界收尾。
+// 必须在关闭数据库前调用 Stop 和 Wait；HTTP handler 的最终确认另由 HTTP Shutdown 等待。
+func (t *Tracker) Stop() {
+	t.mu.Lock()
+	t.stopping = true
+	t.stopWork()
+	t.mu.Unlock()
+}
+
+// Wait 等待已登记的采集和显式申请。先调用 Stop，防止等待期间继续登记工作。
+func (t *Tracker) Wait() { t.workers.Wait() }
+
+func (t *Tracker) beginTarget(kind, id string, limited bool) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.stopping {
+		return ErrRequestStopping
+	}
+	key := kind + ":" + id
+	if t.running[key] {
+		return ErrTargetBusy
+	}
+	if limited && len(t.running) >= 16 {
+		return ErrRequestCapacity
+	}
+	t.running[key] = true
+	t.workers.Add(1)
+	return nil
+}
+
+func (t *Tracker) endTarget(kind, id string) {
+	t.mu.Lock()
+	delete(t.running, kind+":"+id)
+	t.mu.Unlock()
+	t.workers.Done()
 }
 
 func (t *Tracker) runVideo(ctx context.Context, target storage.Target) {

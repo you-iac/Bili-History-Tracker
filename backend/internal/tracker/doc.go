@@ -5,6 +5,7 @@
 // Querier 接口返回的上游数据。
 // 输出：以副作用为主——storage 落库、记录指标、推进调度表，Log 写日志；
 // RunTarget / RunNow 不向调用方返回结果，失败只体现在日志里。
+// RequestTarget 为 Agent 验证并接纳新目标，已跟踪目标不重复采集或改调度；见 docs/client-library.md。
 // 它不认识：B站 HTTP 细节、SQL 语句、HTML 页面。
 //
 // 上下游关系：

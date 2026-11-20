@@ -6,34 +6,25 @@
 ## 总览
 
 ```text
-            ┌────────────────────────────┐                    ┌────────────────────────────┐
-            │ admin  :8182               │                    │ httpapi  :8181             │
-  ┌─────────│ 观察台页面                 │                    │ JSON 查询 API              │
-  │         └────────────────────────────┘                    └────────────────────────────┘
-  │                        │                                                 │
-  │                        │ 立即查询                                        │
-  │                        │                                                 │
-  │                        ▼                                                 │
-  │         ┌────────────────────────────┐                                   │
-  │读写库   │ tracker                    │                                   │ 只查上游
-  │         │ 查询 / 调度 / 发现         │────────┐                          │
-  │         └────────────────────────────┘        │                          │
-  │                        │                      │                          │
-  │                        │ 保存 / 采样          │                          │
-  │                        │                      │                          │
-  │                        ▼                      │平台查询                  ▼
-  │         ┌────────────────────────────┐        │           ┌────────────────────────────┐
-  │         │ storage                    │        │           │ source + provider          │
-  └────────►│ 内容 / 版本 / 指标 / 目标  │        └──────────►│ 能力分发 / 平台适配        │
-            └────────────────────────────┘                    └────────────────────────────┘
-                           │                                                 │
-                           │ SQL                                             │ HTTPS GET
-                           │                                                 │
-                           ▼                                                 ▼
-            ┌────────────────────────────┐                    ┌────────────────────────────┐
-            │ SQLite                     │                    │ api.bilibili.com           │
-            │ data/bht.db                │                    │ B站网页端点                │
-            └────────────────────────────┘                    └────────────────────────────┘
++--------------------------+                 +--------------------------+
+| admin :8182              |                 | publicapi :8181          |
+| HTML / private UI actions|                 | routes / rate / batch    |
++--------------------------+                 +--------------------------+
+             |                                            |
+        read / command                       read / accept / live query
+             |                                            |
+             v                                            v
++--------------------------+                 +--------------------------+
+| storage / tracker       | <--------------- | public read / targets    |
+| history / sampling      |  read / accept   | httpapi: live query      |
++--------------------------+                 +--------------------------+
+             |                                            |
+        SQL read/write                              platform query
+             v                                            v
++--------------------------+                 +--------------------------+
+| SQLite                   |                 | source / provider        |
+| bht.db                   |                 | Bilibili HTTPS endpoints |
++--------------------------+                 +--------------------------+
 ```
 
 ## 模块导航
@@ -49,13 +40,16 @@
 | `tracker` | 查询用例、循环调度、显式导入 | [README](tracker/README.md) |
 | `discovery` | 作者视频融合、关注过滤、分页与导入任务 | [README](discovery/README.md) |
 | `admin` | 8182 观察台页面、详情与命令 | [README](admin/README.md) |
-| `httpapi` | 8181 只读 JSON API | [README](httpapi/README.md) |
+| `publicapi` | 8181公共路由、共享限流和有界目标申请 | [README](publicapi/README.md) |
+| `httpapi` | 8181保留的实时查询内核，由publicapi挂载 | [README](httpapi/README.md) |
 
 入口与组装见 [backend/cmd/server/README.md](../cmd/server/README.md)。
 
+图中`httpapi`是原实时查询内核；当前8181由`publicapi`在限流后分发历史读取、跟踪申请和实时查询。它不挂载后台处理器，两端共享存储和采集实例。
+
 ## 依赖规则
 
-- 入口层（`admin`、`httpapi`）只依赖用例层或契约层；
+- 入口层（`admin`、`publicapi`、`httpapi`）只依赖用例层或契约层；
 - `tracker` 依赖 `source` 与 `storage`；`discovery` 通过小接口调用本地读取和 tracker 的发现、导入能力；
 - `storage` 依赖 `source` 的数据类型；
 - `provider/*` 只依赖 `source`；
@@ -63,6 +57,6 @@
 
 ## 数据流向
 
-- 写：`admin` → `tracker` → `storage`；`scheduler` → `tracker` → `storage`。
-- 读：`httpapi` → `source`；常规页面 `admin` → `storage`；作者可添加视频 `admin` → `discovery` → `storage` / `tracker` → `source`。
+- 写：`publicapi` → `tracker` → `storage`；`admin` → `tracker` → `storage`；`scheduler` → `tracker` → `storage`。
+- 读：`publicapi` → `storage` / `httpapi` → `source`；常规页面 `admin` → `storage`；作者可添加视频 `admin` → `discovery` → `storage` / `tracker` → `source`。
 - 上游：所有取数最终经 `source` 分发到 `provider/bilibili`。
