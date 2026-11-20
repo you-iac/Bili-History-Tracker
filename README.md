@@ -13,10 +13,23 @@ go run ./cmd/server
 
 默认监听：
 
-- 查询 API：`127.0.0.1:8181`
+- 公共 API（Agent、历史资料与实时查询）：监听 `0.0.0.0:8181`，本机访问 `127.0.0.1:8181`，其他主机使用服务器 IP
 - 观察台：`http://127.0.0.1:8182/`
 
 后台不设登录和权限，默认只监听回环地址。
+
+## 浏览器客户端与本地 Agent
+
+客户端统一放在 [client/](client/README.md)，共同需求与设计维护在该目录的 README；[client/frontend/](client/frontend/README.md) 放浏览器界面，[client/agent/](client/agent/README.md) 放本地后台。启动 Agent 后，在浏览器打开它提供的本地页面；Agent 同源提供网页和 API，处理配置、Cookie、同步、发现及后续下载，关闭网页后仍可继续后台任务。
+
+当前已实现独立的 Cookie 配置与 UP 主视频 ID 扫描：验证自己的 B站 Cookie，输入 UID 或空间链接，分页获取当前可见投稿的全部 BV 号，支持停止/继续、复制和 TXT/JSON 导出。Windows Cookie 由当前账户加密保存，扫描结果逐页落盘；普通网页不能直接读取 B站 Cookie，本期采用手动导入。
+
+```powershell
+cd client
+go run ./agent/cmd/agent
+```
+
+默认自动打开浏览器并完成本地认证（地址 `127.0.0.1:8183`）；`-open-browser=false` 可改为手动链接。头像与封面按需读取历史URL，见 [启动与图片](docs/client-launch-media.md)。已支持侧栏工作台、卡片大小调节、独立详情趋势与版本对比、总览完整分页（见 [数据来源说明](docs/client-catalog.md)）、服务器公开搜索、本地关注自动提交、资料/指标/版本、设置与数据目录迁移，见 [工作台说明](docs/client-workspace.md)，关注与缓存重启保留，取消不影响公共采集。Agent 连接8181公共接口，8182只用于本地管理；升级backend后需在Agent设置中切换服务器地址，见[端口迁移与限流](docs/public-api.md)。新增全库排序与UP投稿统计需更新backend；操作见 [客户端说明](client/README.md#当前实现与启动)，协议和验证见 [关注接入](docs/client-library.md)。下载、完整数据管理和云盘仍见 [既有计划](PLANs/README.md)，本轮 UI 调整见 [计划](PLANs/2026-11-16-client-ui-content.md)。
 
 ## 观察台
 
@@ -37,8 +50,11 @@ go run ./cmd/server
 
 | 环境变量 | 默认值 | 说明 |
 |---|---|---|
-| `BHT_ADDR` | `127.0.0.1:8181` | 查询 API 监听地址 |
-| `BHT_ADMIN_ADDR` | `127.0.0.1:8182` | 观察台监听地址 |
+| `BHT_ADDR` | `0.0.0.0:8181` | 公共 API 监听所有 IPv4 网卡，可通过服务器 IP 访问 |
+| `BHT_ADMIN_ADDR` | `127.0.0.1:8182` | 本机管理观察台监听地址 |
+| `BHT_PPROF_ADDR` | 空，关闭 | 可选独立回环诊断入口，如 `127.0.0.1:6060`；采样参数与火焰图见 [性能诊断](docs/performance-profiling.md) |
+| `BHT_API_RPS` | `20` | 全部8181接口共用的滚动每秒接纳数和在途数上限，最大10000 |
+| `BHT_API_BATCH_MAX` | `10` | 批量申请只处理前N项，最大100 |
 | `BHT_DB` | `data/bht.db` | SQLite 文件路径 |
 | `BHT_QUERY_LOG` | 数据库同目录的 `query.log` | 查询日志，JSON Lines |
 | `BHT_BILI_COOKIE` | 空 | 旧查询能力的兼容配置；新的作者视频发现明确不携带此凭据 |
@@ -54,6 +70,8 @@ go run ./cmd/server
 数据库打开时自动迁移到 schema 4：0003 删除快照过滤版本列，0004 为每个关注目标保存最近采集状态和失败恢复信息，供观察台展示，并用已有成功观测回填旧目标。已有 payload 不自动裁剪，内容未变时仍读取旧快照；首次保存或内容变化后才写入裁剪后的新快照。
 
 ## 查询 API
+
+8181也提供公共库、详情、指标、精确状态和跟踪申请；统一限流，超限返回429。单目标提交已有同步应答，批量只处理前N项并逐项报告，不自动处理尾部。完整协议见[公共接口](docs/public-api.md)。以下实时平台查询继续保留。
 
 ```powershell
 curl.exe http://127.0.0.1:8181/healthz

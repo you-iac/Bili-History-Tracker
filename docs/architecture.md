@@ -1,5 +1,11 @@
 # 服务端查询模块
 
+作者详情的数据来源已拆分，见 [数据来源与服务器回退设计](client-detail-data-sources.md) 和 [实施任务](../PLANs/2026-11-19-client-detail-data-sources.md)：Agent 读取平台当前资料，服务器用两次SQL提供记录、跟踪与曲线；平台失败时再用一次SQL读取服务器最后保存资料。作者历史版本/快照/比较按需加载；独立视频详情和旧协议仍沿用原链路。真实平台及VM验收待完成。
+
+公共JSON业务应答和Agent核对见 [协议](public-response.md) 与 [实施计划](../PLANs/archive/2026-11-17-public-json-response.md)。实现位于现有publicapi、remote、library和详情模块，不变更数据库结构。
+
+跟踪申请的阶段预算、错误原因、部分提交及 Agent 等待链见 [分阶段申请设计](request-stages.md)；实现入口为 [RequestTarget](../backend/internal/tracker/request.go)、[阶段策略](../backend/internal/tracker/request_policy.go) 和 [公共申请应答](../backend/internal/publicapi/targets.go)，回归见 [tracker 阶段测试](../backend/internal/tracker/request_stages_test.go) 与 [publicapi 阶段测试](../backend/internal/publicapi/request_stages_test.go)。
+
 当前实现一次性视频元数据查询、UP 主资料查询、SQLite 持久化、8182 观察台和循环调度。成功观测按 [数据库设计](database.md) 的五表写入当前索引与内容版本表；查询失败只记日志，不修改已有内容。尚未实现完整投稿列表发现（B站列表接口需要登录态，当前只用公开合集发现）、可访问性状态机、事件日志和 Agent 同步，不能视为完整实现 FR-005、FR-006、FR-008 或 FR-009。
 
 数据库由 0001 迁移建表；0002 曾增加 `snapshot_version`，0003 删除该列，过滤规则版本改为仅由适配器代码管理；0004 为 `tracking_targets` 增加最近采集状态并回填旧目标。当前 `PRAGMA user_version = 4`；调度目标单独存放在 `tracking_targets`，属于调度配置而非内容设计。迁移不裁剪已有 payload，也不新增历史内容版本。
@@ -12,9 +18,12 @@
 
 | 模块或独立职责 | 功能与边界 | 实现入口与关键符号 | 相关测试 |
 |---|---|---|---|
-| 服务启动 | 组装数据源和查询服务、读取配置、管理 HTTP 服务生命周期 | [main.go](../backend/cmd/server/main.go) 的 `main` | 使用本文的启动、健康检查和查询命令验证 |
+| 详情数据来源与回退 | Agent平台当前资料与服务器历史独立；基础2次SQL，平台失败回退额外1次，历史按需 | [平台适配](../client/agent/internal/bilibili/metadata.go) 的 `Current`、[Agent编排](../client/agent/internal/library/detail_sources.go) 的 `Current/History`、[公共接口](../backend/internal/publicapi/detail_sources.go)、[精确存储](../backend/internal/storage/detail_sources.go)、[前端独立读取](../client/frontend/detail-sources.mjs)；见 [设计](client-detail-data-sources.md) | [SQL计数与索引](../backend/internal/storage/detail_sources_test.go)、[回退缓存](../client/agent/internal/library/detail_sources_test.go)、[真实Agent浏览器桩联调](../client/agent/internal/httpapi/detail_browser_test.go)、[本机对照](performance-detail-optimization-2026-11-19.md) |
+| 性能诊断 | 默认关闭的独立回环 pprof 入口，按需 CPU/内存/阻塞/锁/trace 采样，不挂载到业务端口 | [profiling.go](../backend/cmd/server/profiling.go) 的 `profilingOptions/newProfilingServer`；使用与火焰图见 [性能诊断](performance-profiling.md) | [配置、采样数据与路由隔离](../backend/cmd/server/profiling_test.go) |
+| Agent 视角吞吐压测 | 默认按 ID 读取详情，支持类型筛选和固定目标；保留混合读取、独立 HTTP 基线与申请诊断，区分业务成功、限流和收尾 | [load_test.py](../scripts/perf/load_test.py) 的 `run_load/run_operation`，见 [测量口径与用法](../scripts/perf/README.md) | [协议、统计、详情目标隔离与 HTTP 连接复用回归](../scripts/perf/test_load_test.py) |
+| 服务启动 | 组装数据源和查询服务、读取配置、管理 HTTP 服务生命周期；公共入口默认监听所有 IPv4 网卡，管理入口默认本机 | [main.go](../backend/cmd/server/main.go) 的 `main/listenAddresses` | [main_test.go](../backend/cmd/server/main_test.go)（监听配置与限额）、[shutdown_linux_test.go](../backend/cmd/server/shutdown_linux_test.go)（Linux 空闲服务信号入口）；启动与查询见本文命令 |
 | 通用查询层 | 定义统一数据与错误，按平台和能力分发；平台格式校验交给适配器 | [source.go](../backend/internal/source/source.go) 的 `Provider`、`CreatorProvider`、`Service` | [source_test.go](../backend/internal/source/source_test.go) |
-| HTTP API | 接收调用方请求，提取参数，设置查询超时并返回 JSON | [handler.go](../backend/internal/httpapi/handler.go) 的 `Querier`、`New` | [handler_test.go](../backend/internal/httpapi/handler_test.go) |
+| 实时查询内核 | 保留原实时平台查询，由publicapi统一挂载与限流 | [handler.go](../backend/internal/httpapi/handler.go) 的 `Querier`、`New` | [handler_test.go](../backend/internal/httpapi/handler_test.go) |
 | B站 Provider 与视频查询 | 初始化客户端、校验 BV、转换视频元数据和业务错误 | [bilibili.go](../backend/internal/provider/bilibili/bilibili.go) 的 `Provider`、`GetVideo` | [bilibili_test.go](../backend/internal/provider/bilibili/bilibili_test.go) |
 | B站视频快照 | 仅移除顶层 `ugc_season`，保留分 P、未知字段与大整数；过滤版本只在模块代码中选择 | [snapshot.go](../backend/internal/provider/bilibili/snapshot.go) 的 `videoSnapshot`、`videoSnapshotVersion`、`videoSnapshotV1` | [snapshot_test.go](../backend/internal/provider/bilibili/snapshot_test.go) |
 | B站 UP 主资料查询 | 校验 UID、查询并归一化资料；不获取投稿列表 | [creator.go](../backend/internal/provider/bilibili/creator.go) 的 `GetCreator` | [creator_test.go](../backend/internal/provider/bilibili/creator_test.go) |
@@ -26,6 +35,25 @@
 | 查询与调度 | 执行目标查询、经作者归属验证的显式视频导入、日志、到期调度；作者采集不自动关注视频 | [tracker.go](../backend/internal/tracker/tracker.go)、[ingest.go](../backend/internal/tracker/ingest.go) 的 `IngestVideo`、`persistVideo`、[scheduler.go](../backend/internal/tracker/scheduler.go)、[log.go](../backend/internal/tracker/log.go) | [tracker_test.go](../backend/internal/tracker/tracker_test.go)、[ingest_test.go](../backend/internal/tracker/ingest_test.go) |
 | 观察台（本地后台） | 8182 信息看板、对象详情、关注管理与作者视频选择；常规页面读本地，发现只读，显式导入才采集 | [pages.go](../backend/internal/admin/pages.go)、[views.go](../backend/internal/admin/views.go)、[server.go](../backend/internal/admin/server.go)、[templates](../backend/internal/admin/templates)、[assets](../backend/internal/admin/assets) | [pages_test.go](../backend/internal/admin/pages_test.go)、[chart_test.cjs](../backend/internal/admin/chart_test.cjs) |
 | 看板查询 | 概览统计、内容库分页、日指标、版本动态与快照读取；只读本地，不返回整份 payload | [dashboard.go](../backend/internal/storage/dashboard.go) 的 `Catalog`、`Summary`、`Metrics`、`Versions`、`ReadSnapshot` | [dashboard_test.go](../backend/internal/storage/dashboard_test.go) |
+| 单目标详情查询 | 按目标限定资料和指标窗口；公共详情复用一次摘要并重新确认任务状态，见 [性能与列表分析](detail-query-performance.md) | [content.go](../backend/internal/storage/content.go) 的 `Content`、[response.go](../backend/internal/publicapi/response.go) 的 `targetStatusWithContent` | [字段与窗口](../backend/internal/storage/content_test.go)、[请求内复用](../backend/internal/publicapi/detail_query_test.go)、[基准与执行计划](../backend/internal/storage/content_benchmark_test.go) |
+| 本地当前资料与批量历史 | 当前资料本地查询；服务器提供指定ID的变化、版本与失败兜底；UP汇总只用本地关注，见 [职责与协议](local-first-metadata.md) | [本地适配器](../client/agent/internal/bilibili/metadata.go) 的 `Current`、[组合服务](../client/agent/internal/library/current.go)、[本地汇总](../client/agent/internal/library/local_stats.go)、[历史存储](../backend/internal/storage/client_history.go)、[轻量目录](../backend/internal/storage/catalog_identity.go)、[公共路由](../backend/internal/publicapi/client_history.go) | [本地回归](../client/agent/internal/library/current_test.go)、[存储回归](../backend/internal/storage/client_history_test.go)、[目录回归](../backend/internal/storage/catalog_identity_test.go)、[接口回归](../backend/internal/publicapi/client_history_test.go) |
+| 客户端启动 | 组装扫描、本地关注和远程接入，只监听回环 | [main.go](../client/agent/cmd/agent/main.go)、[Agent说明](../client/agent/README.md) | [关注接入验证](client-library.md#验证) |
+| 浏览器界面 | 本地关注、远程资料、Cookie/扫描/导出，同源无外部依赖 | [assets.go](../client/frontend/assets.go)、[app.js](../client/frontend/app.js)、[library.js](../client/frontend/library.js) | [view.test.mjs](../client/frontend/view.test.mjs)、[接入验证](client-library.md#验证) |
+| 卡片、独立详情与趋势 | 三档内容密度、左右详情、UTC真实采样、版本对比和详情内投稿关注 | [cards.js](../client/frontend/cards.js)、[detail.js](../client/frontend/detail.js)、[creator-videos.js](../client/frontend/creator-videos.js)、[trend.mjs](../client/frontend/trend.mjs)、[catalog.css](../client/frontend/catalog.css)，见 [目录与指标口径](client-catalog.md) | [趋势测试](../client/frontend/trend.test.mjs)、[路由/日期测试](../client/frontend/view.test.mjs)、[HTTP目录测试](../client/agent/internal/httpapi/catalog_test.go) |
+| 自动打开与图片地址 | 默认浏览器启动后自动会话；图片URL按版本缓存、可见懒加载并直连白名单CDN，不改后端 | [startup.go](../client/agent/cmd/agent/startup.go)、[Windows](../client/agent/cmd/agent/browser_windows.go)/[其他系统](../client/agent/cmd/agent/browser_other.go)、[images.go](../client/agent/internal/library/images.go)、[image.go](../client/agent/internal/remote/image.go)、[images.js](../client/frontend/images.js)，见 [启动与图片](client-launch-media.md) | [启动测试](../client/agent/cmd/agent/startup_test.go)、[缓存测试](../client/agent/internal/library/images_test.go)、[HTTP测试](../client/agent/internal/httpapi/images_test.go)、[地址测试](../client/frontend/images.test.mjs) |
+| 客户端本地 API | 会话、Host/Origin/CSRF、扫描与关注/远程/UP视频27个API；固定模块MIME | [server.go](../client/agent/internal/httpapi/server.go)、[library.go](../client/agent/internal/httpapi/library.go) | [server_test.go](../client/agent/internal/httpapi/server_test.go)、[catalog_test.go](../client/agent/internal/httpapi/catalog_test.go) |
+| 本地平台适配器 | Cookie 登录验证、WBI 签名、全部可见投稿分页，无 120 条截断或合集回退 | [client.go](../client/agent/internal/bilibili/client.go) 的 `Login`、`Videos`、[wbi.go](../client/agent/internal/bilibili/wbi.go) | [client_test.go](../client/agent/internal/bilibili/client_test.go) |
+| 本地扫描任务 | 后台逐页去重、完整性判断、取消与恢复，网页关闭不取消任务 | [service.go](../client/agent/internal/scanner/service.go) 的 `Service`、`Start`、`Close` | [service_test.go](../client/agent/internal/scanner/service_test.go) |
+| 客户端持久化 | Cookie保护、扫描和关注库/配置/缓存原子写入 | [store.go](../client/agent/internal/localstate/store.go)、[protect_windows.go](../client/agent/internal/localstate/protect_windows.go) | [store_test.go](../client/agent/internal/localstate/store_test.go)、[关注测试](../client/agent/internal/library/service_test.go) |
+| 本地关注库 | 本地库/公开搜索、总览缓存、自动提交与失败保留、分页前排序和扫描来源持久化，取消不全局停采 | [service.go](../client/agent/internal/library/service.go)、[catalog.go](../client/agent/internal/library/catalog.go)、[summaries.go](../client/agent/internal/library/summaries.go)，[接入说明](client-library.md) | [service_test.go](../client/agent/internal/library/service_test.go)、[catalog_test.go](../client/agent/internal/library/catalog_test.go)、[summaries_test.go](../client/agent/internal/library/summaries_test.go) |
+| 工作台与后台队列 | 侧栏白名单路由、既有库接口聚合总览/公开搜索、待提交退避，目录迁移受会话保护 | [navigation.js](../client/frontend/navigation.js)、[pending.go](../client/agent/internal/library/pending.go)、[directory.go](../client/agent/internal/localstate/directory.go)，见 [工作台说明](client-workspace.md) | [队列测试](../client/agent/internal/library/workspace_test.go)、[目录测试](../client/agent/internal/localstate/directory_test.go)、[设置测试](../client/agent/internal/httpapi/settings_test.go) |
+| Agent远程客户端 | JSON业务码、新旧应答解析、共享节流与限流冷却，无Cookie转发 | [client.go](../client/agent/internal/remote/client.go)，见 [协议](public-response.md) | [client_test.go](../client/agent/internal/remote/client_test.go)、[业务失败](../client/agent/internal/remote/response_test.go) |
+| 关注状态核对 | 浏览与后台精确核对、缺失补申请、暂停保留、六次失败转人工、代际和身份隔离 | [reconciliation.go](../client/agent/internal/library/reconciliation.go) 的 `Reconcile`、[pending.go](../client/agent/internal/library/pending.go)，见 [协议](public-response.md) | [reconciliation_test.go](../client/agent/internal/library/reconciliation_test.go) |
+| 8181公共入口 | JSON库/详情/指标/状态、有界单项及批量申请；统一滚动RPS与在途限制，保留实时查询 | [server.go](../backend/internal/publicapi/server.go)、[read.go](../backend/internal/publicapi/read.go)、[targets.go](../backend/internal/publicapi/targets.go)、[limit.go](../backend/internal/publicapi/limit.go)，[response.go](../backend/internal/publicapi/response.go)、[legacy.go](../backend/internal/publicapi/legacy.go)，见[协议](public-response.md) | [业务应答](../backend/internal/publicapi/response_test.go)、[路由](../backend/internal/publicapi/routes_test.go)、[读取](../backend/internal/publicapi/read_test.go)、[截断](../backend/internal/publicapi/targets_test.go)、[限流](../backend/internal/publicapi/limit_test.go) |
+| 显式申请阶段与收尾 | 独立阶段预算、有效资料有界保存、错误原因与最终结果确认；停机等待在途工作 | [request.go](../backend/internal/tracker/request.go) 的 `RequestTarget`、[request_policy.go](../backend/internal/tracker/request_policy.go) 的 `RequestBudgets/RequestError`、[tracker.go](../backend/internal/tracker/tracker.go) 的 `Stop/Wait`；见 [阶段设计](request-stages.md) | [阶段与事务回归](../backend/internal/tracker/request_stages_test.go)、[阶段应答回归](../backend/internal/publicapi/request_stages_test.go)、[Agent结果核对](../client/agent/internal/library/request_stages_test.go) |
+| 公共准入与下载（规划） | 完整准入、总预算、公共搜索增强及本地下载 | [目标设计](client-server-architecture.md) | 见该文验收，当前尚未全部实现 |
+| Qt桌面客户端（规划） | 未来以C++ + Qt重构客户端，应用内整合界面与业务，保持现有功能与数据迁移 | [技术路线](../client/README.md#未来技术路线c--qt)、[实施计划](../PLANs/2026-11-15-qt-client.md)；尚无Qt实现入口 | 计划中的功能对等、迁移、生命周期和安装验收；实现后补测试入口 |
+| 用户档案与数据管理（规划） | 本地管理、导入导出和备份恢复；未来直连用户自选云盘自动备份，公共服务器不托管私人数据 | [数据管理设计](client-data-management.md)，尚无实现入口；现有 [localstate](../client/agent/internal/localstate/store.go) 已保存状态并可迁移目录，完整档案与备份未实现 | 同文档“实施顺序与验收”，实现后补测试入口 |
 
 注释与技术文档分工：包注释和文件头说明模块职责、边界及文档位置；接口、关键方法和复杂逻辑附近解释输入约束、错误语义及设计原因；本文负责模块关系、执行链路、API、字段映射及扩展方式。普通赋值和显而易见的调用不需要逐行注释。
 
@@ -33,42 +61,41 @@
 
 作者视频融合、关注过滤、统一分页、添加全部及单管理员口径见 [作者视频融合与按需关注设计](video-discovery.md)。通用接口与用户端只处理作者和视频，B站合集遍历封装在适配器内部；发现和导入会话只保存在当前进程，重启后需重新加载，成功采集的历史与关注保持持久化。
 
+已实现的 [浏览器界面](../client/frontend/README.md) 与 [Agent](../client/agent/README.md) 统一在 `client/`，提供扫描及本地关注库，关注和缓存保存 `library.json`；通过8181公共入口提交目标和读取历史。浏览器与API同源，保留会话/来源/CSRF校验，Cookie不转发公共服务器。协议与验证见 [本地关注接入](client-library.md)，原扫描见 [客户端发现](client-discovery.md)。
+
+已实现多人共用公共数据、各自 Agent 保存私人关注的基本接入：按标识读取公共资料与历史，提交目标经验证后加入跟踪，已有目标直接复用；本地取消不停止公共任务。8182只提供本机管理；8181已提供简单限流，不使用访问令牌，长期目标预算和完整公共准入仍待实现。本地下载、评论/弹幕等后续能力见 [协作设计](client-server-architecture.md)。
+
+当前8181由独立`publicapi`提供库/详情/版本JSON、精确状态与验证后跟踪申请，同时保留原实时查询API；所有8181请求共用滚动每秒次数和在途上限。8182取消Agent协议，`/api/*`不再提供，管理页面内部请求改为`/manage/...`。批量只处理前N项、逐项应答且不排队尾部；未增加访问令牌或长期目标预算，见[公共接口](public-api.md)。
+
 新增或移动模块、变更接口或职责时，同步更新上述导航及相关章节。定位实现优先使用文件链接和符号名，避免固定行号随着代码调整而失效。具体要求见 [AGENTS.md](../AGENTS.md)。
+
+私人数据由用户自行管理，规划在 Agent 提供档案、导入导出、备份恢复和清理，再支持直接备份到用户自选存储；不要求公共服务器提供个人账户或中转数据。当前 Windows Cookie 保护与扫描导出不能视为完整可迁移档案，具体范围、凭据和多设备边界见 [本地数据管理](client-data-management.md)。本次只更新设计，未调整 `localstate` 等 Go 包职责。
 
 ## 模块边界
 
 ```text
-            ┌────────────────────────────┐                    ┌────────────────────────────┐
-            │ admin  :8182               │                    │ httpapi  :8181             │
-  ┌─────────│ 观察台页面                 │                    │ JSON 查询 API              │
-  │         └────────────────────────────┘                    └────────────────────────────┘
-  │                        │                                                 │
-  │                        │ 立即查询                                        │
-  │                        │                                                 │
-  │                        ▼                                                 │
-  │         ┌────────────────────────────┐                                   │
-  │读写库   │ tracker                    │                                   │ 只查上游
-  │         │ 查询 / 调度 / 保存         │────────┐                          │
-  │         └────────────────────────────┘        │                          │
-  │                        │                      │                          │
-  │                        │ 保存 / 采样          │                          │
-  │                        │                      │                          │
-  │                        ▼                      │平台查询                  ▼
-  │         ┌────────────────────────────┐        │           ┌────────────────────────────┐
-  │         │ storage                    │        │           │ source + provider          │
-  └────────►│ 内容 / 版本 / 指标 / 目标  │        └──────────►│ 能力分发 / 平台适配        │
-            └────────────────────────────┘                    └────────────────────────────┘
-                           │                                                 │
-                           │ SQL                                             │ HTTPS GET
-                           │                                                 │
-                           ▼                                                 ▼
-            ┌────────────────────────────┐                    ┌────────────────────────────┐
-            │ SQLite                     │                    │ api.bilibili.com           │
-            │ data/bht.db                │                    │ B站网页端点                │
-            └────────────────────────────┘                    └────────────────────────────┘
++--------------------------+                 +--------------------------+
+| admin :8182              |                 | publicapi :8181          |
+| HTML / private UI actions|                 | routes / rate / batch    |
++--------------------------+                 +--------------------------+
+             |                                            |
+        read / command                       read / accept / live query
+             |                                            |
+             v                                            v
++--------------------------+                 +--------------------------+
+| storage / tracker       | <--------------- | public read / targets    |
+| history / sampling      |  read / accept   | httpapi: live query      |
++--------------------------+                 +--------------------------+
+             |                                            |
+        SQL read/write                              platform query
+             v                                            v
++--------------------------+                 +--------------------------+
+| SQLite                   |                 | source / provider        |
+| bht.db                   |                 | Bilibili HTTPS endpoints |
++--------------------------+                 +--------------------------+
 ```
 
-依赖方向由适配器指向通用契约。HTTP 层不导入 B站实现，只有启动入口负责组装具体 Provider。查询模块不依赖用户、订阅、数据库或 HTTP 服务，可直接通过 `Service.GetVideo(ctx, platform, id)` 或 `Service.GetCreator(ctx, platform, id)` 调用。
+图中箭头表示运行时调用，查询结果沿原链路返回；tracker采集也经source/provider请求上游。包导入依赖方向由适配器指向通用契约。HTTP 层不导入 B站实现，只有启动入口负责组装具体 Provider。查询模块不依赖用户、订阅、数据库或 HTTP 服务，可直接通过 `Service.GetVideo(ctx, platform, id)` 或 `Service.GetCreator(ctx, platform, id)` 调用。
 
 平台 ID、视频 ID 和作者 ID 均使用字符串。视频的唯一业务标识是 `(platform, id)`，不要把 B站 BV 或 UID 的格式限制放到通用类型中。
 
@@ -86,23 +113,27 @@
 
 1. `bilibili.New()` 创建 B站 Provider，内部持有一个可复用的 `http.Client`，此时还不查询 B站。
 2. `source.NewService(bilibili.New())` 创建查询服务，按 Provider 的 `Platform()` 返回值注册为 `providers["bilibili"]`。
-3. `httpapi.New(queries)` 创建路由器，将查询服务传给 HTTP 处理函数。
+3. 创建共享`storage`、`tracker`、调度器和`admin`后，`publicapi.New(store, trk, queries, "bilibili", limits)`创建公共入口，内部通过`httpapi.New(queries)`保留实时查询。
 4. `http.Server` 使用该路由器作为 `Handler`，`ListenAndServe()` 开始监听并处理请求。
+
+停机入口通过 `signal.NotifyContext` 接收 `os.Interrupt`（Linux 的 `SIGINT`，通常由 Ctrl+C 触发）和 `syscall.SIGTERM`，主 context 也作为业务及已启用诊断 HTTP 服务的 `BaseContext`。停止时 `Tracker.Stop` 关闭新工作登记并取消查询，已进入保存的显式申请继续短预算收尾；已启用的 HTTP 服务并行 `Shutdown`，共用45秒预算并记录错误，之后等待 tracker 已登记工作及调度 goroutine，再退出并关闭日志和数据库。`RunNow` 在启动 goroutine 前登记，避免停机漏等。发现服务目前仍只取消任务，分页后台工作的完整等待及真实 Linux 活跃任务信号验收继续见 [BACK-SHUTDOWN](../PLANs/2026-11-17-backend-api-freeze-review.md#back-shutdownlinux-sigterm-与后台退出链路不完整)；本次预算和收尾范围见 [分阶段申请设计](request-stages.md#停止接纳与收尾)。
 
 对应的核心代码为：
 
 ```go
 queries, err := source.NewService(bilibili.New())
 // 实际代码在这里检查 err。
+// store、trk由入口创建；此处省略其组装和错误处理。
+publicHandler, err := publicapi.New(store, trk, queries, "bilibili", limits)
 server := &http.Server{
     Addr:    addr,
-    Handler: httpapi.New(queries),
+    Handler: publicHandler.Handler(),
 }
 // 实际代码还配置了超时、信号处理和关闭逻辑。
 err = server.ListenAndServe()
 ```
 
-监听地址由 `main.go` 读取环境变量 `BHT_ADDR` 决定，未设置时为 `127.0.0.1:8181`。`127.0.0.1` 表示本机回环地址，`8181` 是本项目服务的端口。
+监听地址由 `main.go` 的 `listenAddresses` 读取环境变量 `BHT_ADDR` 决定，未设置或为空时为 `0.0.0.0:8181`，监听所有 IPv4 网卡。本机可通过 `127.0.0.1:8181` 访问，其他主机通过服务器实际 IP 的 8181 端口访问；`0.0.0.0` 是监听地址，不作为客户端目标地址。`BHT_ADMIN_ADDR` 默认仍为 `127.0.0.1:8182`，两个入口独立覆盖。
 
 例如，在启动服务的 PowerShell 中设置：
 
@@ -150,8 +181,9 @@ flowchart TD
 
 | 环境变量 | 默认值 | 作用 |
 |---|---|---|
-| `BHT_ADDR` | `127.0.0.1:8181` | 对外查询 API 监听地址 |
+| `BHT_ADDR` | `0.0.0.0:8181` | 对外查询 API 监听所有 IPv4 网卡 |
 | `BHT_ADMIN_ADDR` | `127.0.0.1:8182` | 观察台监听地址 |
+| `BHT_PPROF_ADDR` | 空，关闭 | 独立回环诊断入口；CPU/阻塞/锁采样步骤见 [性能诊断](performance-profiling.md) |
 | `BHT_DB` | `data/bht.db` | SQLite 文件路径 |
 | `BHT_QUERY_LOG` | 与数据库同目录的 `query.log` | 查询日志，JSON Lines |
 | `BHT_BILI_COOKIE` | 空 | 可选，访问需要登录态的接口时使用 |
@@ -381,7 +413,7 @@ Provider 先从 B站返回的 `data` 中读取字段，再构造 `source.Video`�
 
 已有 schema 2 数据库由 0003 迁移删除 `snapshot_version`；schema 1 和新数据库按 0001 → 0002 → 0003 顺序升级。保留已执行的迁移历史，最终视频版本表只有内容快照及相关观测、指纹信息。
 
-裁剪不改变现有指纹，内容相同时不新增版本、不重写旧快照。只有首次保存或真实内容变化后才保存新格式，因此已有目标的详情可能暂时仍含合集数据。历史裁剪和空间回收需单独安排。字段图例见 [裁剪前后对照](database.md#视频快照裁剪前后对照)，采样体积对比见 [存储成本与压缩](database.md#存储成本与压缩)，实施摘要见 [计划归档](../PLAN.md#已完成计划)，存储契约见 [数据库设计](database.md#payload-保存什么)。
+裁剪不改变现有指纹，内容相同时不新增版本、不重写旧快照。只有首次保存或真实内容变化后才保存新格式，因此已有目标的详情可能暂时仍含合集数据。历史裁剪和空间回收需单独安排。字段图例见 [裁剪前后对照](database.md#视频快照裁剪前后对照)，采样体积对比见 [存储成本与压缩](database.md#存储成本与压缩)，实施摘要见 [快照裁剪计划](../PLANs/archive/2026-11-07-video-snapshot.md)，存储契约见 [数据库设计](database.md#payload-保存什么)。
 
 ### 查询 API 的字段映射
 
@@ -404,11 +436,11 @@ Provider 先从 B站返回的 `data` 中读取字段，再构造 `source.Video`�
 
 当前请求 `GET https://api.bilibili.com/x/web-interface/view?bvid=...`，不使用个人认证凭据，不跟随重定向，不获取播放链接和视频内容。这是网页端点的实验性接入，不能由一次查询成功推导出长期可用性或任意目标的授权范围；正式运行条件仍以 PRD 的真实数据源验证要求为准。
 
-每次查询主动发起一次上游请求，没有应用层自动重试。HTTP 客户端超时 10 秒，HTTP 入口上下文超时 12 秒；上下文沿 `httpapi → Service → Provider → HTTP 请求` 传递，客户端断开或超时时可取消上游调用。服务默认只监听本机。第一版没有缓存、调度器或跨请求限流，尚不适合直接对公网开放高频查询。
+每次查询主动发起一次上游请求，没有应用层自动重试。HTTP 客户端超时 10 秒，HTTP 入口上下文超时 12 秒；上下文沿 `httpapi → Service → Provider → HTTP 请求` 传递，客户端断开或超时时可取消上游调用。服务默认只监听本机。实时查询本身仍不使用缓存或自动重试；当前经publicapi共享入口限流，默认每秒20次且在途最多20个，不提供长期跟踪总预算或访问令牌。
 
 适配器只输出元数据，没有 `AVAILABLE` 或“已删除”状态。后续状态机必须另行记录观测依据、失败原因与确认次数；元数据可读取不等于当前可播放。
 
-UID 投稿列表扫描暂未实现。后续可增加独立的列表查询能力契约，以不透明分页游标隔离平台差异，而不强制所有平台 Provider 都支持投稿列表。
+服务器公开发现仍通过独立列表能力与不透明续页隔离平台差异；本地登录态的完整投稿扫描已在独立客户端适配器实现，见 [客户端发现](client-discovery.md)，不在服务器公开请求中注入用户 Cookie。
 
 ## 按 UID 查询 UP 主资料
 
@@ -540,4 +572,4 @@ go run ./cmd/server
 
 另开终端访问 `http://127.0.0.1:8182/`，添加 UP 主 `122541`，等待日志出现 `query_creator` 和 `discover`。SQLite 文件中应出现 `creators`、`videos`、`creator_versions`、`video_versions`、`metric_samples`、`tracking_targets` 六张表，`videos.current_hash` 与 `seq = current_seq` 的版本行一致。重复点击“立即查询”不应增加版本数，只更新 `last_observed_at`。
 
-观察台页面检查：`/`、`/videos`、`/creators`、`/activity`、`/manage`、`/logs`、`/detail/video/{BV}`、`/detail/creator/{UID}`、`/api/metrics/{type}/{id}` 和 `/api/targets/status` 均应返回 200；空库显示空状态而不是错误。迁移后 `PRAGMA user_version = 4`，`tracking_targets` 含 `last_result`、`last_success_at`、`failure_count`、`failure_reason`、`recovered_at` 等列。
+观察台页面检查：`/`、`/videos`、`/creators`、`/activity`、`/manage`、`/logs`、`/detail/video/{BV}`、`/detail/creator/{UID}`、`/manage/metrics/{type}/{id}` 和 `/manage/targets/status` 均应返回 200；8182原`/api/*`应返回404，Agent改连8181；空库显示空状态而不是错误。迁移后 `PRAGMA user_version = 4`，`tracking_targets` 含 `last_result`、`last_success_at`、`failure_count`、`failure_reason`、`recovered_at` 等列。
