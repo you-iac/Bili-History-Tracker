@@ -1,4 +1,7 @@
 // view.mjs 集中处理状态和日期显示，真实数量缺失时保留未知，不推算成完整结果。
+// 库与观看历史共用密度对应的分页数量，避免两处设置漂移。
+export const cardPageLimits=Object.freeze({compact:30,standard:20,large:12});
+
 export function stateLabel(state) {
   return ({running:'扫描中',cancelling:'正在停止',complete:'扫描完成',partial:'部分结果',cancelled:'已停止',interrupted:'待继续'})[state] || '等待开始';
 }

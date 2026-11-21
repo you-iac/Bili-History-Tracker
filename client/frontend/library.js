@@ -1,5 +1,5 @@
 // library.js 编排公开总览、本地库/公开搜索、自动关注与设置；业务请求经本地Agent，图片直连白名单CDN。
-import {detailHref,routeForHash} from './view.mjs';
+import {detailHref,routeForHash,cardPageLimits} from './view.mjs';
 import {renderCards} from './cards.js';
 import {initDetail} from './detail.js';
 import {initImages} from './images.js';
@@ -8,7 +8,6 @@ export function initLibrary({api,notify,onScan,navigate}) {
   const $ = id => document.getElementById(id);
   const images=initImages({api});
   const views = {creator:{page:1,q:'',scope:'local',pending:false,sort:'published'},video:{page:1,q:'',scope:'local',pending:false,sort:'published'}};
-  const pageLimits={compact:30,standard:20,large:12};
   let usable=false,agentOnline=false,ready=false,busy=false,server='',kind='creator',current='overview',result={items:[],page:1,total:0,limit:20};
   let lastLocalLoad=0;
   const summaryJobs=new Map(),summaryReads=new Map(),summaryNotes=new Map();
@@ -105,7 +104,7 @@ export function initLibrary({api,notify,onScan,navigate}) {
     if(current===(requestedKind==='creator'?'creators':'videos')){const hash=`#${current}${publicMode?'?scope=public':''}`;history.replaceState(null,'',location.pathname+location.search+hash);currentRoute=routeForHash(hash);}
     context();$('library-loading').hidden=false;
     const query=new URLSearchParams({kind:requestedKind,q:state.q,page:String(state.page),sort:state.sort});
-    if(!publicMode)query.set('limit',String(pageLimits[size]||20));
+    if(!publicMode)query.set('limit',String(cardPageLimits[size]||20));
     if(state.pending&&!publicMode)query.set('pending','1');
     try {
       if(publicMode&&!server)throw new Error('请先在设置中配置服务器地址。');

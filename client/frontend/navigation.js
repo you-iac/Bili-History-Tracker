@@ -23,7 +23,7 @@ export function initNavigation(onChange) {
     document.querySelectorAll('[data-page]').forEach(el => {el.hidden = el.dataset.page !== (view === 'creators' || view === 'videos' ? 'library' : view);});
     document.querySelectorAll('[data-view]').forEach(el => {if(el.dataset.view === route.section)el.setAttribute('aria-current','page');else el.removeAttribute('aria-current');});
     const title=view==='detail'?[route.kind==='creator'?'UP 主详情':'视频详情','查看真实日采样与观测到的内容变化。']:titles[view];
-    document.querySelector('.page-heading').hidden = ['creators','videos','detail'].includes(view);
+    document.querySelector('.page-heading').hidden = ['creators','videos','detail','history'].includes(view);
     document.getElementById('page-title').textContent = title[0];
     document.getElementById('page-subtitle').textContent = title[1];
     document.getElementById('breadcrumb-current').textContent = title[0];

@@ -5,7 +5,22 @@ package httpapi
 import (
 	"net/http"
 	"strconv"
+
+	"bili-history-tracker/client/agent/internal/bilibili"
+	"bili-history-tracker/client/agent/internal/scanner"
 )
+
+// 关注状态与头像只从本机资料缓存补齐，不因浏览历史查询平台或公共服务器。
+type historyVideoItem struct {
+	bilibili.HistoryItem
+	Followed bool `json:"followed"`
+}
+
+type historyCreatorItem struct {
+	scanner.HistoryCreator
+	Followed bool   `json:"followed"`
+	Cover    string `json:"cover,omitempty"`
+}
 
 func (s *Server) historyRoutes() {
 	s.mux.HandleFunc("POST /api/history/sync", s.historySync)
@@ -34,24 +49,59 @@ func historyDays(r *http.Request) (int, error) {
 	return days, nil
 }
 
+// 未关注指本地未关注，待服务器确认的本地关注同样排除；不查询远程跟踪状态。
+func (s *Server) historyFilter(r *http.Request, kind string) (func(string) bool, error) {
+	switch r.URL.Query().Get("unfollowed") {
+	case "", "0":
+		return nil, nil
+	case "1":
+		return func(id string) bool {
+			cached, _ := s.library.CurrentCache(kind, id)
+			return cached.LocalFollow == nil
+		}, nil
+	default:
+		return nil, strconv.ErrSyntax
+	}
+}
+
 func (s *Server) historyVideos(w http.ResponseWriter, r *http.Request) {
 	days, daysErr := historyDays(r)
 	page, pageErr := positivePage(r, "page")
 	limit, limitErr := boundedLimit(r, "limit")
-	if daysErr != nil || pageErr != nil || limitErr != nil {
-		apiError(w, 400, "invalid_input", "历史范围或分页无效。")
+	include, filterErr := s.historyFilter(r, "video")
+	if daysErr != nil || pageErr != nil || limitErr != nil || filterErr != nil {
+		apiError(w, 400, "invalid_input", "历史范围、筛选或分页无效。")
 		return
 	}
-	writeJSON(w, 200, s.service.HistoryVideos(days, page, limit))
+	data := s.service.HistoryVideosFiltered(days, page, limit, include)
+	items := make([]historyVideoItem, 0, len(data.Items))
+	for _, item := range data.Items {
+		cached, _ := s.library.CurrentCache("video", item.BVID)
+		items = append(items, historyVideoItem{HistoryItem: item, Followed: cached.LocalFollow != nil})
+	}
+	writeJSON(w, 200, struct {
+		scanner.HistoryVideoPage
+		Items []historyVideoItem `json:"items"`
+	}{data, items})
 }
 
 func (s *Server) historyCreators(w http.ResponseWriter, r *http.Request) {
 	days, daysErr := historyDays(r)
 	page, pageErr := positivePage(r, "page")
 	limit, limitErr := boundedLimit(r, "limit")
-	if daysErr != nil || pageErr != nil || limitErr != nil {
-		apiError(w, 400, "invalid_input", "历史范围或分页无效。")
+	include, filterErr := s.historyFilter(r, "creator")
+	if daysErr != nil || pageErr != nil || limitErr != nil || filterErr != nil {
+		apiError(w, 400, "invalid_input", "历史范围、筛选或分页无效。")
 		return
 	}
-	writeJSON(w, 200, s.service.HistoryCreators(days, page, limit))
+	data := s.service.HistoryCreatorsFiltered(days, page, limit, include)
+	items := make([]historyCreatorItem, 0, len(data.Items))
+	for _, item := range data.Items {
+		cached, _ := s.library.CurrentCache("creator", item.ID)
+		items = append(items, historyCreatorItem{HistoryCreator: item, Followed: cached.LocalFollow != nil, Cover: cached.Item.Cover})
+	}
+	writeJSON(w, 200, struct {
+		scanner.HistoryCreatorPage
+		Items []historyCreatorItem `json:"items"`
+	}{data, items})
 }

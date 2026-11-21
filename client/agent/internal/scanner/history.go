@@ -21,16 +21,16 @@ const (
 )
 
 type historyState struct {
-	Version int                     `json:"version"`
-	Items   []bilibili.HistoryItem  `json:"items"`
+	Version int                    `json:"version"`
+	Items   []bilibili.HistoryItem `json:"items"`
 }
 
 // HistorySyncResult 描述一次同步的增量；Removed 是超过 30 天被清理的条数。
 type HistorySyncResult struct {
-	Added   int       `json:"added"`
-	Updated int       `json:"updated"`
-	Removed int       `json:"removed"`
-	Total   int       `json:"total"`
+	Added    int       `json:"added"`
+	Updated  int       `json:"updated"`
+	Removed  int       `json:"removed"`
+	Total    int       `json:"total"`
 	SyncedAt time.Time `json:"synced_at"`
 }
 
@@ -155,6 +155,12 @@ func historyCutoff(days int) int64 {
 
 // HistoryVideos 返回本地历史视频页，按最近观看时间倒序；days 只过滤本地。
 func (s *Service) HistoryVideos(days, page, limit int) HistoryVideoPage {
+	return s.HistoryVideosFiltered(days, page, limit, nil)
+}
+
+// HistoryVideosFiltered 在统计总量和分页前按 BVID 筛选；include=nil 表示全部。
+// include 在扫描锁外调用，应只查询本地状态，不执行网络或写入操作。
+func (s *Service) HistoryVideosFiltered(days, page, limit int, include func(string) bool) HistoryVideoPage {
 	limit = historyPageLimit(limit)
 	if page < 1 {
 		page = 1
@@ -165,7 +171,7 @@ func (s *Service) HistoryVideos(days, page, limit int) HistoryVideoPage {
 	cutoff := historyCutoff(days)
 	items := make([]bilibili.HistoryItem, 0, len(state.Items))
 	for _, item := range state.Items {
-		if item.ViewedAt >= cutoff {
+		if item.ViewedAt >= cutoff && (include == nil || include(item.BVID)) {
 			items = append(items, item)
 		}
 	}
@@ -187,6 +193,12 @@ func (s *Service) HistoryVideos(days, page, limit int) HistoryVideoPage {
 
 // HistoryCreators 按 author_id 聚合历史视频，按最近观看时间倒序。
 func (s *Service) HistoryCreators(days, page, limit int) HistoryCreatorPage {
+	return s.HistoryCreatorsFiltered(days, page, limit, nil)
+}
+
+// HistoryCreatorsFiltered 按 UP ID 筛选聚合结果后再统计总量和分页，保留观看视频数。
+// include=nil 表示全部；回调在扫描锁外执行，只能读取本地状态。
+func (s *Service) HistoryCreatorsFiltered(days, page, limit int, include func(string) bool) HistoryCreatorPage {
 	limit = historyPageLimit(limit)
 	if page < 1 {
 		page = 1
@@ -215,7 +227,9 @@ func (s *Service) HistoryCreators(days, page, limit int) HistoryCreatorPage {
 	}
 	items := make([]HistoryCreator, 0, len(creators))
 	for _, c := range creators {
-		items = append(items, *c)
+		if include == nil || include(c.ID) {
+			items = append(items, *c)
+		}
 	}
 	sort.Slice(items, func(i, j int) bool {
 		if items[i].LastViewedAt != items[j].LastViewedAt {
