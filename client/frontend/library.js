@@ -92,7 +92,7 @@ export function initLibrary({api,notify,onScan,navigate}) {
     if(!force&&Date.now()-(summaryReads.get(key)||0)<60000)return Promise.resolve(null);
     summaryReads.set(key,Date.now());summaryNotes.set(noteKey,'正在更新本地资料与历史变化…');summaryNote();
     const job=(async()=>{
-      try{if(!ids.length)return null;const params=new URLSearchParams({kind:requestedKind});for(const id of ids)params.append('id',id);const data=await post('/api/follows/refresh?'+params);summaryNotes.delete(noteKey);await localDashboard();return data;}
+      try{if(!ids.length)return null;let data=null;for(let i=0;i<ids.length;i+=24){const chunk=ids.slice(i,i+24);const params=new URLSearchParams({kind:requestedKind});for(const id of chunk)params.append('id',id);data=await post('/api/follows/refresh?'+params);}summaryNotes.delete(noteKey);await localDashboard();return data;}
       catch(error){summaryNotes.set(noteKey,'资料更新未完成，已保留可用资料与本地关注。'+error.message);throw error;}
       finally{summaryJobs.delete(key);summaryNote();if(epoch===summaryEpoch&&server===base&&kind===requestedKind&&views[kind].scope==='local'&&current===(kind==='creator'?'creators':'videos')&&!$('follow-rows').querySelector('details[open]'))await load(false);}
     })();
