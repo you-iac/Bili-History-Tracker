@@ -1,6 +1,7 @@
 // app.js 只向同源 Agent 发起请求；Cookie 和连接密钥不写入浏览器存储。
 import {stateLabel, progress, publishedAt, rangeLabel} from './view.mjs';
 import {initLibrary} from './library.js';
+import {initHistory} from './history.js';
 import {initNavigation} from './navigation.js';
 
 const $ = id => document.getElementById(id);
@@ -42,7 +43,8 @@ async function request(path, options = {}) {
 async function api(path, options) { return (await request(path, options)).json(); }
 let navigation;
 const libraryUI = initLibrary({api,notify,navigate:view=>navigation.navigate(view),onScan:id => {navigation.navigate('discovery');$('creator-input').value=id;setTimeout(()=>$('creator-input').focus(),0);}});
-navigation=initNavigation((view,route)=>libraryUI.show(view,route).catch(error=>notify(error.message,true)));
+const historyUI = initHistory({api,notify});
+navigation=initNavigation((view,route)=>view==='history'?historyUI.show():libraryUI.show(view,route).catch(error=>notify(error.message,true)));
 function buttons() {
 	libraryUI.setConnected(connected && online);
   const usable = connected && online && !busyAction;

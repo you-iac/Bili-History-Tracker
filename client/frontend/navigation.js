@@ -6,6 +6,7 @@ const titles = {
   creators:['UP 主库','管理关注的创作者，发现服务器已记录的 UP。'],
   videos:['视频库','整理个人关注的视频，查看播放变化与历史版本。'],
   discovery:['投稿发现','按需获取可见投稿，选择你希望持续跟踪的视频。'],
+  history:['观看历史','从 B站观看记录中选择要关注的视频与 UP 主。'],
   settings:['设置','管理连接、工作目录与本地登录状态。']
 };
 export function initNavigation(onChange) {

@@ -23,7 +23,7 @@ export function routeForHash(hash) {
   const kind = section === 'creators' ? 'creator' : section === 'videos' ? 'video' : '';
   const validID = kind === 'creator' ? /^[1-9]\d{0,19}$/.test(id||'') : /^BV[1-9A-HJ-NP-Za-km-z]{10}$/.test(id||'');
   if(kind&&id&&validID&&!rest.length) return {view:'detail',kind,id,scope,section,hash:`#${section}/${id}${scope?'?scope=public':''}`};
-  if(!id&&!rest.length&&['overview','creators','videos','discovery','settings'].includes(section)) return {view:section,kind,scope,section,hash:`#${section}${kind&&scope?'?scope=public':''}`};
+  if(!id&&!rest.length&&['overview','creators','videos','discovery','settings','history'].includes(section)) return {view:section,kind,scope,section,hash:`#${section}${kind&&scope?'?scope=public':''}`};
   return {view:'overview',kind:'',scope:'',section:'overview',hash:'#overview'};
 }
 export function viewForHash(hash) {return routeForHash(hash).view;}
