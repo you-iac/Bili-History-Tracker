@@ -19,6 +19,7 @@ import (
 type Platform interface {
 	Login(context.Context, string) (bilibili.Account, bilibili.Keys, error)
 	Videos(context.Context, string, string, int, bilibili.Keys) (bilibili.Page, error)
+	History(context.Context, string, int64, int64, bilibili.Keys) (bilibili.HistoryPage, error)
 }
 type Storage interface {
 	LoadCookie() (string, error)
@@ -26,6 +27,8 @@ type Storage interface {
 	PersistentCookie() bool
 	LoadScan(any) error
 	SaveScan(any) error
+	LoadHistory(any) error
+	SaveHistory(any) error
 }
 
 // Config 只返回账号摘要和存储方式；不提供读取 Cookie 的接口。

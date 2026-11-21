@@ -30,6 +30,9 @@ func (platformStub) Videos(_ context.Context, _, _ string, pn int, _ bilibili.Ke
 	}
 	return r, nil
 }
+func (platformStub) History(context.Context, string, int64, int64, bilibili.Keys) (bilibili.HistoryPage, error) {
+	return bilibili.HistoryPage{}, nil
+}
 
 type harness struct {
 	s       *Server

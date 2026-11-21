@@ -125,6 +125,29 @@ func (s *Store) SaveScan(value any) error {
 	return s.write("scan.json", data)
 }
 
+func (s *Store) LoadHistory(target any) error {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	data, err := readLimited(filepath.Join(s.directory, "history.json"), 64<<20)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(data, target)
+}
+
+func (s *Store) SaveHistory(value any) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	data, err := json.Marshal(value)
+	if err != nil {
+		return err
+	}
+	return s.write("history.json", data)
+}
+
 func (s *Store) LoadLibrary(target any) error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
