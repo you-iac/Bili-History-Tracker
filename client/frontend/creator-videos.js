@@ -60,7 +60,7 @@ export function initCreatorVideos({api,notify,onAdd,onChanged,onSyncSummaries,im
     if(!uid||!connected)return;
     const token=++sequence,owner=uid;loading=true;controls();$('creator-videos-loading').hidden=false;
     try{
-      const data=await api(`/api/creator-videos/${owner}?`+new URLSearchParams({scope,sort,q,page:String(page)}));
+      const data=await api(`/api/creator-videos/${owner}?`+new URLSearchParams({scope,sort,q,page:String(page),limit:String(pageLimits[$('creator-videos-size').value]||20)}));
       if(token!==sequence||owner!==uid)return;
       render(data,force);$('creator-videos-error').hidden=true;lastRead=Date.now();
     }catch(error){if(token===sequence){$('creator-videos-error').textContent=error.message+' 已保留上次读取的结果。';$('creator-videos-error').hidden=false;}}
@@ -103,7 +103,8 @@ export function initCreatorVideos({api,notify,onAdd,onChanged,onSyncSummaries,im
   $('creator-scan-start').addEventListener('click',()=>start());$('creator-scan-resume').addEventListener('click',()=>start(true));
   $('creator-scan-cancel').addEventListener('click',()=>act(()=>api('/api/scan/cancel',{method:'POST',body:'{}'})));
   $('creator-videos-follow-page').addEventListener('click',followPage);
-  function density(value){$('creator-videos-size').value=value;$('creator-videos-rows').dataset.size=value;}
+  const pageLimits={compact:30,standard:20,large:12};
+  function density(value){$('creator-videos-size').value=value;$('creator-videos-rows').dataset.size=value;if(uid&&connected){page=1;load(true);}}
   let size='standard';try{const saved=localStorage.getItem('bht.card-size');if(['compact','standard','large'].includes(saved))size=saved;}catch{}density(size);
   $('creator-videos-size').addEventListener('change',()=>{const value=$('creator-videos-size').value;density(value);try{localStorage.setItem('bht.card-size',value);}catch{}window.dispatchEvent(new CustomEvent('bht-density',{detail:value}));});
   window.addEventListener('bht-density',event=>density(event.detail));

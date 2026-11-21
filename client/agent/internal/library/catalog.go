@@ -20,6 +20,26 @@ func ValidSort(order string) bool {
 	return false
 }
 
+// 每页条数由调用方传入；0 使用默认值，库层做防御性钳制。
+const (
+	defaultPageLimit = 20
+	minPageLimit     = 12
+	maxPageLimit     = 48
+)
+
+func pageLimit(limit int) int {
+	if limit == 0 {
+		return defaultPageLimit
+	}
+	if limit < minPageLimit {
+		return minPageLimit
+	}
+	if limit > maxPageLimit {
+		return maxPageLimit
+	}
+	return limit
+}
+
 // SearchQuery 将平台链接变成精确标识，普通文本保留名称搜索语义。
 // 无效 URL 返回输入错误，绝不访问输入网址。
 func SearchQuery(kind, q string) (string, error) {
@@ -105,10 +125,11 @@ func compareItems(a, b remote.Item, order string) int {
 }
 
 // ListCatalog 对全部本地关注筛选和排序后分页；owner 只匹配已知所属 UP 的视频。
-func (s *Service) ListCatalog(kind, q string, page int, pendingOnly bool, order, owner string, scanned ...[]bilibili.Video) Page {
+func (s *Service) ListCatalog(kind, q string, page, limit int, pendingOnly bool, order, owner string, scanned ...[]bilibili.Video) Page {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	result := Page{Items: []Follow{}, Limit: 20}
+	limit = pageLimit(limit)
+	result := Page{Items: []Follow{}, Limit: limit}
 	exactID, _ := Normalize(kind, q)
 	if normalized, err := SearchQuery(kind, q); err == nil {
 		q = normalized
@@ -171,9 +192,9 @@ func (s *Service) ListCatalog(kind, q string, page int, pendingOnly bool, order,
 		return items[i].ID < items[j].ID
 	})
 	result.Total = len(items)
-	result.Page = min(max(1, page), max(1, (len(items)+19)/20))
-	start := (result.Page - 1) * 20
-	result.Items = append(result.Items, items[start:min(start+20, len(items))]...)
+	result.Page = min(max(1, page), max(1, (len(items)+limit-1)/limit))
+	start := (result.Page - 1) * limit
+	result.Items = append(result.Items, items[start:min(start+limit, len(items))]...)
 	return result
 }
 
@@ -195,9 +216,10 @@ func (s *Service) RememberDiscovery(id, owner string, video bilibili.Video) (Fol
 
 // ScanCatalog 把已枚举投稿转换为共用卡片资料，过滤已关注项后再搜索、排序和分页。
 // 扫描 UP 上下文包含合作投稿，不能用视频主作者替换此归属。
-func (s *Service) ScanCatalog(videos []bilibili.Video, owner, q, order string, page int) PublicPage {
+func (s *Service) ScanCatalog(videos []bilibili.Video, owner, q, order string, page, limit int) PublicPage {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	limit = pageLimit(limit)
 	followed := map[string]bool{}
 	exactID, _ := Normalize("video", q)
 	for _, f := range s.state.Follows {
@@ -226,8 +248,8 @@ func (s *Service) ScanCatalog(videos []bilibili.Video, owner, q, order string, p
 		}
 		return items[i].ID < items[j].ID
 	})
-	result := PublicPage{Items: []PublicItem{}, Page: min(max(1, page), max(1, (len(items)+19)/20)), Limit: 20, Total: len(items)}
-	start := (result.Page - 1) * 20
-	result.Items = append(result.Items, items[start:min(start+20, len(items))]...)
+	result := PublicPage{Items: []PublicItem{}, Page: min(max(1, page), max(1, (len(items)+limit-1)/limit)), Limit: limit, Total: len(items)}
+	start := (result.Page - 1) * limit
+	result.Items = append(result.Items, items[start:min(start+limit, len(items))]...)
 	return result
 }

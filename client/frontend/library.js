@@ -8,6 +8,7 @@ export function initLibrary({api,notify,onScan,navigate}) {
   const $ = id => document.getElementById(id);
   const images=initImages({api});
   const views = {creator:{page:1,q:'',scope:'local',pending:false,sort:'published'},video:{page:1,q:'',scope:'local',pending:false,sort:'published'}};
+  const pageLimits={compact:30,standard:20,large:12};
   let usable=false,agentOnline=false,ready=false,busy=false,server='',kind='creator',current='overview',result={items:[],page:1,total:0,limit:20};
   let lastLocalLoad=0;
   const summaryJobs=new Map(),summaryReads=new Map(),summaryNotes=new Map();
@@ -91,7 +92,7 @@ export function initLibrary({api,notify,onScan,navigate}) {
     if(!force&&Date.now()-(summaryReads.get(key)||0)<60000)return Promise.resolve(null);
     summaryReads.set(key,Date.now());summaryNotes.set(noteKey,'正在更新本地资料与历史变化…');summaryNote();
     const job=(async()=>{
-      try{if(!ids.length)return null;const params=new URLSearchParams({kind:requestedKind});for(const id of ids)params.append('id',id);const data=await post('/api/follows/refresh?'+params);summaryNotes.delete(noteKey);await localDashboard();return data;}
+      try{if(!ids.length)return null;let data=null;for(let i=0;i<ids.length;i+=24){const chunk=ids.slice(i,i+24);const params=new URLSearchParams({kind:requestedKind});for(const id of chunk)params.append('id',id);data=await post('/api/follows/refresh?'+params);}summaryNotes.delete(noteKey);await localDashboard();return data;}
       catch(error){summaryNotes.set(noteKey,'资料更新未完成，已保留可用资料与本地关注。'+error.message);throw error;}
       finally{summaryJobs.delete(key);summaryNote();if(epoch===summaryEpoch&&server===base&&kind===requestedKind&&views[kind].scope==='local'&&current===(kind==='creator'?'creators':'videos')&&!$('follow-rows').querySelector('details[open]'))await load(false);}
     })();
@@ -104,6 +105,7 @@ export function initLibrary({api,notify,onScan,navigate}) {
     if(current===(requestedKind==='creator'?'creators':'videos')){const hash=`#${current}${publicMode?'?scope=public':''}`;history.replaceState(null,'',location.pathname+location.search+hash);currentRoute=routeForHash(hash);}
     context();$('library-loading').hidden=false;
     const query=new URLSearchParams({kind:requestedKind,q:state.q,page:String(state.page),sort:state.sort});
+    if(!publicMode)query.set('limit',String(pageLimits[size]||20));
     if(state.pending&&!publicMode)query.set('pending','1');
     try {
       if(publicMode&&!server)throw new Error('请先在设置中配置服务器地址。');
@@ -174,9 +176,13 @@ export function initLibrary({api,notify,onScan,navigate}) {
   for(const [k,name] of [['creator','creators'],['video','videos']]){for(const [direction,delta] of [['previous',-1],['next',1]])$('overview-'+name+'-'+direction).addEventListener('click',()=>overviewPage(k,overviewPages[k].page+delta));}
   const detail=initDetail({api,notify,onAdd:add,onChanged:localDashboard,onScan,onSyncSummaries:(k,ids)=>syncLocalSummaries(k,server,false,ids),images});
   let size='standard';try{const saved=localStorage.getItem('bht.card-size');if(['compact','standard','large'].includes(saved))size=saved;}catch{}
+  function applyDensity(value){
+    size=value;$('card-size').value=value;$('follow-rows').dataset.size=value;
+    if(views[kind].scope==='local'&&(current==='creators'||current==='videos')){views[kind].page=1;void load();}
+  }
   $('card-size').value=size;$('follow-rows').dataset.size=size;
-  $('card-size').addEventListener('change',()=>{size=$('card-size').value;$('follow-rows').dataset.size=size;try{localStorage.setItem('bht.card-size',size);}catch{}window.dispatchEvent(new CustomEvent('bht-density',{detail:size}));});
-  window.addEventListener('bht-density',event=>{size=event.detail;$('card-size').value=size;$('follow-rows').dataset.size=size;});
+  $('card-size').addEventListener('change',()=>{applyDensity($('card-size').value);try{localStorage.setItem('bht.card-size',size);}catch{}window.dispatchEvent(new CustomEvent('bht-density',{detail:size}));});
+  window.addEventListener('bht-density',event=>{if(event.detail!==size)applyDensity(event.detail);});
   controls();
   return {
     setConnected(value){agentOnline=value;usable=value&&ready;detail.setConnected(usable);controls();},

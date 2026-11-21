@@ -285,7 +285,7 @@ func (s *Service) List(kind, q string, page int) Page {
 }
 
 func (s *Service) ListFiltered(kind, q string, page int, pendingOnly bool) Page {
-	return s.ListCatalog(kind, q, page, pendingOnly, "", "")
+	return s.ListCatalog(kind, q, page, 0, pendingOnly, "", "")
 }
 func (s *Service) find(kind, id string) (Follow, string, error) {
 	s.mu.Lock()

@@ -299,7 +299,7 @@ func TestCreatorVideoCatalogUsesCurrentBeforeScanFallback(t *testing.T) {
 		t.Fatal(err)
 	}
 	old := int64(10)
-	page := s.ListCatalog("video", "live", 1, false, "views", "123", []bilibili.Video{{ID: "BV17x411w7KC", Title: "old scan title", Views: &old}})
+	page := s.ListCatalog("video", "live", 1, 0, false, "views", "123", []bilibili.Video{{ID: "BV17x411w7KC", Title: "old scan title", Views: &old}})
 	if page.Total != 1 || page.Items[0].Current == nil || followItem(page.Items[0]).Name != "live title" || *followItem(page.Items[0]).Metric != 200 {
 		t.Fatal("scan data masked current profile", page)
 	}
