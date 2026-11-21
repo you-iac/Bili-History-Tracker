@@ -76,3 +76,26 @@ func TestModuleMIMEOverridesMachineMapping(t *testing.T) {
 		}
 	}
 }
+
+func TestCatalogLimitBounds(t *testing.T) {
+	h := setup(t)
+	for _, path := range []string{
+		"/api/creator-videos/123?scope=discovered&limit=30",
+		"/api/follows?kind=video&limit=30",
+	} {
+		if r := h.call("GET", path, ""); r.Code != 200 {
+			t.Fatal(path, r.Code, r.Body.String())
+		}
+	}
+	for _, path := range []string{
+		"/api/creator-videos/123?scope=discovered&limit=0",
+		"/api/creator-videos/123?scope=discovered&limit=100",
+		"/api/creator-videos/123?scope=discovered&limit=abc",
+		"/api/follows?limit=0",
+		"/api/follows?limit=100",
+	} {
+		if r := h.call("GET", path, ""); r.Code != 400 {
+			t.Fatal(path, r.Code, r.Body.String())
+		}
+	}
+}

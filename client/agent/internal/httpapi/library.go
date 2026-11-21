@@ -174,25 +174,27 @@ func (s *Server) libraryRoutes() {
 func (s *Server) follows(w http.ResponseWriter, r *http.Request) {
 	kind := r.URL.Query().Get("kind")
 	page, err := positivePage(r, "page")
+	limit, limitErr := boundedLimit(r, "limit")
 	q, queryErr := library.SearchQuery(kind, r.URL.Query().Get("q"))
 	order, owner := r.URL.Query().Get("sort"), r.URL.Query().Get("owner")
 	if owner != "" && queryErr == nil {
 		_, queryErr = library.Normalize("creator", owner)
 	}
-	if err != nil || queryErr != nil || len(q) > 300 || !library.ValidSort(order) || (kind != "" && kind != "creator" && kind != "video") {
-		apiError(w, 400, "invalid_input", "关注类型或页码无效。")
+	if err != nil || limitErr != nil || queryErr != nil || len(q) > 300 || !library.ValidSort(order) || (kind != "" && kind != "creator" && kind != "video") {
+		apiError(w, 400, "invalid_input", "关注类型、页码或每页数量无效。")
 		return
 	}
-	writeJSON(w, 200, s.library.ListCatalog(kind, q, page, r.URL.Query().Get("pending") == "1", order, owner))
+	writeJSON(w, 200, s.library.ListCatalog(kind, q, page, limit, r.URL.Query().Get("pending") == "1", order, owner))
 }
 
 // creatorVideos 只组合已有扫描结果和本地关注；获取/停止仍由显式扫描操作触发。
 func (s *Server) creatorVideos(w http.ResponseWriter, r *http.Request) {
 	id, err := library.Normalize("creator", r.PathValue("id"))
 	page, pageErr := positivePage(r, "page")
+	limit, limitErr := boundedLimit(r, "limit")
 	q, queryErr := library.SearchQuery("video", r.URL.Query().Get("q"))
 	order, scope := r.URL.Query().Get("sort"), r.URL.Query().Get("scope")
-	if err != nil || pageErr != nil || queryErr != nil || len(q) > 300 || !library.ValidSort(order) || (scope != "followed" && scope != "discovered") {
+	if err != nil || pageErr != nil || limitErr != nil || queryErr != nil || len(q) > 300 || !library.ValidSort(order) || (scope != "followed" && scope != "discovered") {
 		apiError(w, 400, "invalid_input", "UP 投稿查询条件无效。")
 		return
 	}
@@ -204,11 +206,22 @@ func (s *Server) creatorVideos(w http.ResponseWriter, r *http.Request) {
 	}
 	var data any
 	if scope == "followed" {
-		data = s.library.ListCatalog("video", q, page, false, order, id, result.Videos)
+		data = s.library.ListCatalog("video", q, page, limit, false, order, id, result.Videos)
 	} else {
-		data = s.library.ScanCatalog(result.Videos, id, q, order, page)
+		data = s.library.ScanCatalog(result.Videos, id, q, order, page, limit)
 	}
 	writeJSON(w, 200, map[string]any{"catalog": data, "job": result.Job, "configured": s.service.Config().Configured, "busy_elsewhere": elsewhere})
+}
+func boundedLimit(r *http.Request, name string) (int, error) {
+	raw := r.URL.Query().Get(name)
+	if raw == "" {
+		return 0, nil
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil || n < 12 || n > 48 {
+		return 0, strconv.ErrRange
+	}
+	return n, nil
 }
 func positivePage(r *http.Request, name string) (int, error) {
 	raw := r.URL.Query().Get(name)

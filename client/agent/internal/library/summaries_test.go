@@ -47,7 +47,7 @@ func TestPendingFollowsGetSummariesWithoutSubmittingTracking(t *testing.T) {
 	if err != nil || count != 2 || strings.Join(pages, ",") != "123,456" {
 		t.Fatal(count, pages, err)
 	}
-	for _, f := range s.ListCatalog("creator", "", 1, false, "popular", "").Items {
+	for _, f := range s.ListCatalog("creator", "", 1, 0, false, "popular", "").Items {
 		if f.Summary == nil || f.Summary.Name == f.ID || f.Summary.Metric == nil || *f.Summary.Growth != 59 || !f.Pending || f.Data != nil {
 			t.Fatal("summary must not depend on tracking or pretend to be a full detail", f)
 		}
@@ -56,7 +56,7 @@ func TestPendingFollowsGetSummariesWithoutSubmittingTracking(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := reopened.ListCatalog("creator", "已有资料", 1, false, "popular", ""); got.Total != 1 || got.Items[0].Summary.Metric == nil {
+	if got := reopened.ListCatalog("creator", "已有资料", 1, 0, false, "popular", ""); got.Total != 1 || got.Items[0].Summary.Metric == nil {
 		t.Fatal("summary lost after restart or name search failed", got)
 	}
 	_ = reopened.Configure("http://localhost:8182")
