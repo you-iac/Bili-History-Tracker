@@ -11,6 +11,7 @@ export function initCreatorVideos({api,notify,onAdd,onChanged,onSyncSummaries,im
   function controls(){
     const disabled=!connected||working;
     for(const el of $('creator-videos-panel').querySelectorAll('button,input,select'))el.disabled=disabled;
+    $('creator-videos-follow-page').disabled=disabled||loading||scope!=='discovered'||!result.items.some(item=>!item.followed);
     $('creator-videos-previous').disabled=disabled||loading||result.page<=1;
     $('creator-videos-next').disabled=disabled||loading||result.page*result.limit>=result.total;
     $('creator-scan-start').disabled=disabled||!configured||running()||elsewhere;
@@ -39,6 +40,10 @@ export function initCreatorVideos({api,notify,onAdd,onChanged,onSyncSummaries,im
     $('creator-videos-page').textContent=`第 ${page} / ${Math.max(1,Math.ceil(result.total/result.limit))} 页 · 共 ${result.total} 项`;
     const note=job?`${stateLabel(job.state)} · 已获取 ${job.count} / ${job.total??'未知'} 个可见投稿 · ${job.message}`:(elsewhere?'另一个 UP 的扫描正在进行，可在投稿发现中查看。':'获取这位 UP 的可见投稿，选择感兴趣的视频关注。');
     $('creator-scan-note').textContent=note+(scope==='discovered'?' · 此处只显示尚未本地关注的结果。':'');
+    const pending=scope==='discovered'?result.items.filter(item=>!item.followed):[];
+    const followPage=$('creator-videos-follow-page');
+    followPage.hidden=scope!=='discovered';
+    followPage.textContent=`关注本页（${pending.length}）`;
     if(sort==='hot')$('creator-scan-note').textContent+=' 最近热门使用近7日观测增量；新发现投稿暂无历史采样。';
     const nextStamp=JSON.stringify([scope,result.items]);
     if(force||stamp!==nextStamp){
@@ -68,12 +73,36 @@ export function initCreatorVideos({api,notify,onAdd,onChanged,onSyncSummaries,im
       if(uid===owner){scope='discovered';page=1;q='';$('creator-videos-query').value='';}
     });
   }
+  // 关注本页：前端串行调用单条关注接口，后端保持一次提交一个。
+  async function followPage(){
+    if(!connected||working||loading||scope!=='discovered')return;
+    const pending=result.items.filter(item=>!item.followed).map(item=>item.id);
+    if(!pending.length)return;
+    const owner=uid;working=true;controls();
+    const button=$('creator-videos-follow-page');
+    let done=0;const failed=[];
+    for(const id of pending){
+      if(uid!==owner)break;
+      try{await api('/api/follows',{method:'POST',body:JSON.stringify({kind:'video',id})});done++;}
+      catch(error){failed.push({id,message:error.message});}
+      button.textContent=`关注中 ${done}/${pending.length}`;
+      if(uid!==owner)break;
+      await new Promise(resolve=>setTimeout(resolve,100));
+    }
+    working=false;
+    controls();
+    try{await onChanged();}catch(error){notify(error.message,true);}
+    if(uid===owner)await load(true);
+    if(failed.length)notify(`已关注 ${done} 个，${failed.length} 个失败：${failed[0].message}`,true);
+    else if(done)notify(`已关注本页 ${done} 个视频。`,false);
+  }
   for(const value of ['followed','discovered'])$('creator-videos-'+value).addEventListener('click',()=>{scope=value;page=1;load(true);});
   $('creator-videos-sort').addEventListener('change',()=>{sort=$('creator-videos-sort').value;page=1;load(true);});
   $('creator-videos-search').addEventListener('submit',event=>{event.preventDefault();q=$('creator-videos-query').value.trim();page=1;load(true);});
   for(const [name,delta] of [['previous',-1],['next',1]])$('creator-videos-'+name).addEventListener('click',()=>{page+=delta;load(true);});
   $('creator-scan-start').addEventListener('click',()=>start());$('creator-scan-resume').addEventListener('click',()=>start(true));
   $('creator-scan-cancel').addEventListener('click',()=>act(()=>api('/api/scan/cancel',{method:'POST',body:'{}'})));
+  $('creator-videos-follow-page').addEventListener('click',followPage);
   function density(value){$('creator-videos-size').value=value;$('creator-videos-rows').dataset.size=value;}
   let size='standard';try{const saved=localStorage.getItem('bht.card-size');if(['compact','standard','large'].includes(saved))size=saved;}catch{}density(size);
   $('creator-videos-size').addEventListener('change',()=>{const value=$('creator-videos-size').value;density(value);try{localStorage.setItem('bht.card-size',value);}catch{}window.dispatchEvent(new CustomEvent('bht-density',{detail:value}));});
