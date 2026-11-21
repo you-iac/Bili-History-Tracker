@@ -1,4 +1,39 @@
 /* catalog.css 管理按密度分层的卡片、左右详情和真实趋势。见 docs/client-catalog.md。 */
+/* 观看历史使用独立信息层级，避免库卡片的密度规则隐藏观看时间。 */
+.history-toolbar{padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
+.history-sync-status{display:flex;align-items:center;gap:12px;flex-wrap:wrap;min-height:47px;color:#7489a9;font-size:12px;line-height:1.8}
+.history-sync-status p{margin:10px 0}.history-sync-status .history-error{color:#b27543}
+.history-context{font-size:12px;color:#8796ac;line-height:1.8;margin:0 0 16px}
+.entity-card.watch-history-card{padding:var(--card-pad);gap:14px}
+.history-cover-link{display:block;border-radius:9px;overflow:hidden}
+.history-cover{display:grid;place-items:center;aspect-ratio:16/9;background:linear-gradient(125deg,#edf1fc,#eaf5ff);color:#829dcc;font-size:38px;border-radius:9px}
+.history-info{min-width:0}.history-title{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;font-size:15px;line-height:1.65;font-weight:600;color:#263e60;min-height:3.3em}
+.history-title:hover{color:var(--blue);text-decoration:none}.history-author,.history-id{display:block;font-size:12px;color:#7c90b2;margin-top:9px;overflow-wrap:anywhere}
+.history-meta{font-size:11px;color:#8b9bb4;margin:9px 0}.history-time{font-size:11px;color:#7e90ad;line-height:1.8;display:block}
+.history-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:12px;border-top:1px solid var(--line);margin-top:auto}
+.history-actions .button{min-height:32px;padding:7px 11px}.history-actions .text-button{font-size:12px}
+.entity-card.watch-history-creator{display:grid;grid-template-columns:54px minmax(0,1fr);column-gap:15px;align-content:start}
+.watch-history-creator .history-title{min-height:0}.history-avatar-link{align-self:start}.history-avatar{width:54px;height:54px}
+.watch-history-creator .history-actions{grid-column:1/-1;margin-top:0}.watch-history-creator .history-meta{color:#5c7ba9;margin-top:14px}
+.history-empty{grid-column:1/-1;display:grid;justify-items:center;gap:14px;padding:60px 22px;background:white;border:1px solid var(--line);border-radius:12px;text-align:center;color:#7c8fae}
+.history-empty-icon{font-size:32px;color:#89a3d5}.history-empty p{font-size:12px;margin:0;line-height:1.9}.history-empty strong{font-size:14px;font-weight:500}
+.history-toolbar .button[aria-pressed=true]{color:#3568e9;border-color:#b8ccf7;background:#edf3ff}
+/* 共用 entity-grid 的列宽和数量；历史卡片保留自己的 DOM 与观看信息。 */
+#history-rows .watch-history-card{padding:var(--card-pad)}
+#history-rows[data-size=compact] .watch-history-card{display:grid;grid-template-columns:42px minmax(0,1fr);gap:10px 12px;align-content:start}
+#history-rows[data-size=compact] .history-cover-link,#history-rows[data-size=compact] .history-avatar-link{grid-column:1;grid-row:1;align-self:start}
+#history-rows[data-size=compact] .history-cover,#history-rows[data-size=compact] .history-avatar{width:42px;height:42px;aspect-ratio:1;font-size:21px}
+#history-rows[data-size=compact] .history-info{grid-column:2;grid-row:1}
+#history-rows[data-size=compact] .history-title{font-size:13px;min-height:0;line-height:1.5}
+#history-rows[data-size=compact] .history-author,#history-rows[data-size=compact] .history-id{font-size:10px;margin-top:4px}
+#history-rows[data-size=compact] .history-time{font-size:10px;margin-top:5px}
+#history-rows[data-size=compact] .watch-history-card:not(.watch-history-creator) .history-meta{display:none}
+#history-rows[data-size=compact] .watch-history-creator .history-meta{margin:6px 0;font-size:11px}
+#history-rows[data-size=compact] .history-actions{grid-column:1/-1;margin-top:0;padding-top:9px}
+#history-rows[data-size=large] .history-title{font-size:17px}
+#history-rows[data-size=large] .watch-history-creator{grid-template-columns:88px minmax(0,1fr)}
+#history-rows[data-size=large] .history-avatar{width:88px;height:88px;font-size:37px}
+@media(max-width:700px){.history-toolbar{padding:12px}.history-toolbar .toolbar-actions{width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.history-toolbar .density-picker{display:grid;gap:6px;min-width:0}.history-toolbar .density-picker select{width:100%;min-width:0}.history-toolbar .button{width:100%}.history-context{font-size:11px}.history-sync-status{font-size:11px;gap:8px}.watch-history-rows{gap:14px}.entity-card.watch-history-creator{padding:18px}.history-title{font-size:14px}}
 .library-card{padding:0;background:transparent;border:0;box-shadow:none}
 .library-toolbar{padding:17px 20px;background:#fff;border:1px solid var(--line);border-radius:12px;flex-wrap:wrap}
 .toolbar-actions{align-items:center;flex-wrap:wrap}

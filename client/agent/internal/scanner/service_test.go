@@ -15,9 +15,10 @@ import (
 )
 
 type memoryStore struct {
-	cookie string
-	scan   []byte
-	fail   bool
+	cookie  string
+	scan    []byte
+	history []byte
+	fail    bool
 }
 
 func (m *memoryStore) LoadCookie() (string, error) { return m.cookie, nil }
@@ -44,9 +45,26 @@ func (m *memoryStore) SaveScan(value any) error {
 	return err
 }
 
+func (m *memoryStore) LoadHistory(target any) error {
+	if len(m.history) == 0 {
+		return nil
+	}
+	return json.Unmarshal(m.history, target)
+}
+
+func (m *memoryStore) SaveHistory(value any) error {
+	if m.fail {
+		return errors.New("disk")
+	}
+	data, err := json.Marshal(value)
+	m.history = data
+	return err
+}
+
 type fakeAPI struct {
-	login func(context.Context, string) (bilibili.Account, bilibili.Keys, error)
-	page  func(context.Context, int) (bilibili.Page, error)
+	login   func(context.Context, string) (bilibili.Account, bilibili.Keys, error)
+	page    func(context.Context, int) (bilibili.Page, error)
+	history func(context.Context, string, int64, int64, bilibili.Keys) (bilibili.HistoryPage, error)
 }
 
 func (f *fakeAPI) Login(ctx context.Context, cookie string) (bilibili.Account, bilibili.Keys, error) {
@@ -57,6 +75,13 @@ func (f *fakeAPI) Login(ctx context.Context, cookie string) (bilibili.Account, b
 }
 func (f *fakeAPI) Videos(ctx context.Context, _, _ string, page int, _ bilibili.Keys) (bilibili.Page, error) {
 	return f.page(ctx, page)
+}
+
+func (f *fakeAPI) History(ctx context.Context, cookie string, max, viewAt int64, keys bilibili.Keys) (bilibili.HistoryPage, error) {
+	if f.history != nil {
+		return f.history(ctx, cookie, max, viewAt, keys)
+	}
+	return bilibili.HistoryPage{}, nil
 }
 func page(total, pn int) bilibili.Page {
 	result := bilibili.Page{Total: total, Videos: []bilibili.Video{}}

@@ -1,4 +1,7 @@
 // view.mjs 集中处理状态和日期显示，真实数量缺失时保留未知，不推算成完整结果。
+// 库与观看历史共用密度对应的分页数量，避免两处设置漂移。
+export const cardPageLimits=Object.freeze({compact:30,standard:20,large:12});
+
 export function stateLabel(state) {
   return ({running:'扫描中',cancelling:'正在停止',complete:'扫描完成',partial:'部分结果',cancelled:'已停止',interrupted:'待继续'})[state] || '等待开始';
 }
@@ -23,7 +26,7 @@ export function routeForHash(hash) {
   const kind = section === 'creators' ? 'creator' : section === 'videos' ? 'video' : '';
   const validID = kind === 'creator' ? /^[1-9]\d{0,19}$/.test(id||'') : /^BV[1-9A-HJ-NP-Za-km-z]{10}$/.test(id||'');
   if(kind&&id&&validID&&!rest.length) return {view:'detail',kind,id,scope,section,hash:`#${section}/${id}${scope?'?scope=public':''}`};
-  if(!id&&!rest.length&&['overview','creators','videos','discovery','settings'].includes(section)) return {view:section,kind,scope,section,hash:`#${section}${kind&&scope?'?scope=public':''}`};
+  if(!id&&!rest.length&&['overview','creators','videos','discovery','settings','history'].includes(section)) return {view:section,kind,scope,section,hash:`#${section}${kind&&scope?'?scope=public':''}`};
   return {view:'overview',kind:'',scope:'',section:'overview',hash:'#overview'};
 }
 export function viewForHash(hash) {return routeForHash(hash).view;}

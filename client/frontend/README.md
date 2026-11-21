@@ -7,6 +7,7 @@
 - [index.html](index.html) 与 [app.css](app.css)：账号配置、扫描进度、结果列表和响应式布局，不提供尚未实现功能的入口。
 - [app.js](app.js)：同源会话交换、Cookie 提交与清除、扫描轮询、取消/继续、分页和导出；敏感值不写入浏览器存储。
 - [navigation.js](navigation.js)：白名单路由、侧栏与移动导航；页面切换不终止后台任务。
+- [history.js](history.js)：本地观看历史、会话就绪后的自动同步、视频/UP 主详情入口、未关注筛选和显式关注，卡片大小与库共用偏好及 30/20/12 项分页；状态并发测试见 [history.test.mjs](history.test.mjs)，行为与边界见 [目录说明](../../docs/client-catalog.md#观看历史)。
 - [library.js](library.js)：总览、公开库搜索、自动关注、设置与分页总览；详情使用独立路由；文本使用 `textContent`，所有远程请求经 Agent。
 - [cards.js](cards.js)、[catalog.css](catalog.css)：响应式卡片与三档内容密度。
 - [creator-videos.js](creator-videos.js)：详情内已关注/未关注投稿，搜索、排序、扫描与关注操作。

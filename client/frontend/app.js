@@ -1,6 +1,7 @@
 // app.js 只向同源 Agent 发起请求；Cookie 和连接密钥不写入浏览器存储。
 import {stateLabel, progress, publishedAt, rangeLabel} from './view.mjs';
 import {initLibrary} from './library.js';
+import {initHistory} from './history.js';
 import {initNavigation} from './navigation.js';
 
 const $ = id => document.getElementById(id);
@@ -21,7 +22,7 @@ function connection(text, isOnline) {
 async function request(path, options = {}) {
   const method = options.method || 'GET';
   let response;
-  const timeout = path.startsWith('/api/follows') || path.startsWith('/api/library/') ? 100000 : 25000;
+  const timeout = path.startsWith('/api/follows') || path.startsWith('/api/library/') || path === '/api/history/sync' ? 100000 : 25000;
   try {
     response = await fetch(path, {credentials:'same-origin',cache:'no-store',signal:AbortSignal.timeout(timeout),...options,
       headers:{...(method === 'GET' ? {} : {'Content-Type':'application/json','X-CSRF-Token':csrf}),...options.headers}});
@@ -42,9 +43,14 @@ async function request(path, options = {}) {
 async function api(path, options) { return (await request(path, options)).json(); }
 let navigation;
 const libraryUI = initLibrary({api,notify,navigate:view=>navigation.navigate(view),onScan:id => {navigation.navigate('discovery');$('creator-input').value=id;setTimeout(()=>$('creator-input').focus(),0);}});
-navigation=initNavigation((view,route)=>libraryUI.show(view,route).catch(error=>notify(error.message,true)));
+const historyUI = initHistory({api,notify});
+navigation=initNavigation((view,route)=>{
+  libraryUI.show(view,route).catch(error=>notify(error.message,true));
+  if(view==='history')void historyUI.show();else historyUI.leave();
+});
 function buttons() {
 	libraryUI.setConnected(connected && online);
+  historyUI.setConnected(connected && online,config?.configured);
   const usable = connected && online && !busyAction;
   const running = job?.state === 'running' || job?.state === 'cancelling';
   $('scan-nav-badge').hidden = !running;

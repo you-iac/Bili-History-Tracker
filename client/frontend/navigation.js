@@ -6,6 +6,7 @@ const titles = {
   creators:['UP 主库','管理关注的创作者，发现服务器已记录的 UP。'],
   videos:['视频库','整理个人关注的视频，查看播放变化与历史版本。'],
   discovery:['投稿发现','按需获取可见投稿，选择你希望持续跟踪的视频。'],
+  history:['观看历史','从 B站观看记录中选择要关注的视频与 UP 主。'],
   settings:['设置','管理连接、工作目录与本地登录状态。']
 };
 export function initNavigation(onChange) {
@@ -22,7 +23,7 @@ export function initNavigation(onChange) {
     document.querySelectorAll('[data-page]').forEach(el => {el.hidden = el.dataset.page !== (view === 'creators' || view === 'videos' ? 'library' : view);});
     document.querySelectorAll('[data-view]').forEach(el => {if(el.dataset.view === route.section)el.setAttribute('aria-current','page');else el.removeAttribute('aria-current');});
     const title=view==='detail'?[route.kind==='creator'?'UP 主详情':'视频详情','查看真实日采样与观测到的内容变化。']:titles[view];
-    document.querySelector('.page-heading').hidden = ['creators','videos','detail'].includes(view);
+    document.querySelector('.page-heading').hidden = ['creators','videos','detail','history'].includes(view);
     document.getElementById('page-title').textContent = title[0];
     document.getElementById('page-subtitle').textContent = title[1];
     document.getElementById('breadcrumb-current').textContent = title[0];
