@@ -11,7 +11,7 @@ export function initCreatorVideos({api,notify,onAdd,onChanged,onSyncSummaries,im
   function controls(){
     const disabled=!connected||working;
     for(const el of $('creator-videos-panel').querySelectorAll('button,input,select'))el.disabled=disabled;
-    $('creator-videos-follow-page').disabled=disabled||scope!=='discovered'||!result.items.some(item=>!item.followed);
+    $('creator-videos-follow-page').disabled=disabled||loading||scope!=='discovered'||!result.items.some(item=>!item.followed);
     $('creator-videos-previous').disabled=disabled||loading||result.page<=1;
     $('creator-videos-next').disabled=disabled||loading||result.page*result.limit>=result.total;
     $('creator-scan-start').disabled=disabled||!configured||running()||elsewhere;
@@ -75,7 +75,7 @@ export function initCreatorVideos({api,notify,onAdd,onChanged,onSyncSummaries,im
   }
   // 关注本页：前端串行调用单条关注接口，后端保持一次提交一个。
   async function followPage(){
-    if(!connected||working||scope!=='discovered')return;
+    if(!connected||working||loading||scope!=='discovered')return;
     const pending=result.items.filter(item=>!item.followed).map(item=>item.id);
     if(!pending.length)return;
     const owner=uid;working=true;controls();
