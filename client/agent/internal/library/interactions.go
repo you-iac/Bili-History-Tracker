@@ -143,21 +143,41 @@ func (s *Service) runInteractionsOnce(ctx context.Context, force bool) error {
 	if _, err := s.interactions.CheckInteractions(ctx, 60); err != nil {
 		return err
 	}
-	s.autoFollowInteractions(ctx, cfg)
+	// 关注阶段重新读取配置：同步/查询期间关闭开关或取消来源后不再继续提交。
+	cfg = s.InteractionSettings()
+	if !cfg.Enabled && !force {
+		return nil
+	}
+	s.autoFollowInteractions(ctx, force)
 	return nil
 }
 
 // autoFollowInteractions 遍历最近 30 天的历史页，只关注有指定互动且尚未关注的视频，单轮有上限。
-func (s *Service) autoFollowInteractions(ctx context.Context, cfg InteractionConfig) {
+// 每页和每个候选关注前重新读取配置，设置变更后本轮立即停止；force 只绕过 Enabled，来源仍取最新值。
+func (s *Service) autoFollowInteractions(ctx context.Context, force bool) {
 	count := 0
-	for page := 1; count < cfg.MaxAutoFollow && ctx.Err() == nil; page++ {
+	for page := 1; ctx.Err() == nil; page++ {
+		cfg := s.InteractionSettings()
+		if !cfg.Enabled && !force {
+			return
+		}
+		if count >= cfg.MaxAutoFollow {
+			return
+		}
 		data := s.interactions.HistoryVideosFiltered(30, page, 48, nil)
 		if len(data.Items) == 0 {
 			break
 		}
 		for _, item := range data.Items {
-			if count >= cfg.MaxAutoFollow || ctx.Err() != nil {
-				break
+			if ctx.Err() != nil {
+				return
+			}
+			cfg = s.InteractionSettings()
+			if !cfg.Enabled && !force {
+				return
+			}
+			if count >= cfg.MaxAutoFollow {
+				return
 			}
 			if !interactionHit(item.HistoryItem, cfg.Sources) || s.isFollowed("video", item.BVID) {
 				continue

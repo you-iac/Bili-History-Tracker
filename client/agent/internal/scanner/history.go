@@ -368,6 +368,9 @@ func (s *Service) CheckInteractions(ctx context.Context, limit int) (Interaction
 		if attempted >= limit {
 			break
 		}
+		if ctx.Err() != nil {
+			break
+		}
 		latest := candidate.indexes[0]
 		for _, index := range candidate.indexes {
 			if state.Items[index].ViewedAt > state.Items[latest].ViewedAt {
@@ -390,6 +393,10 @@ func (s *Service) CheckInteractions(ctx context.Context, limit int) (Interaction
 		attempted++
 		relation, err := s.api.ArchiveRelation(ctx, cookie, candidate.bvid, keys)
 		if err != nil {
+			// 取消或超时不是平台失败，不累计未完成查询的退避。
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || ctx.Err() != nil {
+				return result, ctx.Err()
+			}
 			result.Failed++
 			for _, index := range candidate.indexes {
 				state.Items[index].InteractionFailures++
