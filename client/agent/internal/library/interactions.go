@@ -102,7 +102,7 @@ func (s *Service) RunInteractions(ctx context.Context) {
 		case <-s.interactionWake:
 		case <-timer.C:
 		}
-		s.runInteractionsOnce(ctx)
+		s.runInteractionsOnce(ctx, false)
 		if !timer.Stop() {
 			select {
 			case <-timer.C:
@@ -115,7 +115,7 @@ func (s *Service) RunInteractions(ctx context.Context) {
 
 // RunInteractionsOnce 手动执行一轮；不检查 Enabled，供设置页立即触发。
 func (s *Service) RunInteractionsOnce(ctx context.Context) {
-	s.runInteractionsOnce(ctx)
+	s.runInteractionsOnce(ctx, true)
 }
 
 func (s *Service) interactionInterval() time.Duration {
@@ -126,9 +126,9 @@ func (s *Service) interactionInterval() time.Duration {
 	return time.Duration(cfg.IntervalMinutes) * time.Minute
 }
 
-func (s *Service) runInteractionsOnce(ctx context.Context) {
+func (s *Service) runInteractionsOnce(ctx context.Context, force bool) {
 	cfg := s.InteractionSettings()
-	if !cfg.Enabled || s.interactions == nil || ctx.Err() != nil {
+	if (!cfg.Enabled && !force) || s.interactions == nil || ctx.Err() != nil {
 		return
 	}
 	if _, err := s.interactions.HistorySync(ctx); err != nil {
