@@ -303,14 +303,22 @@ func (s *Service) HistoryCreatorsFiltered(days, page, limit int, include func(st
 
 const historyInteractionBudget = 60
 
-// InteractionResult 描述一轮互动查询；FavoriteFailed 表示收藏集合本次不可用。
+// InteractionResult 描述一轮互动查询。
 type InteractionResult struct {
-	Checked        int  `json:"checked"`
-	Liked          int  `json:"liked"`
-	Coined         int  `json:"coined"`
-	Favorited      int  `json:"favorited"`
-	Failed         int  `json:"failed"`
-	FavoriteFailed bool `json:"favorite_failed"`
+	Checked   int `json:"checked"`
+	Liked     int `json:"liked"`
+	Coined    int `json:"coined"`
+	Favorited int `json:"favorited"`
+	Failed    int `json:"failed"`
+}
+
+// HistoryBusy 返回历史同步或互动检查是否正在进行；手动入口用它避免长时间等待。
+func (s *Service) HistoryBusy() bool {
+	if s.historyMu.TryLock() {
+		s.historyMu.Unlock()
+		return false
+	}
+	return true
 }
 
 // CheckInteractions 按 interaction_checked_at 最旧优先，补查最多 limit 条历史视频的互动状态。
