@@ -377,6 +377,16 @@ func (s *Service) CheckInteractions(ctx context.Context, limit int) (Interaction
 		if state.Items[latest].InteractionNextAttempt > now {
 			continue
 		}
+		// 最近 3 天每 6 小时重查，3-30 天每 24 小时重查；首次查询不受限。
+		if checked := state.Items[latest].InteractionCheckedAt; checked > 0 {
+			ttl := int64(24 * 3600)
+			if now-state.Items[latest].ViewedAt <= 3*24*3600 {
+				ttl = 6 * 3600
+			}
+			if now-checked < ttl {
+				continue
+			}
+		}
 		like, err := s.api.HasLike(ctx, cookie, candidate.bvid, keys)
 		if err != nil {
 			result.Failed++

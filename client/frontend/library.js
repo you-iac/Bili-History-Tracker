@@ -140,7 +140,15 @@ export function initLibrary({api,notify,onScan,navigate}) {
   async function settings() {
     const data=await api('/api/settings');$('data-directory').value=data.data_directory;$('directory-current').textContent=data.data_directory;
     $('directory-bytes').textContent=`${(data.state_bytes/1024).toLocaleString('zh-CN',{maximumFractionDigits:1})} KB`;
+    const cfg=await api('/api/interactions').catch(()=>null);
+    if(cfg){$('interactions-enabled').checked=cfg.enabled;$('interactions-like').checked=cfg.sources.includes('like');$('interactions-coin').checked=cfg.sources.includes('coin');$('interactions-favorite').checked=cfg.sources.includes('favorite');$('interactions-interval').value=String(cfg.interval_minutes);$('interactions-max').value=String(cfg.max_auto_follow);$('interactions-badge').textContent=cfg.enabled?'已开启':'未开启';}
   }
+  $('interactions-form').addEventListener('submit',event=>{event.preventDefault();run(async()=>{
+    const sources=[];for(const [id,name] of [['interactions-like','like'],['interactions-coin','coin'],['interactions-favorite','favorite']])if($(id).checked)sources.push(name);
+    const cfg={enabled:$('interactions-enabled').checked,sources,interval_minutes:Number($('interactions-interval').value),max_auto_follow:Number($('interactions-max').value)};
+    await api('/api/interactions',{method:'PUT',body:JSON.stringify(cfg)});notify('互动自动关注设置已保存。');await settings();
+  });});
+  $('interactions-run').addEventListener('click',()=>run(async()=>{await api('/api/interactions/run',{method:'POST',body:'{}'});notify('已执行一轮互动检查。');}));
   $('server-form').addEventListener('submit',event=>{event.preventDefault();run(async()=>{
     const data=await api('/api/remote/connection',{method:'PUT',body:JSON.stringify({server_url:$('server-url').value.trim()})});
     server=data.server_url;summaryEpoch++;summaryReads.clear();summaryNotes.clear();$('server-url').value=server;$('server-note').textContent=server?`已保存 ${server}，待提交关注会自动申请跟踪。`:'未配置服务器，本地关注仍可保存。';
