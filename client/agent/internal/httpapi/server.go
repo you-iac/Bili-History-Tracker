@@ -50,6 +50,8 @@ func New(service *scanner.Service, address string, collection *library.Service, 
 	}
 	s := &Server{service: service, library: collection, store: store, address: address, bootstrap: token, sessions: map[string]session{}, mux: http.NewServeMux()}
 	s.libraryRoutes()
+	s.historyRoutes()
+	s.interactionRoutes()
 	s.mux.HandleFunc("POST /api/session", s.connect)
 	s.mux.HandleFunc("GET /api/session", func(w http.ResponseWriter, r *http.Request) {
 		current, _ := s.session(r)

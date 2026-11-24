@@ -55,7 +55,7 @@ browser -- HTTPS image URL --> Bilibili image CDN
 - [remote/image.go](../client/agent/internal/remote/image.go)：快照图片字段与URL规范化；[测试](../client/agent/internal/remote/image_test.go) 覆盖域名、协议与凭据边界。
 - [library/images.go](../client/agent/internal/library/images.go)：持久地址索引、并发、去重、退避与切服隔离；[测试](../client/agent/internal/library/images_test.go) 覆盖版本、重启、并发去重及错误。
 - [httpapi/library.go](../client/agent/internal/httpapi/library.go)：受保护的图片地址API；[测试](../client/agent/internal/httpapi/images_test.go) 验证认证、参数及CSP。
-- [images.js](../client/frontend/images.js)：可见区域加载、请求合并及图片失败占位，供 [cards.js](../client/frontend/cards.js)、[detail.js](../client/frontend/detail.js)、[library.js](../client/frontend/library.js) 使用；[前端测试](../client/frontend/images.test.mjs) 验证地址与快照提取。
+- [images.js](../client/frontend/images.js)：可见区域加载、请求合并及图片失败占位，供 [cards.js](../client/frontend/cards.js)、[detail.js](../client/frontend/detail.js)、[library.js](../client/frontend/library.js)、[history.js](../client/frontend/history.js) 使用；历史 UP 缺少缓存头像时按需补取当前地址。[地址测试](../client/frontend/images.test.mjs) 验证地址与快照提取，[历史页测试](../client/frontend/history.test.mjs) 验证可见触发、4 并发和失败占位。
 - [启动测试](../client/agent/cmd/agent/startup_test.go) 使用替代浏览器启动器验证真实监听、会话交换、禁用与失败回退，避免测试弹出桌面窗口。Go测试/vet、Windows构建及Linux/macOS交叉构建通过。
 - Edge真实Agent联调使用本地模拟8182/CDN，覆盖自动会话、密钥片段移除、头像/封面在各页面显示、缓存重启、离线地址复用、404/非法来源占位、4并发、无Cookie/Referer泄漏及390像素布局；原卡片/详情与135条扫描回归通过。未使用真实Cookie，不表示已部署远端。
 

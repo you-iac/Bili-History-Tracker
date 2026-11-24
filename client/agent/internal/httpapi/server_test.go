@@ -30,6 +30,21 @@ func (platformStub) Videos(_ context.Context, _, _ string, pn int, _ bilibili.Ke
 	}
 	return r, nil
 }
+func (platformStub) History(context.Context, string, int64, int64, bilibili.Keys) (bilibili.HistoryPage, error) {
+	return bilibili.HistoryPage{}, nil
+}
+func (platformStub) HasLike(context.Context, string, string, bilibili.Keys) (bool, error) {
+	return false, nil
+}
+func (platformStub) Coins(context.Context, string, string, bilibili.Keys) (int, error) {
+	return 0, nil
+}
+func (platformStub) FavoriteSet(context.Context, string, int64, bilibili.Keys) (map[string]bool, error) {
+	return map[string]bool{}, nil
+}
+func (platformStub) ArchiveRelation(context.Context, string, string, bilibili.Keys) (bilibili.Relation, error) {
+	return bilibili.Relation{}, nil
+}
 
 type harness struct {
 	s       *Server
@@ -39,12 +54,16 @@ type harness struct {
 }
 
 func setup(t *testing.T) *harness {
+	return setupWithPlatform(t, platformStub{})
+}
+
+func setupWithPlatform(t *testing.T, platform scanner.Platform) *harness {
 	t.Helper()
 	store, err := localstate.New(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
-	service, err := scanner.New(platformStub{}, store, 0)
+	service, err := scanner.New(platform, store, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -179,10 +198,13 @@ func TestCookieToFullScanAndExport(t *testing.T) {
 }
 func TestStaticAssetsAndInvalidInputs(t *testing.T) {
 	h := setup(t)
-	for _, path := range []string{"/", "/app.css", "/app.js", "/view.mjs", "/favicon.svg"} {
+	for _, path := range []string{"/", "/app.css", "/catalog.css", "/app.js", "/history.js", "/images.js", "/view.mjs", "/favicon.svg"} {
 		r := h.call("GET", path, "")
 		if r.Code != 200 || r.Header().Get("Content-Security-Policy") == "" {
 			t.Fatal(path, r.Code)
+		}
+		if (strings.HasSuffix(path, ".js") || strings.HasSuffix(path, ".mjs")) && !strings.HasPrefix(r.Header().Get("Content-Type"), "text/javascript") {
+			t.Fatal(path, "invalid JavaScript MIME", r.Header().Get("Content-Type"))
 		}
 	}
 	if r := h.call("GET", "/assets.go", ""); r.Code != 404 {

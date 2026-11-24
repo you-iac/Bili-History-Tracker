@@ -15,9 +15,10 @@ import (
 )
 
 type memoryStore struct {
-	cookie string
-	scan   []byte
-	fail   bool
+	cookie  string
+	scan    []byte
+	history []byte
+	fail    bool
 }
 
 func (m *memoryStore) LoadCookie() (string, error) { return m.cookie, nil }
@@ -44,9 +45,30 @@ func (m *memoryStore) SaveScan(value any) error {
 	return err
 }
 
+func (m *memoryStore) LoadHistory(target any) error {
+	if len(m.history) == 0 {
+		return nil
+	}
+	return json.Unmarshal(m.history, target)
+}
+
+func (m *memoryStore) SaveHistory(value any) error {
+	if m.fail {
+		return errors.New("disk")
+	}
+	data, err := json.Marshal(value)
+	m.history = data
+	return err
+}
+
 type fakeAPI struct {
-	login func(context.Context, string) (bilibili.Account, bilibili.Keys, error)
-	page  func(context.Context, int) (bilibili.Page, error)
+	login    func(context.Context, string) (bilibili.Account, bilibili.Keys, error)
+	page     func(context.Context, int) (bilibili.Page, error)
+	history  func(context.Context, string, int64, int64, bilibili.Keys) (bilibili.HistoryPage, error)
+	like     func(context.Context, string, string, bilibili.Keys) (bool, error)
+	coin     func(context.Context, string, string, bilibili.Keys) (int, error)
+	favorite func(context.Context, string, int64, bilibili.Keys) (map[string]bool, error)
+	relation func(context.Context, string, string, bilibili.Keys) (bilibili.Relation, error)
 }
 
 func (f *fakeAPI) Login(ctx context.Context, cookie string) (bilibili.Account, bilibili.Keys, error) {
@@ -57,6 +79,41 @@ func (f *fakeAPI) Login(ctx context.Context, cookie string) (bilibili.Account, b
 }
 func (f *fakeAPI) Videos(ctx context.Context, _, _ string, page int, _ bilibili.Keys) (bilibili.Page, error) {
 	return f.page(ctx, page)
+}
+
+func (f *fakeAPI) History(ctx context.Context, cookie string, max, viewAt int64, keys bilibili.Keys) (bilibili.HistoryPage, error) {
+	if f.history != nil {
+		return f.history(ctx, cookie, max, viewAt, keys)
+	}
+	return bilibili.HistoryPage{}, nil
+}
+
+func (f *fakeAPI) HasLike(ctx context.Context, cookie, bvid string, keys bilibili.Keys) (bool, error) {
+	if f.like != nil {
+		return f.like(ctx, cookie, bvid, keys)
+	}
+	return false, nil
+}
+
+func (f *fakeAPI) Coins(ctx context.Context, cookie, bvid string, keys bilibili.Keys) (int, error) {
+	if f.coin != nil {
+		return f.coin(ctx, cookie, bvid, keys)
+	}
+	return 0, nil
+}
+
+func (f *fakeAPI) FavoriteSet(ctx context.Context, cookie string, mid int64, keys bilibili.Keys) (map[string]bool, error) {
+	if f.favorite != nil {
+		return f.favorite(ctx, cookie, mid, keys)
+	}
+	return map[string]bool{}, nil
+}
+
+func (f *fakeAPI) ArchiveRelation(ctx context.Context, cookie, bvid string, keys bilibili.Keys) (bilibili.Relation, error) {
+	if f.relation != nil {
+		return f.relation(ctx, cookie, bvid, keys)
+	}
+	return bilibili.Relation{}, nil
 }
 func page(total, pn int) bilibili.Page {
 	result := bilibili.Page{Total: total, Videos: []bilibili.Video{}}

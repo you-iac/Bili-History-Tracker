@@ -1,5 +1,5 @@
 // library.js 编排公开总览、本地库/公开搜索、自动关注与设置；业务请求经本地Agent，图片直连白名单CDN。
-import {detailHref,routeForHash} from './view.mjs';
+import {detailHref,routeForHash,cardPageLimits} from './view.mjs';
 import {renderCards} from './cards.js';
 import {initDetail} from './detail.js';
 import {initImages} from './images.js';
@@ -8,7 +8,6 @@ export function initLibrary({api,notify,onScan,navigate}) {
   const $ = id => document.getElementById(id);
   const images=initImages({api});
   const views = {creator:{page:1,q:'',scope:'local',pending:false,sort:'published'},video:{page:1,q:'',scope:'local',pending:false,sort:'published'}};
-  const pageLimits={compact:30,standard:20,large:12};
   let usable=false,agentOnline=false,ready=false,busy=false,server='',kind='creator',current='overview',result={items:[],page:1,total:0,limit:20};
   let lastLocalLoad=0;
   const summaryJobs=new Map(),summaryReads=new Map(),summaryNotes=new Map();
@@ -105,7 +104,7 @@ export function initLibrary({api,notify,onScan,navigate}) {
     if(current===(requestedKind==='creator'?'creators':'videos')){const hash=`#${current}${publicMode?'?scope=public':''}`;history.replaceState(null,'',location.pathname+location.search+hash);currentRoute=routeForHash(hash);}
     context();$('library-loading').hidden=false;
     const query=new URLSearchParams({kind:requestedKind,q:state.q,page:String(state.page),sort:state.sort});
-    if(!publicMode)query.set('limit',String(pageLimits[size]||20));
+    if(!publicMode)query.set('limit',String(cardPageLimits[size]||20));
     if(state.pending&&!publicMode)query.set('pending','1');
     try {
       if(publicMode&&!server)throw new Error('请先在设置中配置服务器地址。');
@@ -141,7 +140,15 @@ export function initLibrary({api,notify,onScan,navigate}) {
   async function settings() {
     const data=await api('/api/settings');$('data-directory').value=data.data_directory;$('directory-current').textContent=data.data_directory;
     $('directory-bytes').textContent=`${(data.state_bytes/1024).toLocaleString('zh-CN',{maximumFractionDigits:1})} KB`;
+    const cfg=await api('/api/interactions').catch(()=>null);
+    if(cfg){$('interactions-enabled').checked=cfg.enabled;$('interactions-like').checked=cfg.sources.includes('like');$('interactions-coin').checked=cfg.sources.includes('coin');$('interactions-favorite').checked=cfg.sources.includes('favorite');$('interactions-interval').value=String(cfg.interval_minutes);$('interactions-max').value=String(cfg.max_auto_follow);$('interactions-badge').textContent=cfg.enabled?'已开启':'未开启';}
   }
+  $('interactions-form').addEventListener('submit',event=>{event.preventDefault();run(async()=>{
+    const sources=[];for(const [id,name] of [['interactions-like','like'],['interactions-coin','coin'],['interactions-favorite','favorite']])if($(id).checked)sources.push(name);
+    const cfg={enabled:$('interactions-enabled').checked,sources,interval_minutes:Number($('interactions-interval').value),max_auto_follow:Number($('interactions-max').value)};
+    await api('/api/interactions',{method:'PUT',body:JSON.stringify(cfg)});notify('互动自动关注设置已保存。');await settings();
+  });});
+  $('interactions-run').addEventListener('click',()=>run(async()=>{await api('/api/interactions/run',{method:'POST',body:'{}'});notify('已执行一轮互动检查。');}));
   $('server-form').addEventListener('submit',event=>{event.preventDefault();run(async()=>{
     const data=await api('/api/remote/connection',{method:'PUT',body:JSON.stringify({server_url:$('server-url').value.trim()})});
     server=data.server_url;summaryEpoch++;summaryReads.clear();summaryNotes.clear();$('server-url').value=server;$('server-note').textContent=server?`已保存 ${server}，待提交关注会自动申请跟踪。`:'未配置服务器，本地关注仍可保存。';
