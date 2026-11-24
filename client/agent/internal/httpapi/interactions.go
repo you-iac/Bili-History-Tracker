@@ -14,7 +14,10 @@ func (s *Server) interactionRoutes() {
 	})
 	s.mux.HandleFunc("PUT /api/interactions", s.saveInteractions)
 	s.mux.HandleFunc("POST /api/interactions/run", func(w http.ResponseWriter, r *http.Request) {
-		s.library.RunInteractionsOnce(r.Context())
+		if err := s.library.RunInteractionsOnce(r.Context()); err != nil {
+			writeError(w, err)
+			return
+		}
 		writeJSON(w, 200, s.library.InteractionSettings())
 	})
 }

@@ -12,11 +12,14 @@ func TestInteractionSettingsRoutes(t *testing.T) {
 	if r := h.call("PUT", "/api/interactions", valid); r.Code != 200 {
 		t.Fatal(r.Code, r.Body.String())
 	}
+	if r := h.call("PUT", "/api/config/cookie", `{"cookie":"SESSDATA=test-only"}`); r.Code != 200 {
+		t.Fatal(r.Code, r.Body.String())
+	}
 	invalid := `{"enabled":true,"sources":["bad"],"interval_minutes":60,"max_auto_follow":20}`
 	if r := h.call("PUT", "/api/interactions", invalid); r.Code != 400 {
 		t.Fatal(r.Code, r.Body.String())
 	}
-	if r := h.call("POST", "/api/interactions/run", "{}"); r.Code != 200 {
+	if r := h.call("POST", "/api/interactions/run", "{}"); r.Code != 500 {
 		t.Fatal(r.Code, r.Body.String())
 	}
 }

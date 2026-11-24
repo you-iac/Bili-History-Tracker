@@ -102,7 +102,7 @@ func (s *Service) RunInteractions(ctx context.Context) {
 		case <-s.interactionWake:
 		case <-timer.C:
 		}
-		s.runInteractionsOnce(ctx, false)
+		_ = s.runInteractionsOnce(ctx, false)
 		if !timer.Stop() {
 			select {
 			case <-timer.C:
@@ -114,8 +114,8 @@ func (s *Service) RunInteractions(ctx context.Context) {
 }
 
 // RunInteractionsOnce 手动执行一轮；不检查 Enabled，供设置页立即触发。
-func (s *Service) RunInteractionsOnce(ctx context.Context) {
-	s.runInteractionsOnce(ctx, true)
+func (s *Service) RunInteractionsOnce(ctx context.Context) error {
+	return s.runInteractionsOnce(ctx, true)
 }
 
 func (s *Service) interactionInterval() time.Duration {
@@ -126,18 +126,25 @@ func (s *Service) interactionInterval() time.Duration {
 	return time.Duration(cfg.IntervalMinutes) * time.Minute
 }
 
-func (s *Service) runInteractionsOnce(ctx context.Context, force bool) {
+func (s *Service) runInteractionsOnce(ctx context.Context, force bool) error {
 	cfg := s.InteractionSettings()
-	if (!cfg.Enabled && !force) || s.interactions == nil || ctx.Err() != nil {
-		return
+	if !cfg.Enabled && !force {
+		return nil
+	}
+	if s.interactions == nil {
+		return &Error{Message: "历史源未接入，无法执行互动检查。", Status: 500}
+	}
+	if ctx.Err() != nil {
+		return ctx.Err()
 	}
 	if _, err := s.interactions.HistorySync(ctx); err != nil {
-		return
+		return err
 	}
 	if _, err := s.interactions.CheckInteractions(ctx, 60); err != nil {
-		return
+		return err
 	}
 	s.autoFollowInteractions(ctx, cfg)
+	return nil
 }
 
 // autoFollowInteractions 遍历最近 30 天的历史页，只关注有指定互动且尚未关注的视频，单轮有上限。
