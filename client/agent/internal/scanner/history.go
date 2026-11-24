@@ -364,11 +364,13 @@ func (s *Service) CheckInteractions(ctx context.Context, limit int) (Interaction
 	})
 	now := time.Now().Unix()
 	attempted := 0
+	canceled := false
 	for _, candidate := range candidates {
 		if attempted >= limit {
 			break
 		}
 		if ctx.Err() != nil {
+			canceled = true
 			break
 		}
 		latest := candidate.indexes[0]
@@ -395,7 +397,8 @@ func (s *Service) CheckInteractions(ctx context.Context, limit int) (Interaction
 		if err != nil {
 			// 取消或超时不是平台失败，不累计未完成查询的退避。
 			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || ctx.Err() != nil {
-				return result, ctx.Err()
+				canceled = true
+				break
 			}
 			result.Failed++
 			for _, index := range candidate.indexes {
@@ -423,6 +426,9 @@ func (s *Service) CheckInteractions(ctx context.Context, limit int) (Interaction
 		}
 	}
 	if result.Checked == 0 && result.Failed == 0 {
+		if canceled {
+			return result, ctx.Err()
+		}
 		return result, nil
 	}
 	s.mu.Lock()
@@ -436,6 +442,9 @@ func (s *Service) CheckInteractions(ctx context.Context, limit int) (Interaction
 		return result, err
 	}
 	s.mu.Unlock()
+	if canceled {
+		return result, ctx.Err()
+	}
 	return result, nil
 }
 
