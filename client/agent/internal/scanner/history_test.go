@@ -112,10 +112,11 @@ func TestHistorySyncKeepsLatestDuplicate(t *testing.T) {
 		t.Fatal(err)
 	}
 	result, err := s.HistorySync(context.Background())
-	if err != nil || result.Added != 1 || result.Updated != 1 || result.Total != 1 {
+	if err != nil || result.Added != 2 || result.Updated != 0 || result.Total != 2 {
 		t.Fatal(result, err)
 	}
-	if got := s.HistoryVideos(1, 1, 20); got.Total != 1 || got.Items[0].ViewedAt != now.Add(-time.Hour).Unix() {
+	got := s.HistoryVideos(1, 1, 20)
+	if got.Total != 1 || got.Items[0].Views != 2 || got.Items[0].ViewedAt != now.Add(-time.Hour).Unix() {
 		t.Fatal(got)
 	}
 }
@@ -195,7 +196,7 @@ func TestCheckInteractionsUpdatesLocalHistory(t *testing.T) {
 		t.Fatal(result, err)
 	}
 	page := s.HistoryVideos(30, 1, 20)
-	byID := map[string]bilibili.HistoryItem{}
+	byID := map[string]HistoryVideo{}
 	for _, item := range page.Items {
 		byID[item.BVID] = item
 	}

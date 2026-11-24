@@ -38,11 +38,22 @@ type HistorySyncResult struct {
 	SyncedAt time.Time `json:"synced_at"`
 }
 
+// HistoryVideo 是按 bvid 聚合后的展示项：主字段取最近一次观看，Views 是观看次数。
+type HistoryVideo struct {
+	bilibili.HistoryItem
+	Views         int   `json:"views"`
+	FirstViewedAt int64 `json:"first_viewed_at"`
+}
+
 type HistoryVideoPage struct {
-	Items []bilibili.HistoryItem `json:"items"`
-	Page  int                    `json:"page"`
-	Limit int                    `json:"limit"`
-	Total int                    `json:"total"`
+	Items []HistoryVideo `json:"items"`
+	Page  int            `json:"page"`
+	Limit int            `json:"limit"`
+	Total int            `json:"total"`
+}
+
+func historyKey(bvid string, viewedAt int64) string {
+	return bvid + "@" + strconv.FormatInt(viewedAt, 10)
 }
 
 type HistoryCreator struct {
@@ -100,7 +111,7 @@ func (s *Service) HistorySync(ctx context.Context) (HistorySyncResult, error) {
 	state := s.loadHistoryLocked()
 	items := make(map[string]bilibili.HistoryItem, len(state.Items))
 	for _, item := range state.Items {
-		items[item.BVID] = item
+		items[historyKey(item.BVID, item.ViewedAt)] = item
 	}
 	s.mu.Unlock()
 	existing := len(items)
@@ -114,16 +125,24 @@ func (s *Service) HistorySync(ctx context.Context) (HistorySyncResult, error) {
 		result.Pages++
 		added := 0
 		for _, item := range loaded.Items {
-			if old, exists := items[item.BVID]; exists {
+			key := historyKey(item.BVID, item.ViewedAt)
+			if old, exists := items[key]; exists {
 				// 历史接口不返回互动状态，合并时保留本地已查询到的结果。
-				item.Like, item.Coin, item.Favorite, item.InteractionCheckedAt = old.Like, old.Coin, old.Favorite, old.InteractionCheckedAt
-				if item.ViewedAt > old.ViewedAt {
-					items[item.BVID] = item
-					result.Updated++
-				}
+				item.Like, item.Coin, item.Favorite = old.Like, old.Coin, old.Favorite
+				item.InteractionCheckedAt, item.InteractionFailures, item.InteractionNextAttempt = old.InteractionCheckedAt, old.InteractionFailures, old.InteractionNextAttempt
+				items[key] = item
+				result.Updated++
 				continue
 			}
-			items[item.BVID] = item
+			// 同一视频的旧观看记录已查过互动时，新记录直接继承，避免重复查询。
+			for _, old := range items {
+				if old.BVID == item.BVID {
+					item.Like, item.Coin, item.Favorite = old.Like, old.Coin, old.Favorite
+					item.InteractionCheckedAt, item.InteractionFailures, item.InteractionNextAttempt = old.InteractionCheckedAt, old.InteractionFailures, old.InteractionNextAttempt
+					break
+				}
+			}
+			items[key] = item
 			result.Added++
 			added++
 		}
@@ -184,11 +203,24 @@ func (s *Service) HistoryVideosFiltered(days, page, limit int, include func(stri
 	state := s.loadHistoryLocked()
 	s.mu.Unlock()
 	cutoff := historyCutoff(days)
-	items := make([]bilibili.HistoryItem, 0, len(state.Items))
+	grouped := map[string][]bilibili.HistoryItem{}
 	for _, item := range state.Items {
 		if item.ViewedAt >= cutoff && (include == nil || include(item.BVID)) {
-			items = append(items, item)
+			grouped[item.BVID] = append(grouped[item.BVID], item)
 		}
+	}
+	items := make([]HistoryVideo, 0, len(grouped))
+	for _, group := range grouped {
+		latest, first := group[0], group[0].ViewedAt
+		for _, item := range group {
+			if item.ViewedAt > latest.ViewedAt {
+				latest = item
+			}
+			if item.ViewedAt < first {
+				first = item.ViewedAt
+			}
+		}
+		items = append(items, HistoryVideo{HistoryItem: latest, Views: len(group), FirstViewedAt: first})
 	}
 	sort.Slice(items, func(i, j int) bool {
 		if items[i].ViewedAt != items[j].ViewedAt {
@@ -223,6 +255,7 @@ func (s *Service) HistoryCreatorsFiltered(days, page, limit int, include func(st
 	s.mu.Unlock()
 	cutoff := historyCutoff(days)
 	creators := map[string]*HistoryCreator{}
+	seen := map[string]map[string]bool{}
 	for _, item := range state.Items {
 		if item.ViewedAt < cutoff {
 			continue
@@ -231,8 +264,12 @@ func (s *Service) HistoryCreatorsFiltered(days, page, limit int, include func(st
 		if !ok {
 			c = &HistoryCreator{ID: item.AuthorID, Name: item.AuthorName}
 			creators[item.AuthorID] = c
+			seen[item.AuthorID] = map[string]bool{}
 		}
-		c.Videos++
+		if !seen[item.AuthorID][item.BVID] {
+			c.Videos++
+			seen[item.AuthorID][item.BVID] = true
+		}
 		if item.ViewedAt > c.LastViewedAt {
 			c.LastViewedAt = item.ViewedAt
 			if item.AuthorName != "" {
@@ -300,33 +337,74 @@ func (s *Service) CheckInteractions(ctx context.Context, limit int) (Interaction
 	if favorite, err = s.api.FavoriteSet(ctx, cookie, mid, keys); err != nil {
 		result.FavoriteFailed = true
 	}
-	indexes := make([]int, len(state.Items))
-	for i := range indexes {
-		indexes[i] = i
+	groups := map[string][]int{}
+	for index := range state.Items {
+		item := &state.Items[index]
+		groups[item.BVID] = append(groups[item.BVID], index)
 	}
-	sort.Slice(indexes, func(i, j int) bool {
-		return state.Items[indexes[i]].InteractionCheckedAt < state.Items[indexes[j]].InteractionCheckedAt
+	candidates := make([]struct {
+		bvid      string
+		indexes   []int
+		checkedAt int64
+	}, 0, len(groups))
+	for bvid, indexes := range groups {
+		latest := indexes[0]
+		for _, index := range indexes {
+			if state.Items[index].ViewedAt > state.Items[latest].ViewedAt {
+				latest = index
+			}
+		}
+		candidates = append(candidates, struct {
+			bvid      string
+			indexes   []int
+			checkedAt int64
+		}{bvid: bvid, indexes: indexes, checkedAt: state.Items[latest].InteractionCheckedAt})
+	}
+	sort.Slice(candidates, func(i, j int) bool {
+		return candidates[i].checkedAt < candidates[j].checkedAt
 	})
-	for _, index := range indexes {
+	now := time.Now().Unix()
+	for _, candidate := range candidates {
 		if result.Checked >= limit {
 			break
 		}
-		item := &state.Items[index]
-		like, err := s.api.HasLike(ctx, cookie, item.BVID, keys)
-		if err != nil {
-			result.Failed++
+		latest := candidate.indexes[0]
+		for _, index := range candidate.indexes {
+			if state.Items[index].ViewedAt > state.Items[latest].ViewedAt {
+				latest = index
+			}
+		}
+		if state.Items[latest].InteractionNextAttempt > now {
 			continue
 		}
-		coin, err := s.api.Coins(ctx, cookie, item.BVID, keys)
+		like, err := s.api.HasLike(ctx, cookie, candidate.bvid, keys)
 		if err != nil {
 			result.Failed++
+			for _, index := range candidate.indexes {
+				state.Items[index].InteractionFailures++
+				state.Items[index].InteractionNextAttempt = interactionBackoff(state.Items[index].InteractionFailures)
+			}
 			continue
 		}
-		item.Like, item.Coin = like, coin
-		if !result.FavoriteFailed {
-			item.Favorite = favorite[item.BVID]
+		coin, err := s.api.Coins(ctx, cookie, candidate.bvid, keys)
+		if err != nil {
+			result.Failed++
+			for _, index := range candidate.indexes {
+				state.Items[index].InteractionFailures++
+				state.Items[index].InteractionNextAttempt = interactionBackoff(state.Items[index].InteractionFailures)
+			}
+			continue
 		}
-		item.InteractionCheckedAt = time.Now().Unix()
+		for _, index := range candidate.indexes {
+			item := &state.Items[index]
+			item.Like, item.Coin = like, coin
+			if !result.FavoriteFailed {
+				item.Favorite = favorite[item.BVID]
+			}
+			item.InteractionCheckedAt = now
+			item.InteractionFailures = 0
+			item.InteractionNextAttempt = 0
+		}
 		result.Checked++
 		if like {
 			result.Liked++
@@ -334,7 +412,7 @@ func (s *Service) CheckInteractions(ctx context.Context, limit int) (Interaction
 		if coin > 0 {
 			result.Coined++
 		}
-		if item.Favorite {
+		if favorite[candidate.bvid] {
 			result.Favorited++
 		}
 	}
@@ -353,4 +431,19 @@ func (s *Service) CheckInteractions(ctx context.Context, limit int) (Interaction
 	}
 	s.mu.Unlock()
 	return result, nil
+}
+
+// interactionBackoff 返回失败后的最早重试时间：5 分钟起，指数退避，最多 6 小时。
+func interactionBackoff(failures int) int64 {
+	if failures < 1 {
+		failures = 1
+	}
+	delay := 5 * time.Minute
+	for i := 1; i < failures && delay < 6*time.Hour; i++ {
+		delay *= 2
+	}
+	if delay > 6*time.Hour {
+		delay = 6 * time.Hour
+	}
+	return time.Now().Add(delay).Unix()
 }

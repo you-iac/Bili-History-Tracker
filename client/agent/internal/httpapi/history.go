@@ -6,13 +6,12 @@ import (
 	"net/http"
 	"strconv"
 
-	"bili-history-tracker/client/agent/internal/bilibili"
 	"bili-history-tracker/client/agent/internal/scanner"
 )
 
 // 关注状态与头像只从本机资料缓存补齐，不因浏览历史查询平台或公共服务器。
 type historyVideoItem struct {
-	bilibili.HistoryItem
+	scanner.HistoryVideo
 	Followed bool `json:"followed"`
 }
 
@@ -87,7 +86,7 @@ func (s *Server) historyVideos(w http.ResponseWriter, r *http.Request) {
 	items := make([]historyVideoItem, 0, len(data.Items))
 	for _, item := range data.Items {
 		cached, _ := s.library.CurrentCache("video", item.BVID)
-		items = append(items, historyVideoItem{HistoryItem: item, Followed: cached.LocalFollow != nil})
+		items = append(items, historyVideoItem{HistoryVideo: item, Followed: cached.LocalFollow != nil})
 	}
 	writeJSON(w, 200, struct {
 		scanner.HistoryVideoPage

@@ -15,18 +15,20 @@ const HistoryPageSize = 30
 // HistoryItem 是一次观看记录；同一视频多次观看由调用方按 viewed_at 去重。
 // Like/Coin/Favorite 由互动查询补充，InteractionCheckedAt 记录上次查询时间。
 type HistoryItem struct {
-	BVID                 string `json:"bvid"`
-	Title                string `json:"title"`
-	Cover                string `json:"cover"`
-	AuthorID             string `json:"author_id"`
-	AuthorName           string `json:"author_name"`
-	ViewedAt             int64  `json:"viewed_at"`
-	Progress             int64  `json:"progress"`
-	Duration             int64  `json:"duration"`
-	Like                 bool   `json:"like,omitempty"`
-	Coin                 int    `json:"coin,omitempty"`
-	Favorite             bool   `json:"favorite,omitempty"`
-	InteractionCheckedAt int64  `json:"interaction_checked_at,omitempty"`
+	BVID                   string `json:"bvid"`
+	Title                  string `json:"title"`
+	Cover                  string `json:"cover"`
+	AuthorID               string `json:"author_id"`
+	AuthorName             string `json:"author_name"`
+	ViewedAt               int64  `json:"viewed_at"`
+	Progress               int64  `json:"progress"`
+	Duration               int64  `json:"duration"`
+	Like                   bool   `json:"like,omitempty"`
+	Coin                   int    `json:"coin,omitempty"`
+	Favorite               bool   `json:"favorite,omitempty"`
+	InteractionCheckedAt   int64  `json:"interaction_checked_at,omitempty"`
+	InteractionFailures    int    `json:"interaction_failures,omitempty"`
+	InteractionNextAttempt int64  `json:"interaction_next_attempt,omitempty"`
 }
 
 // HistoryPage 是历史游标页；More=false 表示本次同步可以结束。

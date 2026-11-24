@@ -74,7 +74,7 @@ export function initHistory({api,notify}) {
     const info=node('div',null,'history-info');info.append(title);
     if(creator)info.append(node('span',`UID ${id}`,'history-id'));
     else if(item.author_id)info.append(link(item.author_name||`UP 主 ${item.author_id}`,detailHref('creator',item.author_id),'history-author'));
-    info.append(node('p',creator?`看过 ${compactNumber(item.videos)} 个视频`:item.bvid,'history-meta'));
+    info.append(node('p',creator?`看过 ${compactNumber(item.videos)} 个视频`:`${item.bvid}${item.views>1?` · 看过 ${item.views} 次`:''}`,'history-meta'));
     const timestamp=creator?item.last_viewed_at:item.viewed_at,time=node('time',`${creator?'最近观看':'观看于'} ${date(timestamp)}`,'history-time');
     if(timestamp)time.dateTime=new Date(timestamp*1000).toISOString();info.append(time);
     if(!creator){
