@@ -19,6 +19,7 @@ type InteractionSource interface {
 	HistorySync(context.Context) (scanner.HistorySyncResult, error)
 	CheckInteractions(context.Context, int) (scanner.InteractionResult, error)
 	HistoryVideosFiltered(int, int, int, func(string) bool) scanner.HistoryVideoPage
+	HistoryBusy() bool
 }
 
 // InteractionConfig 控制后台互动发现；Sources 只允许 like/coin/favorite。
@@ -114,7 +115,14 @@ func (s *Service) RunInteractions(ctx context.Context) {
 }
 
 // RunInteractionsOnce 手动执行一轮；不检查 Enabled，供设置页立即触发。
+// 后台正在同步/检查时直接返回 409，避免手动请求排队超过浏览器等待预算。
 func (s *Service) RunInteractionsOnce(ctx context.Context) error {
+	if s.interactions == nil {
+		return &Error{Message: "历史源未接入，无法执行互动检查。", Status: 500}
+	}
+	if s.interactions.HistoryBusy() {
+		return &Error{Message: "后台历史同步或互动检查正在进行，请稍后再试。", Status: 409}
+	}
 	return s.runInteractionsOnce(ctx, true)
 }
 
