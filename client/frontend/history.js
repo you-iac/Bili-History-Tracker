@@ -11,12 +11,15 @@ export function initHistory({api,notify}) {
   let size='standard',unfollowed=false;
   try{const saved=localStorage.getItem('bht.card-size');if(Object.hasOwn(cardPageLimits,saved))size=saved;}catch{}
   let kind='video',days=30,page=1,result={items:[],page:1,limit:20,total:0};
-  let usable=false,configured=false,visible=false,loading=false,syncing=false,sequence=0,lastAttempt=0;
+  let usable=false,configured=false,visible=false,loading=false,syncing=false,interacting=false,sequence=0,lastAttempt=0;
   let syncMessage='',syncError='',readError='',emptyDescription=null;
   const emptyCopy=()=>syncing?'正在同步，记录将在同步完成后显示。':unfollowed?'可以关闭「仅看未关注」查看全部记录，或调整观看范围。':configured?'可以扩大时间范围，或点击「同步历史」获取最新记录。':'在设置中配置 B站 Cookie，便可自动导入观看历史。';
   function controls(){
-    $('history-sync').disabled=!usable||!configured||syncing;
+    const busy=!usable||!configured||syncing||interacting;
+    $('history-sync').disabled=busy;
     $('history-sync').textContent=syncing?'正在同步…':'↻ 同步历史';
+    $('history-interactions').disabled=busy;
+    $('history-interactions').textContent=interacting?'检查中…':'检查互动';
     $('history-days').disabled=!usable;
     $('history-card-size').disabled=!usable;$('history-unfollowed').disabled=!usable;
     $('history-unfollowed').setAttribute('aria-pressed',String(unfollowed));
@@ -74,6 +77,10 @@ export function initHistory({api,notify}) {
     info.append(node('p',creator?`看过 ${compactNumber(item.videos)} 个视频`:item.bvid,'history-meta'));
     const timestamp=creator?item.last_viewed_at:item.viewed_at,time=node('time',`${creator?'最近观看':'观看于'} ${date(timestamp)}`,'history-time');
     if(timestamp)time.dateTime=new Date(timestamp*1000).toISOString();info.append(time);
+    if(!creator){
+      const badges=[];if(item.like)badges.push('已赞');if(item.coin>0)badges.push(`投币 ${item.coin}`);if(item.favorite)badges.push('已收藏');
+      if(badges.length)info.append(node('p',badges.join(' · '),'history-badges'));
+    }
     const actions=node('div',null,'history-actions');
     actions.append(link(creator?'B站主页 ↗':'B站播放 ↗',creator?`https://space.bilibili.com/${encodeURIComponent(id)}`:`https://www.bilibili.com/video/${encodeURIComponent(id)}`,'text-button',true),actionButton(kind,id,item.followed));
     article.append(media,info,actions);
@@ -108,6 +115,16 @@ export function initHistory({api,notify}) {
     }catch(error){syncError=`同步未完成：${error.message} 本地历史仍可浏览。`;}
     finally{syncing=false;controls();}
   }
+  async function interactions(){
+    if(!usable||!configured||interacting)return;
+    interacting=true;syncError='';controls();
+    try{
+      const data=await api('/api/history/interactions',{method:'POST',body:'{}'});
+      syncMessage=`互动检查完成 · 已检查 ${data.checked} 条 · 点赞 ${data.liked} · 投币 ${data.coined} · 收藏 ${data.favorited}`;
+      if(visible)await load();
+    }catch(error){syncError=`互动检查未完成：${error.message}`;}
+    finally{interacting=false;controls();}
+  }
   function show(){
     visible=true;if(!usable){controls();return Promise.resolve();}
     for(const [key,state] of follows)if(state!=='working')follows.delete(key);
@@ -128,7 +145,7 @@ export function initHistory({api,notify}) {
   });
   window.addEventListener('bht-density',event=>applyDensity(event.detail));
   $('history-unfollowed').addEventListener('click',()=>{unfollowed=!unfollowed;page=1;load();});
-  $('history-sync').addEventListener('click',sync);$('history-retry').addEventListener('click',load);
+  $('history-sync').addEventListener('click',sync);$('history-interactions').addEventListener('click',interactions);$('history-retry').addEventListener('click',load);
   $('history-days').addEventListener('change',()=>{days=Number($('history-days').value);page=1;load();});
   for(const value of ['video','creator'])$('history-'+value+'s-tab').addEventListener('click',()=>{if(kind===value)return;kind=value;page=1;load();});
   $('history-previous').addEventListener('click',()=>{if(page>1){page--;load();}});

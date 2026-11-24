@@ -24,8 +24,18 @@ type historyCreatorItem struct {
 
 func (s *Server) historyRoutes() {
 	s.mux.HandleFunc("POST /api/history/sync", s.historySync)
+	s.mux.HandleFunc("POST /api/history/interactions", s.historyInteractions)
 	s.mux.HandleFunc("GET /api/history/videos", s.historyVideos)
 	s.mux.HandleFunc("GET /api/history/creators", s.historyCreators)
+}
+
+func (s *Server) historyInteractions(w http.ResponseWriter, r *http.Request) {
+	result, err := s.service.CheckInteractions(r.Context(), 60)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, 200, result)
 }
 
 func (s *Server) historySync(w http.ResponseWriter, r *http.Request) {

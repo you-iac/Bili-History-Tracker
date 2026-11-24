@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"sort"
+	"strconv"
 	"time"
 
 	"bili-history-tracker/client/agent/internal/bilibili"
@@ -114,6 +115,8 @@ func (s *Service) HistorySync(ctx context.Context) (HistorySyncResult, error) {
 		added := 0
 		for _, item := range loaded.Items {
 			if old, exists := items[item.BVID]; exists {
+				// 历史接口不返回互动状态，合并时保留本地已查询到的结果。
+				item.Like, item.Coin, item.Favorite, item.InteractionCheckedAt = old.Like, old.Coin, old.Favorite, old.InteractionCheckedAt
 				if item.ViewedAt > old.ViewedAt {
 					items[item.BVID] = item
 					result.Updated++
@@ -257,4 +260,97 @@ func (s *Service) HistoryCreatorsFiltered(days, page, limit int, include func(st
 	start := (page - 1) * limit
 	end := min(start+limit, total)
 	return HistoryCreatorPage{Items: items[start:end], Page: page, Limit: limit, Total: total}
+}
+
+const historyInteractionBudget = 60
+
+// InteractionResult 描述一轮互动查询；FavoriteFailed 表示收藏集合本次不可用。
+type InteractionResult struct {
+	Checked        int  `json:"checked"`
+	Liked          int  `json:"liked"`
+	Coined         int  `json:"coined"`
+	Favorited      int  `json:"favorited"`
+	Failed         int  `json:"failed"`
+	FavoriteFailed bool `json:"favorite_failed"`
+}
+
+// CheckInteractions 按 interaction_checked_at 最旧优先，补查最多 limit 条历史视频的互动状态。
+// 收藏集合每轮只拉一次；单条失败不影响其他条目。
+func (s *Service) CheckInteractions(ctx context.Context, limit int) (InteractionResult, error) {
+	if limit <= 0 || limit > historyInteractionBudget {
+		limit = historyInteractionBudget
+	}
+	s.mu.Lock()
+	cookie, closed := s.cookie, s.closed
+	state := s.loadHistoryLocked()
+	s.mu.Unlock()
+	if closed {
+		return InteractionResult{}, errors.New("本地平台服务已关闭。")
+	}
+	if cookie == "" {
+		return InteractionResult{}, &bilibili.Error{Code: "login_required", Message: "请先在设置中配置 B站 Cookie。"}
+	}
+	account, keys, err := s.api.Login(ctx, cookie)
+	if err != nil {
+		return InteractionResult{}, err
+	}
+	result := InteractionResult{}
+	var favorite map[string]bool
+	mid, _ := strconv.ParseInt(account.ID, 10, 64)
+	if favorite, err = s.api.FavoriteSet(ctx, cookie, mid, keys); err != nil {
+		result.FavoriteFailed = true
+	}
+	indexes := make([]int, len(state.Items))
+	for i := range indexes {
+		indexes[i] = i
+	}
+	sort.Slice(indexes, func(i, j int) bool {
+		return state.Items[indexes[i]].InteractionCheckedAt < state.Items[indexes[j]].InteractionCheckedAt
+	})
+	for _, index := range indexes {
+		if result.Checked >= limit {
+			break
+		}
+		item := &state.Items[index]
+		like, err := s.api.HasLike(ctx, cookie, item.BVID, keys)
+		if err != nil {
+			result.Failed++
+			continue
+		}
+		coin, err := s.api.Coins(ctx, cookie, item.BVID, keys)
+		if err != nil {
+			result.Failed++
+			continue
+		}
+		item.Like, item.Coin = like, coin
+		if !result.FavoriteFailed {
+			item.Favorite = favorite[item.BVID]
+		}
+		item.InteractionCheckedAt = time.Now().Unix()
+		result.Checked++
+		if like {
+			result.Liked++
+		}
+		if coin > 0 {
+			result.Coined++
+		}
+		if item.Favorite {
+			result.Favorited++
+		}
+	}
+	if result.Checked == 0 {
+		return result, nil
+	}
+	s.mu.Lock()
+	if s.closed {
+		s.mu.Unlock()
+		return result, errors.New("本地平台服务已关闭。")
+	}
+	state.Version = historyVersion
+	if err := s.store.SaveHistory(state); err != nil {
+		s.mu.Unlock()
+		return result, err
+	}
+	s.mu.Unlock()
+	return result, nil
 }

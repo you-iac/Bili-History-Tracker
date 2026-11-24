@@ -158,3 +158,51 @@ func TestHistorySyncIncrementalStopsEarly(t *testing.T) {
 		t.Fatal("incremental sync requested an extra page:", calls)
 	}
 }
+
+func TestCheckInteractionsUpdatesLocalHistory(t *testing.T) {
+	now := time.Now()
+	store := &memoryStore{cookie: "SESSDATA=test"}
+	api := &fakeAPI{
+		page: func(context.Context, int) (bilibili.Page, error) { return bilibili.Page{}, nil },
+		history: func(context.Context, string, int64, int64, bilibili.Keys) (bilibili.HistoryPage, error) {
+			return bilibili.HistoryPage{Items: []bilibili.HistoryItem{
+				{BVID: "BV1", AuthorID: "1", AuthorName: "UP", ViewedAt: now.Add(-time.Hour).Unix()},
+				{BVID: "BV2", AuthorID: "2", AuthorName: "UP2", ViewedAt: now.Add(-2 * time.Hour).Unix()},
+			}}, nil
+		},
+		like: func(_ context.Context, _ string, bvid string, _ bilibili.Keys) (bool, error) {
+			return bvid == "BV1", nil
+		},
+		coin: func(_ context.Context, _ string, bvid string, _ bilibili.Keys) (int, error) {
+			if bvid == "BV2" {
+				return 2, nil
+			}
+			return 0, nil
+		},
+		favorite: func(context.Context, string, int64, bilibili.Keys) (map[string]bool, error) {
+			return map[string]bool{"BV2": true}, nil
+		},
+	}
+	s, err := New(api, store, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.HistorySync(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	result, err := s.CheckInteractions(context.Background(), 60)
+	if err != nil || result.Checked != 2 || result.Liked != 1 || result.Coined != 1 || result.Favorited != 1 {
+		t.Fatal(result, err)
+	}
+	page := s.HistoryVideos(30, 1, 20)
+	byID := map[string]bilibili.HistoryItem{}
+	for _, item := range page.Items {
+		byID[item.BVID] = item
+	}
+	if !byID["BV1"].Like || byID["BV1"].Coin != 0 || byID["BV1"].InteractionCheckedAt == 0 {
+		t.Fatal(byID["BV1"])
+	}
+	if byID["BV2"].Like || byID["BV2"].Coin != 2 || !byID["BV2"].Favorite {
+		t.Fatal(byID["BV2"])
+	}
+}
