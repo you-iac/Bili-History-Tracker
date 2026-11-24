@@ -135,6 +135,52 @@ UP 宽松卡片的投稿数、最近投稿与播放合计均由 [local_stats.go]
 
 验证：[历史页状态与交互测试](../client/frontend/history.test.mjs) 覆盖会话就绪、自动同步去重、无 Cookie 缓存、失败重试、迟到响应、显式关注、共享密度、组合筛选、关注后刷新，以及无缓存头像的可见触发、4 并发、已知地址直显与失败占位；[HTTP 测试](../client/agent/internal/httpapi/history_test.go) 验证关注/取关后的即时状态和筛选参数，[本地分页测试](../client/agent/internal/scanner/history_test.go) 用 65 项验证三档数量、先筛选再分页、末页回退与全空结果，[静态资源测试](../client/agent/internal/httpapi/server_test.go) 覆盖 `history.js` 内嵌资源与 JavaScript MIME。2026-11-21 使用无头 Edge、本地模拟 API 与图片验证完整应用的首次 `#history` 加载、视频 / 作者详情跳转、标签与范围、分页、未关注筛选、关注后移出和总数更新、库与历史的密度互通、无缓存 UP 头像自动补取并显示、失效 Cookie 和缓存保留；视频/UP、三种密度均检查 390 / 768 / 1440 / 1920 宽度。该验证未访问真实 B站 Cookie 或更新远端部署。
 
+## 互动自动关注
+
+Agent 在本地观看历史的基础上，发现“看过且点赞/投币/收藏过”的视频，自动加入本地关注并提交服务器跟踪。入口在设置页“互动自动关注”。
+
+### 数据来源
+
+| 来源 | 方式 |
+|---|---|
+| 点赞/投币/收藏 | 对历史视频逐条查询 `/x/web-interface/archive/relation`，一次返回 `like`/`coin`/`favorite` |
+| 转发 | 暂不支持 |
+
+点赞/投币没有公开的完整列表接口，只能对已知历史视频逐条查询；收藏夹可以一次分页拉取。
+
+### 执行链路
+
+```text
+Agent 启动
+  → RunInteractions（library）
+      → 每 30 分钟 / 1 小时 / 6 小时
+      → HistorySync（scanner，增量）
+      → CheckInteractions（scanner，TTL + 失败退避）
+      → autoFollowInteractions（library）
+          → 有互动且未关注
+          → Follow（本地保存 + Submit 服务器）
+```
+
+### 预算与退避
+
+- 每轮最多检查 60 个 bvid，每个 1 次关系查询，失败同样消耗预算；
+- 最近 3 天每 6 小时重查，3–30 天每 24 小时重查；
+- 失败退避 5 分钟起，指数增长，最多 6 小时；
+- 自动关注每轮最多 20 个，按 bvid 去重。
+
+### 持久化与并发
+
+- 历史与互动状态保存在 `history.json`，按 `bvid + viewed_at` 保留多次观看；
+- 互动配置保存在 `library.json` 的 `interactions` 字段；
+- 历史同步和互动检查通过 `historyMu` 串行化，保存时以最新状态为准，避免并发覆盖。
+
+### 边界
+
+- 互动数据只存本地，不上传服务器；
+- 自动关注复用现有 `Follow`/`Submit`，不新增服务器接口；
+- 转发暂不支持；
+- 关闭开关后不再自动关注。
+
 ## 验证与模块导航
 
 - [摘要业务测试](../client/agent/internal/library/summaries_test.go)、[摘要 HTTP 测试](../client/agent/internal/httpapi/summaries_test.go)：空缓存/待提交仍可读取、目录分页、部分失败、切服及取关隔离、默认详情范围回填、落盘失败和 CSRF。

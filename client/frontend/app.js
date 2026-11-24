@@ -22,7 +22,8 @@ function connection(text, isOnline) {
 async function request(path, options = {}) {
   const method = options.method || 'GET';
   let response;
-  const timeout = path.startsWith('/api/follows') || path.startsWith('/api/library/') || path === '/api/history/sync' ? 100000 : 25000;
+  const longOperation = path.startsWith('/api/follows') || path.startsWith('/api/library/') || path.startsWith('/api/history') || path === '/api/interactions/run';
+  const timeout = longOperation ? 100000 : 25000;
   try {
     response = await fetch(path, {credentials:'same-origin',cache:'no-store',signal:AbortSignal.timeout(timeout),...options,
       headers:{...(method === 'GET' ? {} : {'Content-Type':'application/json','X-CSRF-Token':csrf}),...options.headers}});

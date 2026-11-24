@@ -33,6 +33,18 @@ func (platformStub) Videos(_ context.Context, _, _ string, pn int, _ bilibili.Ke
 func (platformStub) History(context.Context, string, int64, int64, bilibili.Keys) (bilibili.HistoryPage, error) {
 	return bilibili.HistoryPage{}, nil
 }
+func (platformStub) HasLike(context.Context, string, string, bilibili.Keys) (bool, error) {
+	return false, nil
+}
+func (platformStub) Coins(context.Context, string, string, bilibili.Keys) (int, error) {
+	return 0, nil
+}
+func (platformStub) FavoriteSet(context.Context, string, int64, bilibili.Keys) (map[string]bool, error) {
+	return map[string]bool{}, nil
+}
+func (platformStub) ArchiveRelation(context.Context, string, string, bilibili.Keys) (bilibili.Relation, error) {
+	return bilibili.Relation{}, nil
+}
 
 type harness struct {
 	s       *Server

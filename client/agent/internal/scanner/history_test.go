@@ -3,6 +3,7 @@ package scanner
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -112,10 +113,139 @@ func TestHistorySyncKeepsLatestDuplicate(t *testing.T) {
 		t.Fatal(err)
 	}
 	result, err := s.HistorySync(context.Background())
-	if err != nil || result.Added != 1 || result.Updated != 1 || result.Total != 1 {
+	if err != nil || result.Added != 2 || result.Updated != 0 || result.Total != 2 {
 		t.Fatal(result, err)
 	}
-	if got := s.HistoryVideos(1, 1, 20); got.Total != 1 || got.Items[0].ViewedAt != now.Add(-time.Hour).Unix() {
+	got := s.HistoryVideos(1, 1, 20)
+	if got.Total != 1 || got.Items[0].Views != 2 || got.Items[0].ViewedAt != now.Add(-time.Hour).Unix() {
 		t.Fatal(got)
+	}
+}
+
+func TestHistorySyncIncrementalStopsEarly(t *testing.T) {
+	now := time.Now()
+	store := &memoryStore{cookie: "SESSDATA=test"}
+	calls := 0
+	api := &fakeAPI{
+		page: func(context.Context, int) (bilibili.Page, error) { return bilibili.Page{}, nil },
+		history: func(_ context.Context, _ string, max, _ int64, _ bilibili.Keys) (bilibili.HistoryPage, error) {
+			calls++
+			if calls == 1 {
+				return bilibili.HistoryPage{Items: []bilibili.HistoryItem{
+					{BVID: "BV1", AuthorID: "1", AuthorName: "UP", ViewedAt: now.Add(-time.Hour).Unix()},
+					{BVID: "BV2", AuthorID: "1", AuthorName: "UP", ViewedAt: now.Add(-2 * time.Hour).Unix()},
+					{BVID: "BV3", AuthorID: "2", AuthorName: "UP2", ViewedAt: now.Add(-3 * time.Hour).Unix()},
+				}}, nil
+			}
+			return bilibili.HistoryPage{Items: []bilibili.HistoryItem{
+				{BVID: "BV4", AuthorID: "1", AuthorName: "UP", ViewedAt: now.Add(-time.Minute).Unix()},
+				{BVID: "BV1", AuthorID: "1", AuthorName: "UP", ViewedAt: now.Add(-time.Hour).Unix()},
+				{BVID: "BV2", AuthorID: "1", AuthorName: "UP", ViewedAt: now.Add(-2 * time.Hour).Unix()},
+			}, Max: 2, ViewAt: 3, More: true}, nil
+		},
+	}
+	s, err := New(api, store, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := s.HistorySync(context.Background())
+	if err != nil || first.Added != 3 || first.Pages != 1 || first.Total != 3 {
+		t.Fatal(first, err)
+	}
+	second, err := s.HistorySync(context.Background())
+	if err != nil || second.Added != 1 || second.Pages != 1 || second.Total != 4 {
+		t.Fatal(second, err)
+	}
+	if calls != 2 {
+		t.Fatal("incremental sync requested an extra page:", calls)
+	}
+}
+
+func TestCheckInteractionsUpdatesLocalHistory(t *testing.T) {
+	now := time.Now()
+	store := &memoryStore{cookie: "SESSDATA=test"}
+	api := &fakeAPI{
+		page: func(context.Context, int) (bilibili.Page, error) { return bilibili.Page{}, nil },
+		history: func(context.Context, string, int64, int64, bilibili.Keys) (bilibili.HistoryPage, error) {
+			return bilibili.HistoryPage{Items: []bilibili.HistoryItem{
+				{BVID: "BV1", AuthorID: "1", AuthorName: "UP", ViewedAt: now.Add(-time.Hour).Unix()},
+				{BVID: "BV2", AuthorID: "2", AuthorName: "UP2", ViewedAt: now.Add(-2 * time.Hour).Unix()},
+			}}, nil
+		},
+		relation: func(_ context.Context, _ string, bvid string, _ bilibili.Keys) (bilibili.Relation, error) {
+			if bvid == "BV1" {
+				return bilibili.Relation{Like: true}, nil
+			}
+			return bilibili.Relation{Coin: 2, Favorite: true}, nil
+		},
+	}
+	s, err := New(api, store, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.HistorySync(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	result, err := s.CheckInteractions(context.Background(), 60)
+	if err != nil || result.Checked != 2 || result.Liked != 1 || result.Coined != 1 || result.Favorited != 1 {
+		t.Fatal(result, err)
+	}
+	page := s.HistoryVideos(30, 1, 20)
+	byID := map[string]HistoryVideo{}
+	for _, item := range page.Items {
+		byID[item.BVID] = item
+	}
+	if !byID["BV1"].Like || byID["BV1"].Coin != 0 || byID["BV1"].InteractionCheckedAt == 0 {
+		t.Fatal(byID["BV1"])
+	}
+	if byID["BV2"].Like || byID["BV2"].Coin != 2 || !byID["BV2"].Favorite {
+		t.Fatal(byID["BV2"])
+	}
+}
+
+func TestCheckInteractionsFailureConsumesBudgetAndSavesBackoff(t *testing.T) {
+	now := time.Now()
+	store := &memoryStore{cookie: "SESSDATA=test"}
+	attempts := 0
+	api := &fakeAPI{
+		page: func(context.Context, int) (bilibili.Page, error) { return bilibili.Page{}, nil },
+		history: func(context.Context, string, int64, int64, bilibili.Keys) (bilibili.HistoryPage, error) {
+			return bilibili.HistoryPage{Items: []bilibili.HistoryItem{
+				{BVID: "BV1", AuthorID: "1", ViewedAt: now.Add(-time.Hour).Unix()},
+				{BVID: "BV2", AuthorID: "1", ViewedAt: now.Add(-2 * time.Hour).Unix()},
+				{BVID: "BV3", AuthorID: "1", ViewedAt: now.Add(-3 * time.Hour).Unix()},
+			}}, nil
+		},
+		relation: func(context.Context, string, string, bilibili.Keys) (bilibili.Relation, error) {
+			attempts++
+			return bilibili.Relation{}, errors.New("boom")
+		},
+		favorite: func(context.Context, string, int64, bilibili.Keys) (map[string]bool, error) {
+			return map[string]bool{}, nil
+		},
+	}
+	s, err := New(api, store, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.HistorySync(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	result, err := s.CheckInteractions(context.Background(), 2)
+	if err != nil || attempts != 2 || result.Failed != 2 || result.Checked != 0 {
+		t.Fatal(result, attempts, err)
+	}
+	var state historyState
+	if err := store.LoadHistory(&state); err != nil {
+		t.Fatal(err)
+	}
+	backoff := 0
+	for _, item := range state.Items {
+		if item.InteractionNextAttempt > 0 {
+			backoff++
+		}
+	}
+	if backoff != 2 {
+		t.Fatal("backoff not saved for failed candidates:", backoff)
 	}
 }

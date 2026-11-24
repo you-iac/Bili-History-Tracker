@@ -65,6 +65,7 @@ func run(ctx context.Context, address, directory string, automatic bool, launch 
 	}
 	server := &http.Server{Handler: handler, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 20 * time.Second, WriteTimeout: 95 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 32 << 10}
 	go collection.RunPending(ctx)
+	go collection.RunInteractions(ctx)
 	fail := make(chan error, 1)
 	go func() { fail <- server.Serve(listener) }()
 	announceStartup(output, listener.Addr().String(), handler.BootstrapToken(), automatic, launch)

@@ -65,13 +65,14 @@ type Follow struct {
 	NextAttempt      *time.Time      `json:"next_attempt_at,omitempty"`
 }
 type state struct {
-	Current   map[string]CurrentView `json:"current_profiles,omitempty"`
-	History   map[string]HistoryView `json:"detail_history,omitempty"`
-	Images    map[string]ImageRecord `json:"images,omitempty"`
-	Version   int                    `json:"version"`
-	ServerURL string                 `json:"server_url"`
-	Follows   []Follow               `json:"follows"`
-	Overview  *remote.Overview       `json:"overview,omitempty"`
+	Current      map[string]CurrentView `json:"current_profiles,omitempty"`
+	History      map[string]HistoryView `json:"detail_history,omitempty"`
+	Images       map[string]ImageRecord `json:"images,omitempty"`
+	Version      int                    `json:"version"`
+	ServerURL    string                 `json:"server_url"`
+	Follows      []Follow               `json:"follows"`
+	Overview     *remote.Overview       `json:"overview,omitempty"`
+	Interactions *InteractionConfig     `json:"interactions,omitempty"`
 }
 type Page struct {
 	Items    []Follow `json:"items"`
@@ -82,33 +83,38 @@ type Page struct {
 	Videos   int      `json:"videos"`
 }
 type Service struct {
-	current         CurrentSource
-	currentCache    map[string]currentRecord
-	currentCalls    map[string]*currentCall
-	currentCooldown time.Time
+	current               CurrentSource
+	currentCache          map[string]currentRecord
+	currentCalls          map[string]*currentCall
+	currentCooldown       time.Time
 	detailCurrentCalls    map[string]*detailCurrentCall
 	detailHistoryCalls    map[string]*detailHistoryCall
 	detailCurrentFailures map[string]detailCurrentFailure
-	summaryCalls    map[string]*summaryCall
-	serverEpoch     uint64
-	imageCalls      map[string]*imageCall
-	imageErrors     map[string]imageFailure
-	imageSlots      chan struct{}
-	mu              sync.Mutex
-	store           Storage
-	client          *remote.Client
-	state           state
-	inFlight        map[string]bool
-	wake            chan struct{}
+	summaryCalls          map[string]*summaryCall
+	serverEpoch           uint64
+	imageCalls            map[string]*imageCall
+	imageErrors           map[string]imageFailure
+	imageSlots            chan struct{}
+	mu                    sync.Mutex
+	store                 Storage
+	client                *remote.Client
+	state                 state
+	inFlight              map[string]bool
+	wake                  chan struct{}
+	interactions          InteractionSource
+	interactionWake       chan struct{}
 }
 
 // New 可注入当前资料源；命令入口始终传入scanner，省略时保留旧接入方的服务器读取行为。
 func New(store Storage, client *remote.Client, sources ...CurrentSource) (*Service, error) {
-	s := &Service{store: store, client: client, state: state{Version: 1, Follows: []Follow{}}, inFlight: map[string]bool{}, wake: make(chan struct{}, 1), imageCalls: map[string]*imageCall{}, imageErrors: map[string]imageFailure{}, imageSlots: make(chan struct{}, 4), summaryCalls: map[string]*summaryCall{}}
+	s := &Service{store: store, client: client, state: state{Version: 1, Follows: []Follow{}}, inFlight: map[string]bool{}, wake: make(chan struct{}, 1), interactionWake: make(chan struct{}, 1), imageCalls: map[string]*imageCall{}, imageErrors: map[string]imageFailure{}, imageSlots: make(chan struct{}, 4), summaryCalls: map[string]*summaryCall{}}
 	s.currentCache = map[string]currentRecord{}
 	s.currentCalls = map[string]*currentCall{}
 	if len(sources) > 0 {
 		s.current = sources[0]
+		if interaction, ok := sources[0].(InteractionSource); ok {
+			s.interactions = interaction
+		}
 	}
 	s.detailCurrentCalls = map[string]*detailCurrentCall{}
 	s.detailHistoryCalls = map[string]*detailHistoryCall{}

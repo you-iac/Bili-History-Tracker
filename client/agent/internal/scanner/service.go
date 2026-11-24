@@ -20,6 +20,10 @@ type Platform interface {
 	Login(context.Context, string) (bilibili.Account, bilibili.Keys, error)
 	Videos(context.Context, string, string, int, bilibili.Keys) (bilibili.Page, error)
 	History(context.Context, string, int64, int64, bilibili.Keys) (bilibili.HistoryPage, error)
+	HasLike(context.Context, string, string, bilibili.Keys) (bool, error)
+	Coins(context.Context, string, string, bilibili.Keys) (int, error)
+	FavoriteSet(context.Context, string, int64, bilibili.Keys) (map[string]bool, error)
+	ArchiveRelation(context.Context, string, string, bilibili.Keys) (bilibili.Relation, error)
 }
 type Storage interface {
 	LoadCookie() (string, error)
@@ -74,6 +78,7 @@ type Result struct {
 
 type Service struct {
 	mu          sync.Mutex
+	historyMu   sync.Mutex
 	api         Platform
 	store       Storage
 	cookie      string

@@ -85,6 +85,9 @@ func TestHistoryRoutes(t *testing.T) {
 	if r := h.call("POST", "/api/history/sync", "{}"); r.Code != 200 {
 		t.Fatal(r.Code, r.Body.String())
 	}
+	if r := h.call("POST", "/api/history/interactions", "{}"); r.Code != 200 {
+		t.Fatal(r.Code, r.Body.String())
+	}
 	for _, path := range []string{
 		"/api/history/videos?days=3&limit=30",
 		"/api/history/videos?days=30",
