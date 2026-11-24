@@ -3,6 +3,7 @@ package scanner
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -205,5 +206,52 @@ func TestCheckInteractionsUpdatesLocalHistory(t *testing.T) {
 	}
 	if byID["BV2"].Like || byID["BV2"].Coin != 2 || !byID["BV2"].Favorite {
 		t.Fatal(byID["BV2"])
+	}
+}
+
+func TestCheckInteractionsFailureConsumesBudgetAndSavesBackoff(t *testing.T) {
+	now := time.Now()
+	store := &memoryStore{cookie: "SESSDATA=test"}
+	attempts := 0
+	api := &fakeAPI{
+		page: func(context.Context, int) (bilibili.Page, error) { return bilibili.Page{}, nil },
+		history: func(context.Context, string, int64, int64, bilibili.Keys) (bilibili.HistoryPage, error) {
+			return bilibili.HistoryPage{Items: []bilibili.HistoryItem{
+				{BVID: "BV1", AuthorID: "1", ViewedAt: now.Add(-time.Hour).Unix()},
+				{BVID: "BV2", AuthorID: "1", ViewedAt: now.Add(-2 * time.Hour).Unix()},
+				{BVID: "BV3", AuthorID: "1", ViewedAt: now.Add(-3 * time.Hour).Unix()},
+			}}, nil
+		},
+		like: func(context.Context, string, string, bilibili.Keys) (bool, error) {
+			attempts++
+			return false, errors.New("boom")
+		},
+		favorite: func(context.Context, string, int64, bilibili.Keys) (map[string]bool, error) {
+			return map[string]bool{}, nil
+		},
+	}
+	s, err := New(api, store, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.HistorySync(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	result, err := s.CheckInteractions(context.Background(), 2)
+	if err != nil || attempts != 2 || result.Failed != 2 || result.Checked != 0 {
+		t.Fatal(result, attempts, err)
+	}
+	var state historyState
+	if err := store.LoadHistory(&state); err != nil {
+		t.Fatal(err)
+	}
+	backoff := 0
+	for _, item := range state.Items {
+		if item.InteractionNextAttempt > 0 {
+			backoff++
+		}
+	}
+	if backoff != 2 {
+		t.Fatal("backoff not saved for failed candidates:", backoff)
 	}
 }

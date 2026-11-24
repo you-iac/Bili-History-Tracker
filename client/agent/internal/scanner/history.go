@@ -94,6 +94,8 @@ func (s *Service) loadHistoryLocked() historyState {
 // HistorySync 增量拉取观看历史：首次同步翻到接口末尾，之后遇到新增很少的一页就停止。
 // 按 bvid 去重并保留最新观看时间；需要本地 Cookie。
 func (s *Service) HistorySync(ctx context.Context) (HistorySyncResult, error) {
+	s.historyMu.Lock()
+	defer s.historyMu.Unlock()
 	s.mu.Lock()
 	cookie, closed := s.cookie, s.closed
 	s.mu.Unlock()
@@ -314,6 +316,8 @@ type InteractionResult struct {
 // CheckInteractions 按 interaction_checked_at 最旧优先，补查最多 limit 条历史视频的互动状态。
 // 收藏集合每轮只拉一次；单条失败不影响其他条目。
 func (s *Service) CheckInteractions(ctx context.Context, limit int) (InteractionResult, error) {
+	s.historyMu.Lock()
+	defer s.historyMu.Unlock()
 	if limit <= 0 || limit > historyInteractionBudget {
 		limit = historyInteractionBudget
 	}
@@ -364,8 +368,9 @@ func (s *Service) CheckInteractions(ctx context.Context, limit int) (Interaction
 		return candidates[i].checkedAt < candidates[j].checkedAt
 	})
 	now := time.Now().Unix()
+	attempted := 0
 	for _, candidate := range candidates {
-		if result.Checked >= limit {
+		if attempted >= limit {
 			break
 		}
 		latest := candidate.indexes[0]
@@ -387,6 +392,7 @@ func (s *Service) CheckInteractions(ctx context.Context, limit int) (Interaction
 				continue
 			}
 		}
+		attempted++
 		like, err := s.api.HasLike(ctx, cookie, candidate.bvid, keys)
 		if err != nil {
 			result.Failed++
@@ -426,7 +432,7 @@ func (s *Service) CheckInteractions(ctx context.Context, limit int) (Interaction
 			result.Favorited++
 		}
 	}
-	if result.Checked == 0 {
+	if result.Checked == 0 && result.Failed == 0 {
 		return result, nil
 	}
 	s.mu.Lock()

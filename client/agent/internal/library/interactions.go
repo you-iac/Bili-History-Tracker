@@ -1,6 +1,7 @@
 // interactions.go 管理互动自动关注：后台按设置频率同步历史、重查点赞/投币/收藏，
 // 并把有互动且未关注的视频自动加入本地关注和服务器跟踪。
-// 只依赖 scanner 的只读历史接口，复用 Follow/Submit 的推送链路。见 PLANs/2026-11-24-interaction-follow.md。
+// 只依赖 scanner 的只读历史接口，复用 Follow/Submit 的推送链路。
+// 执行链路、预算与持久化边界见 docs/client-catalog.md#互动自动关注。
 package library
 
 import (
@@ -139,21 +140,29 @@ func (s *Service) runInteractionsOnce(ctx context.Context) {
 	s.autoFollowInteractions(ctx, cfg)
 }
 
-// autoFollowInteractions 只关注最近 30 天、有指定互动且尚未关注的视频，单轮有上限。
+// autoFollowInteractions 遍历最近 30 天的历史页，只关注有指定互动且尚未关注的视频，单轮有上限。
 func (s *Service) autoFollowInteractions(ctx context.Context, cfg InteractionConfig) {
-	page := s.interactions.HistoryVideosFiltered(30, 1, 60, nil)
 	count := 0
-	for _, item := range page.Items {
-		if count >= cfg.MaxAutoFollow || ctx.Err() != nil {
+	for page := 1; count < cfg.MaxAutoFollow && ctx.Err() == nil; page++ {
+		data := s.interactions.HistoryVideosFiltered(30, page, 48, nil)
+		if len(data.Items) == 0 {
 			break
 		}
-		if !interactionHit(item.HistoryItem, cfg.Sources) || s.isFollowed("video", item.BVID) {
-			continue
+		for _, item := range data.Items {
+			if count >= cfg.MaxAutoFollow || ctx.Err() != nil {
+				break
+			}
+			if !interactionHit(item.HistoryItem, cfg.Sources) || s.isFollowed("video", item.BVID) {
+				continue
+			}
+			if _, err := s.Follow(ctx, "video", item.BVID); err != nil {
+				continue
+			}
+			count++
 		}
-		if _, err := s.Follow(ctx, "video", item.BVID); err != nil {
-			continue
+		if page*data.Limit >= data.Total {
+			break
 		}
-		count++
 	}
 }
 

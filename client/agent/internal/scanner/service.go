@@ -77,6 +77,7 @@ type Result struct {
 
 type Service struct {
 	mu          sync.Mutex
+	historyMu   sync.Mutex
 	api         Platform
 	store       Storage
 	cookie      string
