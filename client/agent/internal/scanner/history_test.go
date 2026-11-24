@@ -119,3 +119,42 @@ func TestHistorySyncKeepsLatestDuplicate(t *testing.T) {
 		t.Fatal(got)
 	}
 }
+
+func TestHistorySyncIncrementalStopsEarly(t *testing.T) {
+	now := time.Now()
+	store := &memoryStore{cookie: "SESSDATA=test"}
+	calls := 0
+	api := &fakeAPI{
+		page: func(context.Context, int) (bilibili.Page, error) { return bilibili.Page{}, nil },
+		history: func(_ context.Context, _ string, max, _ int64, _ bilibili.Keys) (bilibili.HistoryPage, error) {
+			calls++
+			if calls == 1 {
+				return bilibili.HistoryPage{Items: []bilibili.HistoryItem{
+					{BVID: "BV1", AuthorID: "1", AuthorName: "UP", ViewedAt: now.Add(-time.Hour).Unix()},
+					{BVID: "BV2", AuthorID: "1", AuthorName: "UP", ViewedAt: now.Add(-2 * time.Hour).Unix()},
+					{BVID: "BV3", AuthorID: "2", AuthorName: "UP2", ViewedAt: now.Add(-3 * time.Hour).Unix()},
+				}}, nil
+			}
+			return bilibili.HistoryPage{Items: []bilibili.HistoryItem{
+				{BVID: "BV4", AuthorID: "1", AuthorName: "UP", ViewedAt: now.Add(-time.Minute).Unix()},
+				{BVID: "BV1", AuthorID: "1", AuthorName: "UP", ViewedAt: now.Add(-time.Hour).Unix()},
+				{BVID: "BV2", AuthorID: "1", AuthorName: "UP", ViewedAt: now.Add(-2 * time.Hour).Unix()},
+			}, Max: 2, ViewAt: 3, More: true}, nil
+		},
+	}
+	s, err := New(api, store, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := s.HistorySync(context.Background())
+	if err != nil || first.Added != 3 || first.Pages != 1 || first.Total != 3 {
+		t.Fatal(first, err)
+	}
+	second, err := s.HistorySync(context.Background())
+	if err != nil || second.Added != 1 || second.Pages != 1 || second.Total != 4 {
+		t.Fatal(second, err)
+	}
+	if calls != 2 {
+		t.Fatal("incremental sync requested an extra page:", calls)
+	}
+}

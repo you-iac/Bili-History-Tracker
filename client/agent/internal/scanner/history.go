@@ -12,17 +12,19 @@ import (
 )
 
 const (
-	historyVersion    = 1
-	historyRetention  = 30 * 24 * time.Hour
-	historyMaxPages   = 10
-	historyMinLimit   = 12
-	historyMaxLimit   = 48
-	historyDefaultLim = 20
+	historyVersion              = 1
+	historyRetention            = 30 * 24 * time.Hour
+	historyMaxPages             = 50
+	historyIncrementalThreshold = 2
+	historyMinLimit             = 12
+	historyMaxLimit             = 48
+	historyDefaultLim           = 20
 )
 
 type historyState struct {
-	Version int                    `json:"version"`
-	Items   []bilibili.HistoryItem `json:"items"`
+	Version    int                    `json:"version"`
+	Items      []bilibili.HistoryItem `json:"items"`
+	LastSyncAt time.Time              `json:"last_sync_at"`
 }
 
 // HistorySyncResult 描述一次同步的增量；Removed 是超过 30 天被清理的条数。
@@ -31,6 +33,7 @@ type HistorySyncResult struct {
 	Updated  int       `json:"updated"`
 	Removed  int       `json:"removed"`
 	Total    int       `json:"total"`
+	Pages    int       `json:"pages"`
 	SyncedAt time.Time `json:"synced_at"`
 }
 
@@ -76,7 +79,8 @@ func (s *Service) loadHistoryLocked() historyState {
 	return state
 }
 
-// HistorySync 拉取最近 30 天历史，按 bvid 去重并保留最新观看时间；需要本地 Cookie。
+// HistorySync 增量拉取观看历史：首次同步翻到接口末尾，之后遇到新增很少的一页就停止。
+// 按 bvid 去重并保留最新观看时间；需要本地 Cookie。
 func (s *Service) HistorySync(ctx context.Context) (HistorySyncResult, error) {
 	s.mu.Lock()
 	cookie, closed := s.cookie, s.closed
@@ -98,6 +102,7 @@ func (s *Service) HistorySync(ctx context.Context) (HistorySyncResult, error) {
 		items[item.BVID] = item
 	}
 	s.mu.Unlock()
+	existing := len(items)
 	result := HistorySyncResult{}
 	var max, viewAt int64
 	for page := 0; page < historyMaxPages; page++ {
@@ -105,6 +110,8 @@ func (s *Service) HistorySync(ctx context.Context) (HistorySyncResult, error) {
 		if err != nil {
 			return result, err
 		}
+		result.Pages++
+		added := 0
 		for _, item := range loaded.Items {
 			if old, exists := items[item.BVID]; exists {
 				if item.ViewedAt > old.ViewedAt {
@@ -115,6 +122,11 @@ func (s *Service) HistorySync(ctx context.Context) (HistorySyncResult, error) {
 			}
 			items[item.BVID] = item
 			result.Added++
+			added++
+		}
+		// 已有历史时，最新几页都没什么新增，说明后面只会更旧，停止继续翻页。
+		if existing > 0 && added <= historyIncrementalThreshold {
+			break
 		}
 		max, viewAt = loaded.Max, loaded.ViewAt
 		if !loaded.More {
@@ -135,7 +147,7 @@ func (s *Service) HistorySync(ctx context.Context) (HistorySyncResult, error) {
 		s.mu.Unlock()
 		return result, errors.New("本地平台服务已关闭。")
 	}
-	state = historyState{Version: historyVersion, Items: kept}
+	state = historyState{Version: historyVersion, Items: kept, LastSyncAt: time.Now().UTC()}
 	if err := s.store.SaveHistory(state); err != nil {
 		s.mu.Unlock()
 		return result, err
