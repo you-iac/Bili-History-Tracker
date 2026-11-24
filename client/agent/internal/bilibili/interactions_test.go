@@ -46,3 +46,17 @@ func TestFavoriteSetPaginates(t *testing.T) {
 		t.Fatal(set, err)
 	}
 }
+
+func TestArchiveRelation(t *testing.T) {
+	keys, _ := NewKeys(img, sub)
+	client := New(&http.Client{Transport: roundTrip(func(r *http.Request) (*http.Response, error) {
+		if r.URL.Path != "/x/web-interface/archive/relation" {
+			t.Error("unexpected path:", r.URL.Path)
+		}
+		return response(`{"code":0,"data":{"like":true,"coin":2,"favorite":true,"attention":false}}`, 200), nil
+	})})
+	relation, err := client.ArchiveRelation(context.Background(), "SESSDATA=test", "BV17x411w7KC", keys)
+	if err != nil || !relation.Like || relation.Coin != 2 || !relation.Favorite {
+		t.Fatal(relation, err)
+	}
+}

@@ -23,6 +23,7 @@ type Platform interface {
 	HasLike(context.Context, string, string, bilibili.Keys) (bool, error)
 	Coins(context.Context, string, string, bilibili.Keys) (int, error)
 	FavoriteSet(context.Context, string, int64, bilibili.Keys) (map[string]bool, error)
+	ArchiveRelation(context.Context, string, string, bilibili.Keys) (bilibili.Relation, error)
 }
 type Storage interface {
 	LoadCookie() (string, error)

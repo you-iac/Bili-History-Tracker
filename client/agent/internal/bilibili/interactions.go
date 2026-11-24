@@ -9,6 +9,35 @@ import (
 	"time"
 )
 
+// Relation 是当前用户对单个视频的互动关系；一次请求可同时得到点赞、投币和收藏。
+type Relation struct {
+	Like      bool
+	Coin      int
+	Favorite  bool
+	Attention bool
+}
+
+// ArchiveRelation 查询当前用户对视频的点赞/投币/收藏状态；需要登录态 Cookie。
+func (c *Client) ArchiveRelation(ctx context.Context, cookie, bvid string, keys Keys) (Relation, error) {
+	if !bvidPattern.MatchString(bvid) {
+		return Relation{}, &Error{Code: "invalid_bvid", Message: "视频 ID 无效。"}
+	}
+	query := keys.Sign(url.Values{"bvid": {bvid}}, time.Now())
+	var data struct {
+		Like      bool `json:"like"`
+		Coin      int  `json:"coin"`
+		Favorite  bool `json:"favorite"`
+		Attention bool `json:"attention"`
+	}
+	if err := c.get(ctx, "/x/web-interface/archive/relation", query, cookie, "", &data); err != nil {
+		return Relation{}, err
+	}
+	if data.Coin < 0 {
+		return Relation{}, &Error{Code: "invalid_response", Message: "B站返回的互动数据无效。"}
+	}
+	return Relation{Like: data.Like, Coin: data.Coin, Favorite: data.Favorite, Attention: data.Attention}, nil
+}
+
 // HasLike 查询当前用户是否点赞该视频；需要登录态 Cookie。
 func (c *Client) HasLike(ctx context.Context, cookie, bvid string, keys Keys) (bool, error) {
 	if !bvidPattern.MatchString(bvid) {

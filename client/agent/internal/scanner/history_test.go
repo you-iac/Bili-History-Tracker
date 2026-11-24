@@ -172,17 +172,11 @@ func TestCheckInteractionsUpdatesLocalHistory(t *testing.T) {
 				{BVID: "BV2", AuthorID: "2", AuthorName: "UP2", ViewedAt: now.Add(-2 * time.Hour).Unix()},
 			}}, nil
 		},
-		like: func(_ context.Context, _ string, bvid string, _ bilibili.Keys) (bool, error) {
-			return bvid == "BV1", nil
-		},
-		coin: func(_ context.Context, _ string, bvid string, _ bilibili.Keys) (int, error) {
-			if bvid == "BV2" {
-				return 2, nil
+		relation: func(_ context.Context, _ string, bvid string, _ bilibili.Keys) (bilibili.Relation, error) {
+			if bvid == "BV1" {
+				return bilibili.Relation{Like: true}, nil
 			}
-			return 0, nil
-		},
-		favorite: func(context.Context, string, int64, bilibili.Keys) (map[string]bool, error) {
-			return map[string]bool{"BV2": true}, nil
+			return bilibili.Relation{Coin: 2, Favorite: true}, nil
 		},
 	}
 	s, err := New(api, store, 0)
@@ -222,9 +216,9 @@ func TestCheckInteractionsFailureConsumesBudgetAndSavesBackoff(t *testing.T) {
 				{BVID: "BV3", AuthorID: "1", ViewedAt: now.Add(-3 * time.Hour).Unix()},
 			}}, nil
 		},
-		like: func(context.Context, string, string, bilibili.Keys) (bool, error) {
+		relation: func(context.Context, string, string, bilibili.Keys) (bilibili.Relation, error) {
 			attempts++
-			return false, errors.New("boom")
+			return bilibili.Relation{}, errors.New("boom")
 		},
 		favorite: func(context.Context, string, int64, bilibili.Keys) (map[string]bool, error) {
 			return map[string]bool{}, nil

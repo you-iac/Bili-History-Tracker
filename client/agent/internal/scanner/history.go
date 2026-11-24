@@ -331,16 +331,11 @@ func (s *Service) CheckInteractions(ctx context.Context, limit int) (Interaction
 	if cookie == "" {
 		return InteractionResult{}, &bilibili.Error{Code: "login_required", Message: "请先在设置中配置 B站 Cookie。"}
 	}
-	account, keys, err := s.api.Login(ctx, cookie)
+	_, keys, err := s.api.Login(ctx, cookie)
 	if err != nil {
 		return InteractionResult{}, err
 	}
 	result := InteractionResult{}
-	var favorite map[string]bool
-	mid, _ := strconv.ParseInt(account.ID, 10, 64)
-	if favorite, err = s.api.FavoriteSet(ctx, cookie, mid, keys); err != nil {
-		result.FavoriteFailed = true
-	}
 	groups := map[string][]int{}
 	for index := range state.Items {
 		item := &state.Items[index]
@@ -393,16 +388,7 @@ func (s *Service) CheckInteractions(ctx context.Context, limit int) (Interaction
 			}
 		}
 		attempted++
-		like, err := s.api.HasLike(ctx, cookie, candidate.bvid, keys)
-		if err != nil {
-			result.Failed++
-			for _, index := range candidate.indexes {
-				state.Items[index].InteractionFailures++
-				state.Items[index].InteractionNextAttempt = interactionBackoff(state.Items[index].InteractionFailures)
-			}
-			continue
-		}
-		coin, err := s.api.Coins(ctx, cookie, candidate.bvid, keys)
+		relation, err := s.api.ArchiveRelation(ctx, cookie, candidate.bvid, keys)
 		if err != nil {
 			result.Failed++
 			for _, index := range candidate.indexes {
@@ -413,22 +399,19 @@ func (s *Service) CheckInteractions(ctx context.Context, limit int) (Interaction
 		}
 		for _, index := range candidate.indexes {
 			item := &state.Items[index]
-			item.Like, item.Coin = like, coin
-			if !result.FavoriteFailed {
-				item.Favorite = favorite[item.BVID]
-			}
+			item.Like, item.Coin, item.Favorite = relation.Like, relation.Coin, relation.Favorite
 			item.InteractionCheckedAt = now
 			item.InteractionFailures = 0
 			item.InteractionNextAttempt = 0
 		}
 		result.Checked++
-		if like {
+		if relation.Like {
 			result.Liked++
 		}
-		if coin > 0 {
+		if relation.Coin > 0 {
 			result.Coined++
 		}
-		if favorite[candidate.bvid] {
+		if relation.Favorite {
 			result.Favorited++
 		}
 	}

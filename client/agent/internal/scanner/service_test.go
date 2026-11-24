@@ -68,6 +68,7 @@ type fakeAPI struct {
 	like     func(context.Context, string, string, bilibili.Keys) (bool, error)
 	coin     func(context.Context, string, string, bilibili.Keys) (int, error)
 	favorite func(context.Context, string, int64, bilibili.Keys) (map[string]bool, error)
+	relation func(context.Context, string, string, bilibili.Keys) (bilibili.Relation, error)
 }
 
 func (f *fakeAPI) Login(ctx context.Context, cookie string) (bilibili.Account, bilibili.Keys, error) {
@@ -106,6 +107,13 @@ func (f *fakeAPI) FavoriteSet(ctx context.Context, cookie string, mid int64, key
 		return f.favorite(ctx, cookie, mid, keys)
 	}
 	return map[string]bool{}, nil
+}
+
+func (f *fakeAPI) ArchiveRelation(ctx context.Context, cookie, bvid string, keys bilibili.Keys) (bilibili.Relation, error) {
+	if f.relation != nil {
+		return f.relation(ctx, cookie, bvid, keys)
+	}
+	return bilibili.Relation{}, nil
 }
 func page(total, pn int) bilibili.Page {
 	result := bilibili.Page{Total: total, Videos: []bilibili.Video{}}

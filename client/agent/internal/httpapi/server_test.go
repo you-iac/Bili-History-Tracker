@@ -42,6 +42,9 @@ func (platformStub) Coins(context.Context, string, string, bilibili.Keys) (int, 
 func (platformStub) FavoriteSet(context.Context, string, int64, bilibili.Keys) (map[string]bool, error) {
 	return map[string]bool{}, nil
 }
+func (platformStub) ArchiveRelation(context.Context, string, string, bilibili.Keys) (bilibili.Relation, error) {
+	return bilibili.Relation{}, nil
+}
 
 type harness struct {
 	s       *Server
