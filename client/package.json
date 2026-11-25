@@ -1,7 +1,7 @@
 {
   "name": "@bili-history-tracker/client",
   "private": true,
-  "version": "1.1.0",
+  "version": "0.1.1",
   "type": "module",
   "scripts": {
     "lint": "node --check frontend/app.js && node --check frontend/library.js && node --check frontend/history.js && node --check frontend/navigation.js && node --check frontend/view.mjs && node --check frontend/cards.js && node --check frontend/detail.js && node --check frontend/trend.mjs && node --check frontend/images.js && node --check frontend/creator-videos.js && node --check frontend/detail-sources.mjs",
